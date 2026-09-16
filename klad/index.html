@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>КЛАД-3</title>
+<meta name="description" content="CSP probe for the КЛАД-3 build.">
+<link rel="stylesheet" href="klad.css">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+</head>
+<body>
+<main class="crt">
+  <div class="screen">
+
+    <p class="statusline">
+      <span lang="ru">КЛАД-3</span>
+      <span>CSP PROBE</span>
+    </p>
+
+    <h1>Script gate</h1>
+    <p class="lede">This page exists to prove one thing before any game code is
+    written: that <code>/klad/</code> can run a module while the apex stays
+    locked down.</p>
+
+    <p id="probe" class="probe blocked">
+      <strong>BLOCKED.</strong> This text is static markup. If it is still here,
+      the module did not execute and the scoped CSP is not working.
+    </p>
+
+    <h2>Why</h2>
+    <p>Cloudflare Pages merges matching <code>_headers</code> rules rather than
+    letting the specific one win, and joins duplicate header values with a
+    comma. Two comma-joined CSP values are enforced as an intersection, so the
+    apex <code>default-src 'none'</code> would still block this script. The
+    fix under test is removing the inherited header with a bang prefix before
+    setting the replacement.</p>
+
+    <p><a href="/">&larr; back to the title screen</a></p>
+
+    <footer>
+      <p>No analytics, no cookies, no third-party requests.</p>
+    </footer>
+
+  </div>
+</main>
+<script type="module" src="src/boot.js"></script>
+</body>
+</html>

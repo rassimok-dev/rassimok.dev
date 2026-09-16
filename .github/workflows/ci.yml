@@ -21,7 +21,7 @@ jobs:
       # Catches malformed markup and, importantly, missing accessibility
       # attributes that are easy to regress by hand.
       - name: Validate HTML
-        run: npx --yes html-validate index.html
+        run: npx --yes html-validate index.html klad/index.html
 
       # A broken link on a CV site is the cheapest possible bad impression.
       - name: Check links
@@ -41,20 +41,32 @@ jobs:
                  | grep -vE 'www\.w3\.org' \
                  | grep -vE 'rel="me noopener"' \
                  | grep -vE 'https://github\.com/' || true)
-          if [ -n "$hits" ]; then
+
+          # JavaScript is scanned separately and more precisely. A bare `//`
+          # would match every line comment in every module, so match real
+          # external references instead: an absolute scheme, or a
+          # protocol-relative module specifier.
+          jshits=$(grep -rInE "https?:|from[[:space:]]*['\"]//|import\([[:space:]]*['\"]//" \
+                     --include='*.js' . || true)
+
+          if [ -n "$hits$jshits" ]; then
             echo "$hits"
+            echo "$jshits"
             echo "::error::Third-party reference found. This site must make zero external requests."
             exit 1
           fi
           echo "OK: no third-party references."
 
-      # The page ships no JavaScript. That is a design decision, so assert it.
-      - name: No JavaScript
+      # The apex ships no JavaScript. That is a design decision, so assert it.
+      # /klad/ is the one deliberate exception and carries its own CSP, so it
+      # is excluded here rather than the guard being deleted outright -- the
+      # claim stays enforced on every page that actually makes it.
+      - name: No JavaScript outside /klad/
         run: |
-          hits=$(grep -rIn -E '<script|\.js"' --include='*.html' . || true)
+          hits=$(grep -rIn -E '<script|\.js"' --include='*.html' --exclude-dir=klad . || true)
           if [ -n "$hits" ]; then
             echo "$hits"
-            echo "::error::JavaScript found. This site is intentionally JS-free."
+            echo "::error::JavaScript outside /klad/. Those pages are intentionally JS-free."
             exit 1
           fi
           echo "OK: no JavaScript."

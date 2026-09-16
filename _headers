@@ -7,3 +7,13 @@
   Cross-Origin-Opener-Policy: same-origin
   Cross-Origin-Resource-Policy: same-origin
   X-Frame-Options: DENY
+
+# /klad/ is the one place on this site that runs JavaScript. Pages MERGES
+# matching rules and joins duplicate header values with a comma, and two
+# comma-joined CSP values are enforced as an intersection -- so without the
+# bang-prefixed removal below, the apex `default-src 'none'` would still
+# block the game's modules. `default-src 'none'` is kept here too, so fetch,
+# XHR and websockets stay blocked; only script-src is opened, to 'self'.
+/klad/*
+  ! Content-Security-Policy
+  Content-Security-Policy: default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'

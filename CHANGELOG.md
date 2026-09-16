@@ -20,6 +20,11 @@ or a future session needing to know what already exists and why.
   illegible at 16 px, so the favicon is a heavier five-peer reduction.
   Avatar is composed inside the inscribed circle because GitHub crops to one.
 
+- Commits are **SSH-signed** with `id_ed25519`, registered on GitHub as a
+  signing key. Signing was deliberately left off until the key was
+  registered: a signature GitHub cannot verify displays as "Unverified",
+  which looks worse than no signature at all.
+
 ### Decisions worth not relitigating
 
 - **The w3.org exclusion in the third-party guard is deliberate.**

@@ -1,0 +1,24 @@
+# Code owners for rassimok.dev
+#
+# Every line matches a path pattern; the last matching line wins.
+# Owners are requested for review automatically when a PR touches their paths.
+#
+# GitHub never requests review from the PR author, so while this is a
+# one-person project these lines are inert. They are here so that the moment
+# a second person joins, the sensitive paths already route to the right
+# reviewer instead of being noticed after something slips through.
+
+# Default owner for everything not matched below.
+*                       @rassimok-dev
+
+# Security headers. A careless edit here silently weakens the CSP for every
+# visitor, and nothing in the page itself will look different.
+/_headers               @rassimok-dev
+
+# CI definition. These workflows are the only thing enforcing the
+# no-JavaScript and zero-third-party guarantees; a change here can disable
+# the checks rather than pass them.
+/.github/workflows/     @rassimok-dev
+
+# Conventions the assistant and contributors follow.
+/CLAUDE.md              @rassimok-dev

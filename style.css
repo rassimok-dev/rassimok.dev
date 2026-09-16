@@ -1,4 +1,8 @@
-/* System font stack: zero font downloads, so nothing leaks to a font CDN. */
+/* System font stack: zero font downloads, so nothing leaks to a font CDN.
+   The Korvet's own ROM glyphs would need a self-hosted @font-face, which the
+   CSP blocks outright -- there is no font-src, so it falls back to
+   default-src 'none'. Block characters in the system monospace stack get the
+   look without touching that header. */
 :root {
   --bg: #fdfdfc;
   --fg: #23221f;
@@ -16,11 +20,24 @@
   }
 }
 
+/* The screen itself is dark in both colour schemes. A CRT has no light mode,
+   and a fixed palette is also what keeps the contrast ratios below provably
+   AA rather than dependent on which theme the visitor happens to be in. */
+:root {
+  --crt-bg: #0b1410;
+  --crt-fg: #7bf7ad;    /* 13.9:1 on --crt-bg */
+  --crt-dim: #5bbd8a;   /*  8.1:1 on --crt-bg */
+  --crt-hot: #ffd479;   /* 12.6:1 on --crt-bg */
+  --crt-rule: #23503c;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "DejaVu Sans Mono",
+          "Liberation Mono", monospace;
+}
+
 * { box-sizing: border-box; }
 
 body {
   margin: 0;
-  padding: 4rem 1.25rem;
+  padding: 3rem 1.25rem;
   background: var(--bg);
   color: var(--fg);
   font: 1rem/1.65 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
@@ -28,45 +45,140 @@ body {
   -webkit-text-size-adjust: 100%;
 }
 
-main { max-width: 34rem; margin: 0 auto; }
+.crt { max-width: 34rem; margin: 0 auto; }
+
+.screen {
+  position: relative;
+  padding: 1.6rem 1.4rem 1.4rem;
+  border-radius: 10px;
+  background: var(--crt-bg);
+  color: var(--crt-fg);
+  font-family: var(--mono);
+  font-size: .9rem;
+  line-height: 1.6;
+  box-shadow: 0 0 0 1px var(--crt-rule), 0 18px 48px -24px rgba(0, 0, 0, .8);
+}
+
+/* Scanlines. Kept faint on purpose: heavy enough to read as a CRT, light
+   enough that it does not eat into the contrast ratios above. */
+.screen::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  border-radius: inherit;
+  background: repeating-linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, .10) 0 1px,
+    rgba(0, 0, 0, 0) 1px 3px
+  );
+}
+
+.statusline {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  margin: 0 0 1.6rem;
+  padding-bottom: .5rem;
+  border-bottom: 1px solid var(--crt-rule);
+  color: var(--crt-dim);
+  font-size: .7rem;
+  letter-spacing: .1em;
+}
+
+.wordmark {
+  margin: 0;
+  overflow: hidden;
+  color: var(--crt-fg);
+  font-size: clamp(.55rem, 4.4vw, 1.15rem);
+  line-height: 1.04;
+  text-shadow: 0 0 14px rgba(123, 247, 173, .45);
+}
+
+.cartridge {
+  margin: .9rem 0 0;
+  color: var(--crt-dim);
+  font-size: .78rem;
+  letter-spacing: .34em;
+}
+
+hr {
+  height: 0;
+  margin: 1.6rem 0;
+  border: 0;
+  border-top: 1px dashed var(--crt-rule);
+}
 
 h1 {
-  margin: 0 0 .5rem;
-  font-size: 1.5rem;
-  letter-spacing: -0.01em;
+  margin: 0 0 .4rem;
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: lowercase;
 }
 
 h2 {
-  margin: 2.5rem 0 .4rem;
-  font-size: .8rem;
+  margin: 1.9rem 0 .3rem;
+  color: var(--crt-dim);
+  font-size: .72rem;
   font-weight: 600;
+  letter-spacing: .16em;
   text-transform: uppercase;
-  letter-spacing: .08em;
-  color: var(--muted);
 }
 
-.lede { margin: 0; color: var(--muted); }
+h2::before { content: "> "; }
 
-p { margin: 0 0 1rem; }
+p { margin: 0 0 .9rem; }
+.lede { margin: 0; color: var(--crt-dim); }
 
 .links { margin: 0; padding: 0; list-style: none; }
-.links li { margin-bottom: .3rem; }
+.links li { margin-bottom: .2rem; }
+.links li::before { content: "  * "; color: var(--crt-dim); }
 
-a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+a {
+  color: var(--crt-hot);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
 a:hover { text-decoration-thickness: 2px; }
 
 /* Visible keyboard focus: accessibility, and it costs nothing. */
 a:focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--crt-hot);
   outline-offset: 3px;
   border-radius: 2px;
 }
 
-footer {
-  margin-top: 3.5rem;
-  padding-top: 1.25rem;
-  border-top: 1px solid var(--rule);
+.prompt {
+  margin: 2rem 0 0;
+  color: var(--crt-dim);
   font-size: .8rem;
-  color: var(--muted);
+}
+
+.caret {
+  display: inline-block;
+  width: .58em;
+  height: 1.05em;
+  margin-left: .45em;
+  vertical-align: -.18em;
+  background: var(--crt-fg);
+  animation: blink 1.2s steps(1) infinite;
+}
+
+@keyframes blink { 50% { opacity: 0; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .caret { animation: none; }
+}
+
+footer {
+  margin-top: 2.2rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--crt-rule);
+  color: var(--crt-dim);
+  font-size: .72rem;
 }
 footer p { margin: 0; }
+.origin { margin: 0 0 .7rem; opacity: .85; }
+.origin i { font-style: italic; }

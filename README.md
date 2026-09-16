@@ -53,6 +53,21 @@ Semantic HTML, a visible keyboard focus indicator, colour contrast meeting
 WCAG AA in both light and dark themes, and a theme that follows the system
 preference rather than overriding it.
 
+## Identity
+
+The mark is a mesh node — a hub with linked peers — rendered as two separate
+SVGs rather than one scaled file:
+
+- `avatar.svg` / `avatar.png` — full mesh, six peers with cross-links. Sized
+  512px and composed inside the inscribed circle, because GitHub crops avatars
+  to a circle.
+- `favicon.svg` — five peers, no cross-links, proportionally heavier strokes.
+  A faithful reduction of the avatar turns to mush at 16px, so the small size
+  gets its own drawing.
+
+Both use the accent colour from `style.css`, so the site, favicon and avatar
+read as one system.
+
 ## Deployment
 
 Cloudflare Pages, built from `main`. There is no build step — the files in

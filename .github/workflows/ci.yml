@@ -30,11 +30,19 @@ jobs:
       # Enforces the privacy claim in the footer. If someone (or some AI)
       # ever pastes in a Google Font or an analytics snippet, this fails
       # rather than quietly making the page's promise untrue.
+      #
+      # www.w3.org is excluded deliberately: `xmlns="http://www.w3.org/2000/svg"`
+      # is an XML namespace *identifier*, not a URL the browser ever fetches.
+      # Excluding it keeps the check honest instead of training us to ignore it.
       - name: No third-party requests
         run: |
-          if grep -rInE '(https?:)?//' --include='*.html' --include='*.css' . \
-             | grep -vE 'rel="me noopener"|^\./\.github/' \
-             | grep -vE 'https://github\.com/' ; then
+          hits=$(grep -rInE '(https?:)?//' \
+                   --include='*.html' --include='*.css' --include='*.svg' . \
+                 | grep -vE 'www\.w3\.org' \
+                 | grep -vE 'rel="me noopener"' \
+                 | grep -vE 'https://github\.com/' || true)
+          if [ -n "$hits" ]; then
+            echo "$hits"
             echo "::error::Third-party reference found. This site must make zero external requests."
             exit 1
           fi
@@ -43,7 +51,9 @@ jobs:
       # The page ships no JavaScript. That is a design decision, so assert it.
       - name: No JavaScript
         run: |
-          if grep -rIn -E '<script|\.js"' --include='*.html' . ; then
+          hits=$(grep -rIn -E '<script|\.js"' --include='*.html' . || true)
+          if [ -n "$hits" ]; then
+            echo "$hits"
             echo "::error::JavaScript found. This site is intentionally JS-free."
             exit 1
           fi

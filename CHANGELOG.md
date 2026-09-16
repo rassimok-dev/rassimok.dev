@@ -3,6 +3,24 @@
 Dated entries, newest first. Written for a reader picking this up cold —
 or a future session needing to know what already exists and why.
 
+## 2026-09-16 (later) — Live
+
+`rassimok.dev` and `www.rassimok.dev` serve from Cloudflare Pages. All eight
+security headers verified on the live response, not just in CI.
+
+### Two failures worth remembering
+
+- **Attaching a custom domain via the Pages API left it `pending` and did not
+  write the DNS records.** The dashboard normally does this implicitly. Fix was
+  to create the CNAMEs directly (apex and `www` → `rassimok-dev.pages.dev`,
+  proxied); the domain flipped to `active` within a minute.
+- **The apex appeared dead locally while `www` worked.** That was a stale
+  negative DNS cache: `rassimok.dev` had been queried repeatedly before any
+  records existed, so `systemd-resolved` had cached NXDOMAIN. `www` had never
+  been queried, so nothing was cached. Every public resolver was correct the
+  whole time. `resolvectl flush-caches` fixes it. If a hostname fails locally
+  but a sibling on identical records works, suspect the cache before the config.
+
 ## 2026-09-16 — Site created
 
 **Repo:** `rassimok-dev/rassimok.dev` (private for now) · **Host:** Cloudflare Pages (pending)

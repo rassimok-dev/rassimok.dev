@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>КЛАД-3</title>
-<meta name="description" content="CSP probe for the КЛАД-3 build.">
+<meta name="description" content="A clean-room homage to the Korvet-era game КЛАД: climb out of the dungeon, collect every chest, reach the exit.">
 <link rel="stylesheet" href="klad.css">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 </head>
@@ -14,35 +14,63 @@
 
     <p class="statusline">
       <span lang="ru">КЛАД-3</span>
-      <span>CSP PROBE</span>
+      <span>HOMAGE BUILD</span>
     </p>
 
-    <h1>Script gate</h1>
-    <p class="lede">This page exists to prove one thing before any game code is
-    written: that <code>/klad/</code> can run a module while the apex stays
-    locked down.</p>
+    <!-- width/height are the backing-store size, not CSS: main.js reasserts
+         them from the geometry constants, but declaring them here keeps the
+         page from reflowing through the 300x150 canvas default before the
+         module runs. -->
+    <canvas id="screen" class="viewport" width="512" height="256" tabindex="0"
+            aria-label="КЛАД playfield. Score, lives and level are reported in text below this screen."
+            aria-describedby="controls"></canvas>
 
-    <p id="probe" class="probe blocked">
-      <strong>BLOCKED.</strong> This text is static markup. If it is still here,
-      the module did not execute and the scoped CSP is not working.
-    </p>
+    <p id="hud" class="hud" role="status" aria-live="polite">Loading.</p>
 
-    <h2>Why</h2>
-    <p>Cloudflare Pages merges matching <code>_headers</code> rules rather than
-    letting the specific one win, and joins duplicate header values with a
-    comma. Two comma-joined CSP values are enforced as an intersection, so the
-    apex <code>default-src 'none'</code> would still block this script. The
-    fix under test is removing the inherited header with a bang prefix before
-    setting the replacement.</p>
+    <noscript>
+      <!-- Deliberately not a link: klad/ keeps exactly one edge to the rest of
+           the site, the back link below, so that lifting this directory into
+           its own repo is a move rather than a rewrite. -->
+      <p class="notice">This page needs JavaScript, and it is the only page on
+      this site that does. The rest of rassimok.dev ships none.</p>
+    </noscript>
 
-    <p><a href="/">&larr; back to the title screen</a></p>
+    <section class="copy">
+      <h1>Клад</h1>
+      <p class="lede">Collect every chest, then reach the exit — it stays shut
+      until the last one is gone. Shoot a brick to open a way through it; it
+      grows back. Guardians cannot be killed: shots pass straight through them,
+      so this is routing and timing, not combat. Water and fire kill on touch.
+      There is no jump.</p>
+
+      <h2>Controls</h2>
+      <dl id="controls" class="legend">
+        <dt><kbd>&larr;</kbd> <kbd>&rarr;</kbd> <kbd>&uarr;</kbd> <kbd>&darr;</kbd> <span class="or">or</span> <kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd></dt>
+        <dd>Move and climb ladders</dd>
+        <dt><kbd>Space</kbd> <span class="or">or</span> <kbd>Z</kbd></dt>
+        <dd>Shoot along the row you face — and start the game</dd>
+        <dt><kbd>P</kbd></dt>
+        <dd>Pause</dd>
+        <dt><kbd>R</kbd></dt>
+        <dd>Restart from the first level</dd>
+      </dl>
+      <p class="aside">Click the screen or tab to it to give it the keyboard.
+      Losing focus pauses the game.</p>
+
+      <p><a href="/">&larr; back to the title screen</a></p>
+    </section>
 
     <footer>
-      <p>No analytics, no cookies, no third-party requests.</p>
+      <p>Original «Клад» for the Korvet by Д. Иванов and А. Шаталов, itself
+      after ASCII Corporation's <span lang="ja">ライズアウト</span> (Rise Out,
+      1983). This is a clean-room homage — own code, own art, own levels — not
+      a port, and no original data is used.</p>
+      <p>No analytics, no cookies, no storage, no third-party requests. The
+      score lives in memory and dies with the tab.</p>
     </footer>
 
   </div>
 </main>
-<script type="module" src="src/boot.js"></script>
+<script type="module" src="src/main.js"></script>
 </body>
 </html>

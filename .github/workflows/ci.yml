@@ -23,6 +23,14 @@ jobs:
       - name: Validate HTML
         run: npx --yes html-validate index.html klad/index.html
 
+      # /klad/ ships a real simulation with a real test suite. Without this
+      # step the game's logic would be the one part of the repo CI cannot see:
+      # every other guard greps text or validates markup, so a collision or
+      # key-counting regression that soft-locks a level would merge green.
+      # Zero dependencies, and Node is already set up above.
+      - name: Game tests
+        run: node --test klad/test/
+
       # A broken link on a CV site is the cheapest possible bad impression.
       - name: Check links
         run: npx --yes linkinator . --recurse --skip "^https://github.com"

@@ -1,0 +1,118 @@
+/* Self-contained. /klad/ shares nothing with the rest of the site -- no
+   imported tokens, no shared stylesheet -- so the game can be lifted out to
+   its own repo as a move rather than a rewrite. The visual similarity to the
+   title screen is deliberate duplication, not a dependency. */
+
+:root {
+  --page: #16151a;
+  --crt-bg: #0b1410;
+  --crt-fg: #7bf7ad;
+  --crt-dim: #5bbd8a;
+  --crt-hot: #ffd479;
+  --crt-bad: #ff8b6b;
+  --crt-rule: #23503c;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "DejaVu Sans Mono",
+          "Liberation Mono", monospace;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  padding: 3rem 1.25rem;
+  background: var(--page);
+  color: var(--crt-fg);
+  font-family: var(--mono);
+  font-size: .9rem;
+  line-height: 1.6;
+  -webkit-text-size-adjust: 100%;
+}
+
+.crt { max-width: 34rem; margin: 0 auto; }
+
+.screen {
+  position: relative;
+  padding: 1.6rem 1.4rem 1.4rem;
+  border-radius: 10px;
+  background: var(--crt-bg);
+  box-shadow: 0 0 0 1px var(--crt-rule), 0 18px 48px -24px rgba(0, 0, 0, .8);
+}
+
+.screen::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  border-radius: inherit;
+  background: repeating-linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, .10) 0 1px,
+    rgba(0, 0, 0, 0) 1px 3px
+  );
+}
+
+.statusline {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  margin: 0 0 1.6rem;
+  padding-bottom: .5rem;
+  border-bottom: 1px solid var(--crt-rule);
+  color: var(--crt-dim);
+  font-size: .7rem;
+  letter-spacing: .1em;
+}
+
+h1 {
+  margin: 0 0 .4rem;
+  font-size: 1.05rem;
+  letter-spacing: .06em;
+}
+
+h2 {
+  margin: 1.9rem 0 .3rem;
+  color: var(--crt-dim);
+  font-size: .72rem;
+  font-weight: 600;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+}
+
+h2::before { content: "> "; }
+
+p { margin: 0 0 .9rem; }
+.lede { margin: 0 0 .9rem; color: var(--crt-dim); }
+
+a { color: var(--crt-hot); text-underline-offset: 3px; }
+
+a:focus-visible {
+  outline: 2px solid var(--crt-hot);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+
+code {
+  padding: 0 .25em;
+  color: var(--crt-fg);
+  font-size: .92em;
+}
+
+.probe {
+  margin: 1.4rem 0;
+  padding: .8rem 1rem;
+  border-left: 3px solid currentColor;
+  font-size: .82rem;
+}
+
+.probe.blocked { color: var(--crt-bad); }
+.probe.running { color: var(--crt-fg); }
+
+footer {
+  margin-top: 2.2rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--crt-rule);
+  color: var(--crt-dim);
+  font-size: .72rem;
+}
+footer p { margin: 0; }

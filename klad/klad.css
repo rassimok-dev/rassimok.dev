@@ -3,7 +3,12 @@
    its own repo as a move rather than a rewrite. The visual similarity to the
    title screen is deliberate duplication, not a dependency. */
 
+/* The screen is dark under both colour schemes on purpose: a CRT has no light
+   mode, and fixing the palette makes the contrast ratios provable rather than
+   theme-dependent. */
 :root {
+  color-scheme: dark;
+
   --page: #16151a;
   --crt-bg: #0b1410;
   --crt-fg: #7bf7ad;
@@ -19,7 +24,7 @@
 
 body {
   margin: 0;
-  padding: 3rem 1.25rem;
+  padding: 2rem 1.25rem 3rem;
   background: var(--page);
   color: var(--crt-fg);
   font-family: var(--mono);
@@ -28,7 +33,9 @@ body {
   -webkit-text-size-adjust: 100%;
 }
 
-.crt { max-width: 34rem; margin: 0 auto; }
+/* Wide enough to hold the 512px canvas at integer scale 2 plus the screen
+   padding; the prose inside is capped separately so lines stay readable. */
+.crt { max-width: 70rem; margin: 0 auto; }
 
 .screen {
   position: relative;
@@ -38,6 +45,10 @@ body {
   box-shadow: 0 0 0 1px var(--crt-rule), 0 18px 48px -24px rgba(0, 0, 0, .8);
 }
 
+/* Scanlines are a static gradient, not an animation. All motion in this page
+   happens inside the canvas, where prefers-reduced-motion is honoured by the
+   renderer -- so there is nothing here for a reduced-motion query to switch
+   off, and no CSS transition that could fight it. */
 .screen::before {
   content: "";
   position: absolute;
@@ -56,13 +67,45 @@ body {
   display: flex;
   justify-content: space-between;
   gap: 1rem;
-  margin: 0 0 1.6rem;
+  margin: 0 0 1.4rem;
   padding-bottom: .5rem;
   border-bottom: 1px solid var(--crt-rule);
   color: var(--crt-dim);
   font-size: .7rem;
   letter-spacing: .1em;
 }
+
+/* The canvas is sized in CSS pixels by main.js, always at an integer multiple
+   of the backing store, so a texel never lands on a fraction of a pixel.
+   max-width is a floor under that: if the viewport is narrower than one
+   unscaled screen, shrinking beats a horizontal scrollbar. */
+.viewport {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 0 auto;
+  background: #000;
+  border: 1px solid var(--crt-rule);
+  image-rendering: pixelated;
+}
+
+.viewport:focus-visible {
+  outline: 2px solid var(--crt-hot);
+  outline-offset: 3px;
+}
+
+.hud {
+  margin: .9rem auto 0;
+  max-width: 44rem;
+  color: var(--crt-hot);
+  font-size: .78rem;
+  letter-spacing: .06em;
+  text-align: center;
+}
+
+.hud.fault { color: var(--crt-bad); }
+
+.copy { max-width: 40rem; margin: 2rem 0 0; }
 
 h1 {
   margin: 0 0 .4rem;
@@ -82,7 +125,41 @@ h2 {
 h2::before { content: "> "; }
 
 p { margin: 0 0 .9rem; }
-.lede { margin: 0 0 .9rem; color: var(--crt-dim); }
+.lede { color: var(--crt-dim); }
+.aside { color: var(--crt-dim); font-size: .78rem; }
+
+.notice {
+  margin: 1.2rem auto 0;
+  max-width: 40rem;
+  padding: .8rem 1rem;
+  border-left: 3px solid currentColor;
+  color: var(--crt-bad);
+  font-size: .82rem;
+}
+
+.legend {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: .45rem 1.2rem;
+  margin: .6rem 0 1.1rem;
+}
+
+.legend dt { display: flex; flex-wrap: wrap; align-items: center; gap: .3rem; }
+.legend dd { margin: 0; color: var(--crt-dim); }
+.legend .or { color: var(--crt-dim); font-size: .72rem; }
+
+kbd {
+  display: inline-block;
+  min-width: 1.7em;
+  padding: .05em .45em;
+  border: 1px solid var(--crt-rule);
+  border-radius: 3px;
+  color: var(--crt-fg);
+  font: inherit;
+  font-size: .78rem;
+  line-height: 1.5;
+  text-align: center;
+}
 
 a { color: var(--crt-hot); text-underline-offset: 3px; }
 
@@ -92,27 +169,15 @@ a:focus-visible {
   border-radius: 2px;
 }
 
-code {
-  padding: 0 .25em;
-  color: var(--crt-fg);
-  font-size: .92em;
-}
-
-.probe {
-  margin: 1.4rem 0;
-  padding: .8rem 1rem;
-  border-left: 3px solid currentColor;
-  font-size: .82rem;
-}
-
-.probe.blocked { color: var(--crt-bad); }
-.probe.running { color: var(--crt-fg); }
-
 footer {
   margin-top: 2.2rem;
   padding-top: 1rem;
   border-top: 1px solid var(--crt-rule);
+  max-width: 40rem;
   color: var(--crt-dim);
   font-size: .72rem;
+  line-height: 1.7;
 }
-footer p { margin: 0; }
+
+footer p { margin: 0 0 .6rem; }
+footer p:last-child { margin: 0; }

@@ -26,3 +26,9 @@ SSH-signed.
 ## Before proposing changes
 Run the checks in `.github/workflows/ci.yml` locally. If a change fails
 them, fix the change rather than the check.
+
+## Changelog
+Record every meaningful change in `CHANGELOG.md` — dated entry, newest first.
+Include the *reasoning*, especially for decisions that look arbitrary later.
+The point is that a future session can recap what exists without re-deriving
+it, and does not undo a deliberate choice by mistake.

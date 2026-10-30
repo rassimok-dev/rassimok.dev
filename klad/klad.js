@@ -11,7 +11,7 @@
   const $ = (id) => document.getElementById(id);
   const cv = $('game'), ctx = cv.getContext('2d'), stage = $('stage');
   const hud = { level: $('h-level'), lives: $('h-lives'), chests: $('h-chests'),
-                key: $('h-key'), score: $('h-score') };
+                key: $('h-key'), score: $('h-score'), sound: $('h-sound') };
   const msg = $('msg'), msgTitle = $('msg-title'), msgBody = $('msg-body');
   const touch = matchMedia('(hover: none) and (pointer: coarse)').matches;
 
@@ -59,6 +59,46 @@
       }
     });
     return (cache[key] = c);
+  }
+
+  /* ---- Sound: a 1-bit beeper like the Korvet's. Square waves, made on the
+     fly, so there are no audio files and nothing to download. The context is
+     created on the first key or tap, which is what browsers require. ---- */
+  let ac = null, muted = false;
+  function audio() {
+    if (!ac && window.AudioContext) { try { ac = new AudioContext(); } catch (e) { ac = null; } }
+    if (ac && ac.state === 'suspended') ac.resume();
+  }
+  function tone(notes, dur, vol) {
+    if (!ac || muted || ac.state !== 'running') return;
+    let t = ac.currentTime + 0.01;
+    for (const f of notes) {
+      if (f) {
+        const o = ac.createOscillator(), g = ac.createGain();
+        o.type = 'square'; o.frequency.value = f;
+        g.gain.setValueAtTime(vol || 0.05, t);
+        g.gain.linearRampToValueAtTime(0.0001, t + dur);
+        o.connect(g).connect(ac.destination);
+        o.start(t); o.stop(t + dur);
+      }
+      t += dur;
+    }
+  }
+  const SFX = {
+    start: () => tone([440, 0, 440, 660], 0.09),
+    shot: () => tone([1900, 1300, 800], 0.03),
+    hole: () => tone([320, 240], 0.035),
+    chest: () => tone([880, 1320], 0.06),
+    key: () => tone([660, 880, 1100, 1480], 0.07),
+    life: () => tone([520, 660, 780, 1040], 0.08),
+    wall: () => tone([170, 110], 0.07, 0.07),
+    die: () => tone([600, 500, 400, 300, 200, 120], 0.09),
+    clear: () => tone([660, 880, 1100, 0, 1320, 1320], 0.09),
+  };
+  function setMuted(m) {
+    muted = m;
+    hud.sound.setAttribute('aria-pressed', String(!m));
+    hud.sound.textContent = m ? 'Звук выкл' : 'Звук вкл';
   }
 
   /* ---- State ---- */
@@ -208,8 +248,9 @@
     const kind = chests.get(k);
     chests.delete(k);
     S.chestsLeft--; S.score += SCORE[kind];
-    if (kind === 'K') S.hasKey = true;
-    if (kind === 'L') S.lives++;
+    if (kind === 'K') { S.hasKey = true; SFX.key(); }
+    else if (kind === 'L') { S.lives++; SFX.life(); }
+    else SFX.chest();
   }
   function drown(g) { g.dead = GUARD_RESPAWN; g.moving = false; g.inHole = 0; }
   function respawn(g) {
@@ -220,6 +261,7 @@
   function fire() {
     if (S.phase !== 'play' || shot || player.falling) return;
     shot = { x: player.x + player.dir * 0.5, y: player.cy, dir: player.dir, cell: idx(player.cx, player.cy) };
+    SFX.shot();
   }
   function updateShot(dt) {
     shot.x += shot.dir * SPEED.shot * dt;
@@ -231,6 +273,7 @@
     const c = at(cx, shot.y);
     if (c === '#' && !holes.has(k)) {
       holes.set(k, HOLE_TIME);
+      SFX.hole();
       for (const g of guards) if (g.stuck && cellOf(g) === k) { g.stuck = false; g.inHole = GUARD_HOLE; }
       shot = null;
     } else if (c === '=' || (c === 'D' && !S.hasKey)) shot = null;
@@ -239,11 +282,14 @@
     for (const [k, t] of holes) {
       const left = t - dt;
       if (left > 0) { holes.set(k, left); continue; }
+      /* A wall never closes on the player: while you stand in the gap it
+         waits, flickering, and seals the moment you step out. */
+      if (cellOf(player) === k || (player.moving && idx(player.tx, player.ty) === k)) { holes.set(k, 0.3); continue; }
       holes.delete(k);
-      if (cellOf(player) === k) { die(); return; }
       for (const g of guards) if (!g.stuck && g.dead <= 0 && cellOf(g) === k) {
         g.stuck = true; g.inHole = 0; g.moving = false;
         g.x = g.cx = k % W; g.y = g.cy = (k - g.cx) / W;
+        SFX.wall();
       }
     }
   }
@@ -262,22 +308,25 @@
     history.replaceState(null, '', '#' + (S.level + 1));
     show('ЭТАП ' + (S.level + 1), LEVELS[S.level].name);
     setPhase('intro', 1.4);
+    SFX.start();
   }
   function die() {
     if (S.phase !== 'play') return;
     show('ПОГИБ', S.lives > 0 ? 'осталось жизней: ' + S.lives : 'это была последняя');
     setPhase('dead', 1.4);
+    SFX.die();
   }
   function levelClear() {
     S.score += SCORE.clear;
     show('ЭТАП ПРОЙДЕН', S.chestsLeft === 0 ? 'все клады собраны' : 'кладов осталось: ' + S.chestsLeft);
     setPhase('clear', 1.8);
+    SFX.clear();
   }
   function title() {
     loadLevel(S.level);
     show('КЛАД', touch
       ? 'ОГОНЬ — старт · крестовина — ход · этап ' + (S.level + 1)
-      : '← → ↑ ↓ ход · Z/пробел выстрел · P пауза · R заново (−1 жизнь) · 1–5 этап · Enter старт');
+      : '← → ↑ ↓ ход · Z/пробел выстрел · P пауза · R заново (−1 жизнь) · M звук · 1–5 этап · Enter старт');
     setPhase('title');
   }
   function timers(dt) {
@@ -383,6 +432,8 @@
   }
   addEventListener('keydown', (e) => {
     if (e.repeat) { if (KEYMAP[e.code]) e.preventDefault(); return; }
+    audio();
+    if (e.code === 'KeyM') { setMuted(!muted); return; }
     if (KEYMAP[e.code]) { keys[KEYMAP[e.code]] = true; e.preventDefault(); return; }
     if (e.code === 'Space' || e.code === 'KeyZ' || e.code === 'KeyX' || e.code === 'Enter') { press('fire'); e.preventDefault(); }
     else if (e.code === 'KeyP' || e.code === 'Escape') press('pause');
@@ -392,7 +443,7 @@
   addEventListener('keyup', (e) => { if (KEYMAP[e.code]) keys[KEYMAP[e.code]] = false; });
   for (const b of document.querySelectorAll('[data-k]')) {
     const k = b.dataset.k;
-    const down = (e) => { e.preventDefault(); b.setPointerCapture(e.pointerId); if (k === 'fire') press('fire'); else keys[k] = true; };
+    const down = (e) => { e.preventDefault(); b.setPointerCapture(e.pointerId); audio(); if (k === 'fire') press('fire'); else keys[k] = true; };
     const up = () => { if (k !== 'fire') keys[k] = false; };
     b.addEventListener('pointerdown', down);
     b.addEventListener('pointerup', up);
@@ -400,6 +451,7 @@
     b.addEventListener('lostpointercapture', up);
     b.addEventListener('contextmenu', (e) => e.preventDefault());
   }
+  hud.sound.addEventListener('click', () => { audio(); setMuted(!muted); cv.focus({ preventScroll: true }); });
   addEventListener('resize', () => { if (S.phase === 'title' && pickShape() !== S.shape) title(); else resize(); });
   document.addEventListener('visibilitychange', () => { if (document.hidden && S.phase === 'play') press('pause'); });
 

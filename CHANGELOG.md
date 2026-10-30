@@ -3,6 +3,30 @@
 Dated entries, newest first. Written for a reader picking this up cold —
 or a future session needing to know what already exists and why.
 
+## 2026-10-30 (later still) — Game feel: no selection, no wall deaths, beeper sound
+
+Three changes from the first rounds on a real phone.
+
+- **The play area is not selectable.** A drag that starts on the field, or
+  a long press on the pad, used to highlight the HUD and buttons. `user-select:
+  none` on the HUD, stage and pad, `-webkit-touch-callout: none`, and
+  `touch-action: none` on the canvas. Footer text stays selectable.
+- **A regrowing wall never kills the player.** If you are standing in the
+  gap when the timer runs out, the hole stays open, flickering, and seals
+  the moment you step out. Lode Runner kills you here; the original's
+  behaviour is undocumented and dying to a timer you cannot see felt
+  arbitrary. Guards are still walled in, which is the whole point of the
+  mechanic.
+- **Sound, Korvet style.** The ПК-8020 had a 1-bit beeper, so every effect
+  is a square wave synthesised at the moment it plays: shot, hole, chest,
+  key, extra life, walled guard, death, level clear, level start. No audio
+  files, nothing to download, nothing to license. The AudioContext is
+  created on the first key or tap, as browsers require. `M` or the HUD
+  button mutes; the choice is not remembered, because the site stores
+  nothing. Verified on the live preview that the strict
+  `Permissions-Policy: autoplay=()` does not block Web Audio after a
+  gesture, so `_headers` is untouched.
+
 ## 2026-10-30 (later) — КЛАД is playable: five levels at /klad/
 
 The game the title screen has been promising. Five levels, each in two

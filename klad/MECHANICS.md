@@ -46,3 +46,7 @@ ameblo «ライズアウト (MSX)» player write-up; idpixel. MobyGames, GoodOld
   wall up several; trick a guard; 5 = everything together.
 - Level code = URL hash (no storage). Two shapes per level (landscape/portrait).
 - Fire left out of v1 until behaviour is confirmed.
+- A wall that regrows while the player stands in the gap waits for them to leave
+  instead of killing them (Lode Runner kills; the original is undocumented here).
+- Sound is synthesised square waves in the spirit of the Korvet beeper, not
+  recordings of the original.

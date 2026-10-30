@@ -13,6 +13,13 @@
           "Liberation Mono", monospace;
 }
 * { box-sizing: border-box; }
+/* Nothing in the play area is text to select: a long press or a drag that
+   starts on the field must not highlight the HUD, the canvas or the pad. */
+.hud, .stage, .pad {
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
 html, body { height: 100%; }
 body {
   margin: 0;
@@ -44,6 +51,19 @@ body {
 }
 .hud b { color: var(--crt-fg); font-weight: 600; }
 .hud .key { color: var(--crt-hot); }
+.hud button {
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  color: var(--crt-dim);
+  background: transparent;
+  border: 1px solid var(--crt-rule);
+  border-radius: .3rem;
+  padding: 0 .5rem;
+  cursor: pointer;
+}
+.hud button[aria-pressed="true"] { color: var(--crt-fg); border-color: var(--crt-dim); }
+.hud button:focus-visible { outline: 2px solid var(--crt-hot); outline-offset: 2px; }
 .hud [hidden] { display: none; }
 .stage {
   grid-area: stage;
@@ -56,6 +76,7 @@ body {
 }
 canvas {
   display: block;
+  touch-action: none;
   box-shadow: 0 0 0 1px var(--crt-rule);
   outline: none;
 }

@@ -58,6 +58,9 @@ the original as far as sources describe it; see `klad/MECHANICS.md`.
   ledge, a ledge walling off the only corridor, a one-tile gap in a ladder).
   `klad/test/levels.test.js` checks a key-then-exit route without shooting,
   which is conservative: shooting only ever opens more routes.
+- **Footer hidden on short portrait phones.** A phone in portrait has about
+  660 CSS px to work with; the footer cost a third of the playfield. The
+  same credit is one tap away on the home page.
 - **Fire left out.** Sources list it as a hazard but nobody describes its
   behaviour. Levels 1–5 use water, planks, bricks and guards only.
 - **Unreachable chests are allowed, one per map.** The Korvet version had

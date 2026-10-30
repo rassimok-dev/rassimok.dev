@@ -106,9 +106,9 @@ canvas:focus-visible { box-shadow: 0 0 0 2px var(--crt-hot); }
 .pad button:focus-visible { outline: 2px solid var(--crt-hot); outline-offset: 2px; }
 .dpad {
   display: grid;
-  grid-template-columns: repeat(3, 3.2rem);
-  grid-template-rows: repeat(3, 3.2rem);
-  gap: .25rem;
+  grid-template-columns: repeat(3, 2.9rem);
+  grid-template-rows: repeat(3, 2.9rem);
+  gap: .2rem;
 }
 .dpad .up { grid-area: 1 / 2; }
 .dpad .left { grid-area: 2 / 1; }
@@ -128,8 +128,13 @@ canvas:focus-visible { box-shadow: 0 0 0 2px var(--crt-hot); }
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: .6rem 1.2rem .9rem;
+    padding: .5rem 1.2rem .8rem;
   }
+}
+/* A phone in portrait has about 660px to work with. The field matters more
+   than the footer there; the same credit is one tap away on the home page. */
+@media (hover: none) and (pointer: coarse) and (orientation: portrait) and (max-height: 760px) {
+  footer { display: none; }
 }
 @media (hover: none) and (pointer: coarse) and (orientation: landscape) {
   .app {

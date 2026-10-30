@@ -3,6 +3,19 @@
 Dated entries, newest first. Written for a reader picking this up cold —
 or a future session needing to know what already exists and why.
 
+## 2026-10-30 — CI actions refresh
+
+- `actions/checkout` v4 → v7 and `actions/setup-node` v4 → v7. These are the
+  only dependencies this repository has, so this is the whole "update
+  everything" for the site. Both now run on the node24 action runtime, which
+  is what GitHub is moving all actions to.
+- Checked against each action's definition at the new tag: `node-version`
+  is unchanged. setup-node v5+ turns on npm caching by default when a
+  `package.json` names a package manager; this repo has no `package.json`,
+  so nothing changes. The removed `always-auth` input was never used here.
+- All four CI checks were run locally before committing: html-validate,
+  linkinator, the no-third-party grep and the no-JavaScript grep. All pass.
+
 ## 2026-09-16 (later still) — КЛАД-3 title screen
 
 The landing page is now a Korvet CRT screen: block-letter КЛАД wordmark,

@@ -3,6 +3,70 @@
 Dated entries, newest first. Written for a reader picking this up cold —
 or a future session needing to know what already exists and why.
 
+## 2026-10-30 (later) — КЛАД is playable: five levels at /klad/
+
+The game the title screen has been promising. Five levels, each in two
+shapes (landscape 24×16, portrait 16×24) picked from the device orientation
+when a level starts, keyboard on desktop, a touch pad on phones. Rules follow
+the original as far as sources describe it; see `klad/MECHANICS.md`.
+
+### What was learned about the original (and corrects earlier notes)
+
+- The "five stages then it cycles" claim belongs to the Фотон arcade
+  version, not the Korvet. The Korvet game repeated the MSX original's
+  gameplay and level design; Onliner remembers 25 labyrinths, the MSX had 20.
+  Five levels is **our** scope.
+- Guards are not killed by being walled in. On the MSX they die only by
+  falling into water, then respawn at their start. A walled-in guard just
+  stays stuck, which is exactly why «замуровать чертика» was the trick.
+- The shot travels any distance and removes the first breakable wall it hits;
+  the wall regrows after a while. Shots never harm guards. Planks hold you
+  when you walk on, drop you when you land on them. No jumping, no digging.
+
+### Decisions worth not relitigating
+
+- **One folder, deletable in one go.** Everything lives in `klad/`, with
+  `klad/README.md` listing the four places outside it that reference it.
+  The apex keeps its zero-JS claim; the footer now says so precisely.
+- **Path-scoped CSP with a detach.** `_headers` gets a `/klad/*` block that
+  first removes the site-wide `Content-Security-Policy` (`!`) and then sets
+  one with `script-src 'self'`. Without the detach both headers are sent
+  and both enforced, and the apex policy has no `script-src`, so the game
+  would stay blocked. Verify on the live response, not the file.
+- **Vanilla JS, canvas 2D, procedural 8×8 sprites, no storage.** Resume is
+  the URL hash (`/klad/#3`); `localStorage` would break the "collects
+  nothing" promise for a convenience. Palette comes from CSS variables so
+  the game and the site stay one system.
+- **Guards path with BFS and believe planks always hold.** Physics says
+  otherwise. That asymmetry is the whole of level 4 ("обмани хранителя")
+  and costs nothing. Guards avoid water in their planning but fall into it
+  when a plank gives way.
+- **Hole timing.** A hole stays open 4.2 s and flickers for the last
+  second. A guard that falls in climbs out after 3.6 s if the hole is still
+  open, so only a guard that drops in within half a second of the shot
+  escapes; the rest get walled. A player caught in a regrowing wall dies, as
+  in Lode Runner. Shooting a brick with a stuck guard inside frees it.
+- **Guard speed ramps per level** (3.0 to 3.9 tiles/s against the player's
+  5) so level 1 teaches the trap without a guard on your heels, and the
+  "outrun" level is the fast one.
+- **Two shapes per level, chosen at level start.** Rotating mid-level keeps
+  the current shape until the next level; swapping a map under a running
+  player is a bad experience and a source of bugs. Desktop always gets
+  landscape.
+- **Level validator in CI.** Hand-drawn maps broke four times out of ten on
+  the first pass, every time in a boring way (a ladder ending under a brick
+  ledge, a ledge walling off the only corridor, a one-tile gap in a ladder).
+  `klad/test/levels.test.js` checks a key-then-exit route without shooting,
+  which is conservative: shooting only ever opens more routes.
+- **Footer hidden on short portrait phones.** A phone in portrait has about
+  660 CSS px to work with; the footer cost a third of the playfield. The
+  same credit is one tap away on the home page.
+- **Fire left out.** Sources list it as a hazard but nobody describes its
+  behaviour. Levels 1–5 use water, planks, bricks and guards only.
+- **Unreachable chests are allowed, one per map.** The Korvet version had
+  them as a joke; the validator permits at most one so a typo cannot hide
+  behind the tradition.
+
 ## 2026-10-30 — Attract mode: the title screen moves
 
 The landing page now plays like a cycled title "video": the tube powers on,

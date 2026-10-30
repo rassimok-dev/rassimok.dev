@@ -7,3 +7,10 @@
   Cross-Origin-Opener-Policy: same-origin
   Cross-Origin-Resource-Policy: same-origin
   X-Frame-Options: DENY
+
+# The game at /klad/ is the one place with a script. The site-wide policy is
+# detached first: two CSP headers would both be enforced, and the apex one
+# has no script-src, so the game would stay blocked.
+/klad/*
+  ! Content-Security-Policy
+  Content-Security-Policy: default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'

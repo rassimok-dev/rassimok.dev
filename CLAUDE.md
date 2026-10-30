@@ -5,12 +5,16 @@ A static personal site served by Cloudflare Pages. No build step: the repo
 root is the document root.
 
 ## Hard rules — CI enforces these, do not work around them
-- **No JavaScript.** The site ships zero JS. Do not add a script tag.
+- **No JavaScript on the apex.** The home page ships zero JS. Do not add a
+  script tag to it. The single exception is the game under `klad/`: its own
+  same-origin scripts only, no dependencies, no build step, no storage. It is
+  self-contained so it can be deleted in one go (see `klad/README.md`).
 - **No third-party requests.** No CDN links, no Google Fonts, no analytics,
   no external images. Everything is same-origin. Use the system font stack.
 - **No cookies, no storage, no tracking.** The site collects nothing.
 - Keep the Content-Security-Policy in `_headers` as strict as it is. If a
-  change appears to require loosening it, the change is wrong.
+  change appears to require loosening it, the change is wrong. The `/klad/*`
+  block adds `script-src 'self'` for the game and nothing else.
 
 ## Style
 - Semantic HTML. Accessibility is not optional: keyboard focus must stay

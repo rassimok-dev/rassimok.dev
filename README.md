@@ -17,9 +17,11 @@ Fonts sends every visitor's IP address to Google. This site uses the system
 font stack instead, so it downloads no fonts at all — faster *and* private,
 which is the rare case where those agree.
 
-**No JavaScript.** Not minimal JavaScript, none. It removes an entire class
-of vulnerability, makes the Content-Security-Policy trivially strict, and
-means the page works identically everywhere.
+**No JavaScript on the home page.** Not minimal JavaScript, none. It removes
+an entire class of vulnerability, makes the Content-Security-Policy trivially
+strict, and means the page works identically everywhere. The one exception is
+the game at `/klad/`, which runs its own same-origin script under a
+path-scoped policy and lives in one folder so it can be removed in one go.
 
 ## Security headers
 
@@ -41,7 +43,8 @@ Every push runs four checks:
 1. **HTML validation** — catches malformed markup and missing accessibility attributes.
 2. **Link checking** — a dead link on a personal site is a cheap bad impression.
 3. **No third-party references** — fails the build if any external URL appears in HTML or CSS. This is what keeps the privacy claim honest over time.
-4. **No JavaScript** — asserts the design decision rather than trusting discipline.
+4. **No JavaScript** outside `/klad/` — asserts the design decision rather than trusting discipline. Inside `/klad/`, only the game's own scripts may load.
+5. **Level sanity** — every game level, in both orientations, must have a route from start to key to exit.
 
 Checks 3 and 4 exist because *intentions decay*. A future me, or an AI
 assistant helping a future me, will eventually paste in a font link or an

@@ -21,7 +21,7 @@ jobs:
       # Catches malformed markup and, importantly, missing accessibility
       # attributes that are easy to regress by hand.
       - name: Validate HTML
-        run: npx --yes html-validate index.html
+        run: npx --yes html-validate index.html klad/index.html
 
       # A broken link on a CV site is the cheapest possible bad impression.
       - name: Check links
@@ -41,6 +41,8 @@ jobs:
                  | grep -vE 'www\.w3\.org' \
                  | grep -vE 'rel="me noopener"' \
                  | grep -vE 'https://github\.com/' || true)
+          # Scripts use // for comments, so for them only a full URL counts.
+          hits="$hits$(grep -rInE 'https?://' --include='*.js' . || true)"
           if [ -n "$hits" ]; then
             echo "$hits"
             echo "::error::Third-party reference found. This site must make zero external requests."
@@ -48,13 +50,27 @@ jobs:
           fi
           echo "OK: no third-party references."
 
-      # The page ships no JavaScript. That is a design decision, so assert it.
+      # The apex ships no JavaScript. That is a design decision, so assert it.
+      # The one exception is the game under /klad/, which may load only its
+      # own same-origin scripts: no inline code, nothing from elsewhere.
       - name: No JavaScript
         run: |
-          hits=$(grep -rIn -E '<script|\.js"' --include='*.html' . || true)
+          hits=$(grep -rIn -E '<script|\.js"' --include='*.html' --exclude-dir=klad . || true)
           if [ -n "$hits" ]; then
             echo "$hits"
-            echo "::error::JavaScript found. This site is intentionally JS-free."
+            echo "::error::JavaScript found outside /klad/. The apex is intentionally JS-free."
             exit 1
           fi
-          echo "OK: no JavaScript."
+          bad=$(grep -rIn -E '<script' klad/ | grep -vE '<script src="/klad/[a-z]+\.js"></script>' || true)
+          if [ -n "$bad" ]; then
+            echo "$bad"
+            echo "::error::The game may only load its own scripts from /klad/."
+            exit 1
+          fi
+          echo "OK: no JavaScript outside /klad/, and /klad/ loads only its own."
+
+      # Hand-drawn maps break in boring ways: a ladder ending under a brick,
+      # a ledge walling off the only corridor. This checks shape, legend and
+      # a key-then-exit route for every level in both orientations.
+      - name: Level sanity (klad)
+        run: node --test klad/test/*.test.js

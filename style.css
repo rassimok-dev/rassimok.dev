@@ -168,9 +168,6 @@ a:focus-visible {
 
 @keyframes blink { 50% { opacity: 0; } }
 
-@media (prefers-reduced-motion: reduce) {
-  .caret { animation: none; }
-}
 
 footer {
   margin-top: 2.2rem;
@@ -182,3 +179,124 @@ footer {
 footer p { margin: 0; }
 .origin { margin: 0 0 .7rem; opacity: .85; }
 .origin i { font-style: italic; }
+
+.wordmark span { display: block; }
+
+code { font: inherit; color: var(--crt-hot); }
+
+/* ---- Attract mode ----------------------------------------------------------
+   The "video" is CSS: every element's *base* style is its final, resting
+   state, and each @keyframes only supplies the starting frame. So if
+   animations are off, unsupported, or reduced, the page is simply there,
+   complete. steps() does the frame-by-frame look; nothing is ever hidden
+   from assistive tech, because the reel is decorative and the same facts
+   live in the copy below it. */
+
+/* 1. Power-on: the tube expands from a line and overshoots in brightness. */
+.screen { animation: power-on .55s cubic-bezier(.2, .8, .2, 1) both; }
+@keyframes power-on {
+  from { transform: scaleY(.004); filter: brightness(3); }
+  55%  { transform: none; filter: brightness(1.7); }
+}
+
+/* 2. Status line scans in, left field then right. */
+.statusline span { animation: wipe .55s steps(18, end) .5s both; }
+.statusline span + span { animation-delay: .95s; }
+@keyframes wipe { from { clip-path: inset(0 100% 0 0); } }
+
+/* 3. Wordmark draws row by row, then its glow settles. */
+.wordmark span { animation: wipe .5s steps(26, end) 1.3s both; }
+.wordmark span:nth-child(2) { animation-delay: 1.45s; }
+.wordmark span:nth-child(3) { animation-delay: 1.6s; }
+.wordmark span:nth-child(4) { animation-delay: 1.75s; }
+.wordmark span:nth-child(5) { animation-delay: 1.9s; }
+.wordmark { animation: glow 1s ease-out 2.3s both; }
+@keyframes glow {
+  from { text-shadow: 0 0 28px rgba(123, 247, 173, 1), 0 0 6px rgba(123, 247, 173, .9); }
+}
+
+/* 4. Cartridge label fades in as its tracking settles. */
+.cartridge { animation: settle .8s ease-out 2.5s both; }
+@keyframes settle { from { opacity: 0; letter-spacing: .8em; } }
+
+/* 5. The copy below the rule rises in last. */
+.copy { animation: rise .7s ease-out 3.2s both; }
+@keyframes rise { from { opacity: 0; transform: translateY(8px); } }
+
+/* 6. The reel: five title cards, 4 s each, looping for as long as the page
+   is open. Each card types in (stepped clip-path), holds, cuts to black.
+   The deck is one 20 s cycle; a card's delay is its slot in the cycle. */
+.reel {
+  position: relative;
+  height: 6.4rem;
+  margin: 1.4rem 0 .6rem;
+}
+@media (min-width: 30rem) { .reel { height: 4.6rem; } }
+.reel p {
+  position: absolute;
+  inset: 0 auto auto 0;
+  margin: 0;
+  opacity: 0;
+  animation: card 20s linear 3.2s infinite both;
+}
+.reel p:nth-child(2) { animation-delay: 7.2s; }
+.reel p:nth-child(3) { animation-delay: 11.2s; }
+.reel p:nth-child(4) { animation-delay: 15.2s; }
+.reel p:nth-child(5) { animation-delay: 19.2s; }
+.k {
+  display: block;
+  color: var(--crt-dim);
+  font-size: .72rem;
+  font-weight: 600;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+}
+.k::before { content: "> "; }
+@keyframes card {
+  0%        { opacity: 1; clip-path: inset(0 100% 0 0); animation-timing-function: steps(30, end); }
+  6%        { clip-path: inset(0 0 0 0); }
+  19.5%     { opacity: 1; clip-path: inset(0 0 0 0); }
+  20%, 100% { opacity: 0; clip-path: inset(0 100% 0 0); }
+}
+
+/* 7. Progress bar: one full fill per cycle of the deck, so it doubles as
+   the reel's position indicator. The runner above it is the only sprite:
+   a half-block flipped every third of a second reads as a stride. */
+.bar {
+  position: relative;
+  height: .7rem;
+  margin: 1.6rem 0 0;
+  box-shadow: 0 0 0 1px var(--crt-rule);
+  animation: rise .5s ease-out 3.2s both;
+}
+.fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 100%;
+  background: repeating-linear-gradient(
+    to right, var(--crt-dim) 0 .5rem, transparent .5rem .64rem);
+  animation: fill 20s steps(32, end) 3.2s infinite both;
+}
+@keyframes fill { from { width: 0; } }
+.run {
+  position: absolute;
+  bottom: .7rem;
+  left: 0;
+  width: 1ch;
+  line-height: 1;
+  color: var(--crt-fg);
+  animation: trot 20s steps(40, end) 3.2s infinite both,
+             gait .32s steps(1) infinite;
+}
+.run::before { content: "▚"; }
+@keyframes trot { from { left: 0; } to { left: calc(100% - 1ch); } }
+@keyframes gait { 50% { transform: scaleX(-1); } }
+
+/* Reduced motion: no animation at all. Base styles are the final frame, so
+   the only extra work is laying the reel out as a static list. */
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after { animation: none !important; }
+  .reel, .reel p { position: static; height: auto; opacity: 1; }
+  .reel p { margin-bottom: .7rem; }
+  .run { display: none; }
+}

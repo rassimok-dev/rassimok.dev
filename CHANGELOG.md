@@ -3,6 +3,46 @@
 Dated entries, newest first. Written for a reader picking this up cold —
 or a future session needing to know what already exists and why.
 
+## 2026-10-30 — Attract mode: the title screen moves
+
+The landing page now plays like a cycled title "video": the tube powers on,
+the status line and КЛАД wordmark draw themselves in, and a reel of five
+title cards (who / builds / now / next / rules) loops for as long as the
+page is open, with a block-character progress bar and a one-glyph runner.
+The CV copy still sits below the rule, and a `Next` section was added so the
+static text says everything the reel says.
+
+### Decisions worth not relitigating
+
+- **It is CSS, not JavaScript.** The brief said "JS or something you know
+  better". A looping title sequence is timed frames, and `@keyframes` with
+  `steps()` does that natively, so the apex keeps its zero-JS claim, the
+  CI guard, and the CSP with no `script-src`. The earlier decision that JS
+  lives only under `/klad/` stands. A `<video>` file was also rejected: it
+  would need `media-src`, `Permissions-Policy` already sets `autoplay=()`,
+  and it would weigh more than the rest of the site combined.
+- **Base styles are the final frame; keyframes supply only the start.**
+  If animations are unsupported, disabled, or reduced, nothing is missing
+  because nothing's resting state is hidden. The one exception is the reel,
+  whose cards are stacked and hidden by default; `prefers-reduced-motion`
+  lays them out as a static list instead. Don't "fix" this by hiding
+  content with `display: none` in a keyframe.
+- **The reel is `aria-hidden`.** Five absolutely-positioned paragraphs
+  flickering in and out would be read as overlapping gibberish. Every fact
+  on a card also appears in the copy below, so screen readers lose
+  nothing. If a card gains a fact, the copy must gain it too.
+- **Card timing is a 20 s deck, 4 s per card, delays as slots.** Each card
+  runs the same 20 s animation offset by its position, so adding a sixth
+  card means a 24 s deck and five delays to adjust, not a new keyframe.
+  The progress bar fills once per deck, which makes it the reel's position
+  indicator rather than decoration.
+- **The runner is one glyph flipped with `scaleX(-1)`.** Animating
+  `content` is still discrete-only and uneven across engines; a mirrored
+  `▚` reads as a stride and costs nothing.
+- **Size:** `index.html` 2.9 KB, `style.css` 8.7 KB uncompressed, zero new
+  requests. That is past the original "few kilobytes" aspiration; the
+  reasoning is that HTML and CSS together are about 4.5 KB gzipped, and that the motion is the point of this revision.
+
 ## 2026-09-16 (later still) — КЛАД-3 title screen
 
 The landing page is now a Korvet CRT screen: block-letter КЛАД wordmark,

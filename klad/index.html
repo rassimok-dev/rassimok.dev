@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<title>КЛАД — rassimok</title>
+<meta name="description" content="КЛАД: a clean-room homage to the Korvet platformer. Five levels, no analytics, no storage.">
+<link rel="stylesheet" href="/klad/klad.css">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+</head>
+<body>
+<div class="app">
+  <header class="hud">
+    <span>Этап <b id="h-level">1</b></span>
+    <span>Жизни <b id="h-lives">3</b></span>
+    <span>Клады <b id="h-chests">0/0</b></span>
+    <span id="h-key" class="key" hidden>Ключ</span>
+    <span>Счёт <b id="h-score">0</b></span>
+  </header>
+
+  <main id="stage" class="stage">
+    <canvas id="game" width="768" height="512" tabindex="0" role="img" aria-label="Игровое поле КЛАД"></canvas>
+    <div id="msg" class="msg" role="status">
+      <p id="msg-title" class="msg-title">КЛАД</p>
+      <p id="msg-body">загрузка</p>
+    </div>
+  </main>
+
+  <div class="pad" role="group" aria-label="Управление">
+    <div class="dpad">
+      <button type="button" class="up" data-k="up" aria-label="Вверх">▲</button>
+      <button type="button" class="left" data-k="left" aria-label="Влево">◀</button>
+      <button type="button" class="right" data-k="right" aria-label="Вправо">▶</button>
+      <button type="button" class="down" data-k="down" aria-label="Вниз">▼</button>
+    </div>
+    <button type="button" class="fire" data-k="fire" aria-label="Выстрел или старт">ОГОНЬ</button>
+  </div>
+
+  <footer lang="en">
+    <p>A clean-room homage to <span lang="ru">«Клад»</span> (D. Ivanov, A. Shatalov, Korvet <span lang="ru">ПК-8020</span>),
+    itself after <span lang="ja">ライズアウト</span> / <i>Rise Out</i> (ASCII, 1983). Own code, art and levels.
+    No analytics, no cookies, no storage; the only script is this page's own.
+    <a href="/">← rassimok</a></p>
+  </footer>
+</div>
+<script src="/klad/levels.js"></script>
+<script src="/klad/klad.js"></script>
+</body>
+</html>

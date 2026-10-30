@@ -1,0 +1,155 @@
+/* КЛАД page styles. Same palette as the site; the game reads these variables. */
+:root {
+  --crt-bg: #0b1410;
+  --crt-fg: #7bf7ad;
+  --crt-dim: #5bbd8a;
+  --crt-hot: #ffd479;
+  --crt-rule: #23503c;
+  --crt-dark: #163a2a;
+  --crt-alert: #ff8a7a;   /* guards: 9.6:1 on --crt-bg */
+  --crt-water: #2f5d8a;
+  --crt-water-hi: #8fb4d9;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "DejaVu Sans Mono",
+          "Liberation Mono", monospace;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  background: var(--crt-bg);
+  color: var(--crt-fg);
+  font: .85rem/1.5 var(--mono);
+  -webkit-text-size-adjust: 100%;
+  overscroll-behavior: none;
+}
+.app {
+  display: grid;
+  height: 100vh;
+  height: 100dvh;
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  grid-template-areas: "hud" "stage" "pad" "foot";
+}
+.hud {
+  grid-area: hud;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: .3rem 1rem;
+  padding: .45rem .8rem;
+  border-bottom: 1px solid var(--crt-rule);
+  color: var(--crt-dim);
+  font-size: .68rem;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+.hud b { color: var(--crt-fg); font-weight: 600; }
+.hud .key { color: var(--crt-hot); }
+.hud [hidden] { display: none; }
+.stage {
+  grid-area: stage;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+  padding: .3rem;
+}
+canvas {
+  display: block;
+  box-shadow: 0 0 0 1px var(--crt-rule);
+  outline: none;
+}
+canvas:focus-visible { box-shadow: 0 0 0 2px var(--crt-hot); }
+.stage::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(to bottom, rgba(0, 0, 0, .10) 0 1px, rgba(0, 0, 0, 0) 1px 3px);
+}
+.msg {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  text-align: center;
+  background: rgba(11, 20, 16, .86);
+}
+.msg[hidden] { display: none; }
+.msg p { margin: 0; }
+.msg-title {
+  font-size: 1.6rem;
+  font-weight: 700;
+  letter-spacing: .3em;
+  text-shadow: 0 0 14px rgba(123, 247, 173, .45);
+}
+#msg-body { margin-top: .6rem; max-width: 30rem; color: var(--crt-dim); font-size: .78rem; }
+
+/* Touch controls: only on coarse pointers. Portrait puts them under the
+   field, landscape puts them beside it, thumbs where they already are. */
+.pad { grid-area: pad; display: none; }
+.pad button {
+  font: inherit;
+  color: var(--crt-fg);
+  background: transparent;
+  border: 1px solid var(--crt-dim);
+  border-radius: .5rem;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.pad button:active { background: var(--crt-rule); }
+.pad button:focus-visible { outline: 2px solid var(--crt-hot); outline-offset: 2px; }
+.dpad {
+  display: grid;
+  grid-template-columns: repeat(3, 3.2rem);
+  grid-template-rows: repeat(3, 3.2rem);
+  gap: .25rem;
+}
+.dpad .up { grid-area: 1 / 2; }
+.dpad .left { grid-area: 2 / 1; }
+.dpad .right { grid-area: 2 / 3; }
+.dpad .down { grid-area: 3 / 2; }
+.fire {
+  width: 5.4rem;
+  height: 5.4rem;
+  border-radius: 50% !important;
+  color: var(--crt-hot) !important;
+  border-color: var(--crt-hot) !important;
+  letter-spacing: .1em;
+  font-size: .75rem;
+}
+@media (hover: none) and (pointer: coarse) {
+  .pad {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: .6rem 1.2rem .9rem;
+  }
+}
+@media (hover: none) and (pointer: coarse) and (orientation: landscape) {
+  .app {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    grid-template-areas: "padl hud padr" "padl stage padr" "padl foot padr";
+  }
+  .pad { display: contents; }
+  .dpad { grid-area: padl; align-self: center; margin: 0 .7rem; }
+  .fire { grid-area: padr; align-self: center; margin: 0 .7rem; }
+  footer { display: none; }
+}
+footer {
+  grid-area: foot;
+  padding: .4rem .8rem .6rem;
+  border-top: 1px solid var(--crt-rule);
+  color: var(--crt-dim);
+  font-size: .62rem;
+  line-height: 1.5;
+}
+footer p { margin: 0; }
+footer a { color: var(--crt-hot); text-underline-offset: 3px; }
+footer a:focus-visible { outline: 2px solid var(--crt-hot); outline-offset: 3px; }

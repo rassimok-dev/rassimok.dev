@@ -18,14 +18,18 @@ jobs:
         with:
           node-version: 24
 
+      # Both tools are pinned: unpinned, `npx --yes` runs whatever version was
+      # published last, unreviewed. Bump on purpose, to a release that has
+      # been out for a couple of weeks.
+
       # Catches malformed markup and, importantly, missing accessibility
       # attributes that are easy to regress by hand.
       - name: Validate HTML
-        run: npx --yes html-validate index.html klad/index.html
+        run: npx --yes html-validate@11.17.0 index.html klad/index.html
 
       # A broken link on a CV site is the cheapest possible bad impression.
       - name: Check links
-        run: npx --yes linkinator . --recurse --skip "^https://github.com"
+        run: npx --yes linkinator@8.1.0 . --recurse --skip "^https://github.com"
 
       # Enforces the privacy claim in the footer. If someone (or some AI)
       # ever pastes in a Google Font or an analytics snippet, this fails

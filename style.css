@@ -300,3 +300,96 @@ code { font: inherit; color: var(--crt-hot); }
   .reel p { margin-bottom: .7rem; }
   .run { display: none; }
 }
+
+/* ---- Start page ------------------------------------------------------------
+   One word on a dark field. The letters are five parallel strands (see
+   tools/wordmark.py): ink and background stroked alternately over the same
+   centre line. Base styles are the final frame; keyframes supply only the
+   start, so with animation off or reduced the word is simply there. */
+.splash {
+  --void: #0a0b0d;
+  --ink: #ece8df;        /* 16.6:1 on --void */
+  --signal: #7bf7ad;     /* 14.5:1 on --void: the same phosphor as the CRT */
+  display: grid;
+  min-height: 100vh;
+  min-height: 100dvh;
+  margin: 0;
+  padding: 1.25rem;
+  place-items: center;
+  background: var(--void);
+  color: var(--ink);
+  color-scheme: dark;
+}
+.splash h1 { margin: 0; width: min(88vw, 46rem); }
+.sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.mark { display: block; border-radius: 6px; color: inherit; }
+.mark:focus-visible { outline: 2px solid var(--signal); outline-offset: 10px; }
+.word { display: block; width: 100%; height: auto; overflow: visible; }
+.word path, .word circle { fill: none; stroke-linecap: butt; stroke-linejoin: miter; }
+
+.l0, .l2, .l4 { stroke: var(--ink); transition: stroke .3s; }
+.l1, .l3 { stroke: var(--void); }
+.l0 { stroke-width: 13px; }
+.l1 { stroke-width: 10.111px; }
+.l2 { stroke-width: 7.222px; }
+.l3 { stroke-width: 4.333px; }
+.l4 { stroke-width: 1.444px; }
+.mark:hover .l0, .mark:hover .l2, .mark:hover .l4 { stroke: #fff; }
+
+/* 1. Each glyph writes itself in, strands together, one after another. */
+.ink path {
+  stroke-dasharray: 1.01 1.01;
+  animation: draw 1.1s cubic-bezier(.65, 0, .25, 1) both;
+}
+@keyframes draw { from { stroke-dashoffset: 1.01; } to { stroke-dashoffset: 0; } }
+.ink .g2 { animation-delay: .11s; }
+.ink .g3 { animation-delay: .22s; }
+.ink .g4 { animation-delay: .33s; }
+.ink .g5 { animation-delay: .44s; }
+.ink .g6 { animation-delay: .55s; }
+.ink .g7 { animation-delay: .66s; }
+.ink .g8 { animation-delay: .77s; }
+
+/* 2. Packets: short phosphor dashes riding the centre strand for as long as
+   the page is open. Each glyph runs at its own period so they never sync. */
+.pk {
+  stroke: var(--signal);
+  stroke-width: 2px;
+  filter: drop-shadow(0 0 2px var(--signal));
+  animation: appear .8s ease-out 1.9s both;
+}
+.pk path { stroke-dasharray: .06 .44; animation: run 3.2s linear 1.9s infinite; }
+.pk .g2 { animation-duration: 4.1s; }
+.pk .g3 { animation-duration: 2.7s; }
+.pk .g4 { animation-duration: 3.6s; animation-direction: reverse; }
+.pk .g5 { animation-duration: 2.3s; }
+.pk .g6 { animation-duration: 4.6s; animation-direction: reverse; }
+.pk .g7 { animation-duration: 3.9s; }
+.pk .g8 { animation-duration: 2.9s; animation-direction: reverse; }
+@keyframes run { to { stroke-dashoffset: -1; } }
+@keyframes appear { from { opacity: 0; } }
+
+/* 3. The dot of the i is a network node, and it pings. */
+.ping {
+  stroke: var(--signal);
+  stroke-width: 1.444px;
+  opacity: 0;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: ping 2.6s cubic-bezier(.2, .6, .3, 1) 2.2s infinite;
+}
+@keyframes ping {
+  from { opacity: .9; transform: scale(.7); }
+  to   { opacity: 0;  transform: scale(2.8); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pk, .ping { display: none; }
+}

@@ -1,0 +1,7 @@
+# Security contact for rassimok.dev. Reports go to GitHub's private
+# vulnerability reporting, so nothing here exposes an email address.
+Contact: https://github.com/rassimok-dev/rassimok.dev/security/advisories/new
+Expires: 2027-10-31T23:59:59Z
+Preferred-Languages: en, ru
+Canonical: https://rassimok.dev/.well-known/security.txt
+Policy: https://github.com/rassimok-dev/rassimok.dev/security/policy

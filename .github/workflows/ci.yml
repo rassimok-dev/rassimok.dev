@@ -5,27 +5,44 @@ on:
     branches: [main]
   pull_request:
 
+# Read-only token, and nothing else. No step here needs to write.
 permissions:
   contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   check:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      # Actions are pinned to full commit SHAs, not tags: a tag can be moved
+      # to new code after review, a SHA cannot. Dependabot bumps the SHA and
+      # the version comment together (.github/dependabot.yml).
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
 
       # Catches malformed markup and, importantly, missing accessibility
-      # attributes that are easy to regress by hand.
+      # attributes that are easy to regress by hand. Tool versions are
+      # pinned: `npx --yes <tool>` would run whatever was published last.
       - name: Validate HTML
-        run: npx --yes html-validate index.html klad/index.html
+        run: npx --yes html-validate@11.17.0 index.html about/index.html klad/index.html
 
       # A broken link on a CV site is the cheapest possible bad impression.
       - name: Check links
-        run: npx --yes linkinator . --recurse --skip "^https://github.com"
+        run: npx --yes linkinator@8.1.0 . --recurse --skip "^https://github.com"
+
+      # The start page is generated; a hand edit would be lost on the next
+      # regeneration, so refuse it here.
+      - name: Start page matches its generator
+        run: python3 tools/wordmark.py --check
 
       # Enforces the privacy claim in the footer. If someone (or some AI)
       # ever pastes in a Google Font or an analytics snippet, this fails
@@ -74,3 +91,64 @@ jobs:
       # a key-then-exit route for every level in both orientations.
       - name: Level sanity (klad)
         run: node --test klad/test/*.test.js
+
+      # The CSP is the site's last line of defence and the easiest thing to
+      # "just loosen a little". Every policy must stay deny-by-default with no
+      # unsafe-* keyword, wildcard or scheme source, and the apex must still
+      # have no script-src at all.
+      - name: Headers stay strict
+        run: |
+          python3 - <<'PY'
+          import re, sys
+          text = open('_headers').read()
+          csps = re.findall(r'^\s*Content-Security-Policy:\s*(.+)$', text, re.M)
+          bad = []
+          if len(csps) < 2:
+              bad.append('expected an apex CSP and a /klad/ CSP')
+          for c in csps:
+              if "default-src 'none'" not in c:
+                  bad.append("missing default-src 'none': " + c)
+              for tok in ("'unsafe-inline'", "'unsafe-eval'", "'unsafe-hashes'", "'wasm-unsafe-eval'", 'http:', 'data:', 'blob:', ' * ', '*.'):
+                  if tok in c + ' ':
+                      bad.append(f'{tok.strip()} in: {c}')
+              if "frame-ancestors 'none'" not in c:
+                  bad.append("missing frame-ancestors 'none': " + c)
+          if csps and 'script-src' in csps[0]:
+              bad.append('the apex CSP must not have a script-src')
+          for h in ('Strict-Transport-Security', 'X-Content-Type-Options: nosniff', 'Referrer-Policy: no-referrer', 'Cross-Origin-Opener-Policy: same-origin', 'X-Frame-Options: DENY'):
+              if h not in text:
+                  bad.append('missing header: ' + h)
+          if bad:
+              print('\n'.join(bad)); print('::error::_headers was loosened.'); sys.exit(1)
+          print('OK: headers are strict.')
+          PY
+
+      # Inline styles and inline event handlers would only work by adding
+      # 'unsafe-inline' to the CSP, so stop them at the markup.
+      - name: No inline styles or handlers
+        run: |
+          hits=$(grep -rInE '<style|[[:space:]]style=|[[:space:]]on[a-z]+=' --include='*.html' --include='*.svg' . || true)
+          if [ -n "$hits" ]; then
+            echo "$hits"
+            echo "::error::Inline style or event handler found. Use style.css and same-origin scripts."
+            exit 1
+          fi
+          echo "OK: no inline styles or handlers."
+
+      # RFC 9116 requires an Expires field; a lapsed security.txt tells
+      # researchers the contact is dead. Fail a month early so it gets renewed.
+      - name: security.txt is current
+        run: |
+          python3 - <<'PY'
+          import datetime as dt, re, sys
+          txt = open('.well-known/security.txt').read()
+          m = re.search(r'^Expires:\s*(\S+)$', txt, re.M)
+          if not m or not re.search(r'^Contact:\s*https://', txt, re.M):
+              sys.exit('::error::security.txt needs Contact and Expires.')
+          left = dt.datetime.fromisoformat(m.group(1).replace('Z', '+00:00')) - dt.datetime.now(dt.timezone.utc)
+          if left.days < 30:
+              sys.exit(f'::error::security.txt expires in {left.days} days. Renew Expires (max one year ahead).')
+          if left.days > 366:
+              sys.exit('::error::security.txt Expires is more than a year ahead (RFC 9116 recommends less).')
+          print(f'OK: security.txt valid for {left.days} more days.')
+          PY

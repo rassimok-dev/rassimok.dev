@@ -1,16 +1,24 @@
+# Security headers for every response. Cloudflare Pages applies this file;
+# CI asserts the CSP stays strict (no unsafe-*, no wildcards, no http:).
 /*
   Content-Security-Policy: default-src 'none'; style-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'
   Strict-Transport-Security: max-age=63072000; includeSubDomains; preload
   X-Content-Type-Options: nosniff
   Referrer-Policy: no-referrer
-  Permissions-Policy: accelerometer=(), autoplay=(), camera=(), display-capture=(), encrypted-media=(), fullscreen=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), midi=(), payment=(), picture-in-picture=(), usb=()
+  Permissions-Policy: accelerometer=(), autoplay=(), bluetooth=(), browsing-topics=(), camera=(), display-capture=(), encrypted-media=(), fullscreen=(), geolocation=(), gyroscope=(), hid=(), idle-detection=(), magnetometer=(), microphone=(), midi=(), payment=(), picture-in-picture=(), publickey-credentials-get=(), screen-wake-lock=(), serial=(), usb=(), xr-spatial-tracking=()
   Cross-Origin-Opener-Policy: same-origin
+  Cross-Origin-Embedder-Policy: require-corp
   Cross-Origin-Resource-Policy: same-origin
+  Origin-Agent-Cluster: ?1
   X-Frame-Options: DENY
+  X-Permitted-Cross-Domain-Policies: none
 
 # The game at /klad/ is the one place with a script. The site-wide policy is
 # detached first: two CSP headers would both be enforced, and the apex one
-# has no script-src, so the game would stay blocked.
+# has no script-src, so the game would stay blocked. Trusted Types are
+# enforced with no policies at all: the game only ever writes textContent,
+# so any HTML-injection sink that appears later fails loudly instead of
+# becoming a DOM XSS.
 /klad/*
   ! Content-Security-Policy
-  Content-Security-Policy: default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'
+  Content-Security-Policy: default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; require-trusted-types-for 'script'; trusted-types 'none'

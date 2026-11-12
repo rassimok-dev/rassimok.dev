@@ -20,5 +20,11 @@
 # the checks rather than pass them.
 /.github/workflows/     @rassimok-dev
 
+# Security contact, policy and the update bot. A wrong Contact line sends
+# vulnerability reports nowhere.
+/.well-known/           @rassimok-dev
+/SECURITY.md            @rassimok-dev
+/.github/dependabot.yml @rassimok-dev
+
 # Conventions the assistant and contributors follow.
 /CLAUDE.md              @rassimok-dev

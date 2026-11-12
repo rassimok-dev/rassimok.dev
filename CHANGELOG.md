@@ -3,6 +3,67 @@
 Dated entries, newest first. Written for a reader picking this up cold —
 or a future session needing to know what already exists and why.
 
+## 2026-11-12 — Start page wordmark, and the project hardened
+
+### A one-word start page
+
+`/` is now just the word **rassimok** on a near-black field, drawn as a
+bundle of five parallel strands. Each letter writes itself in, strands
+together; then short phosphor-green "packets" run along the centre strand
+of every letter, each at its own period, and the dot of the *i*, a set of
+concentric rings, pings like a network node. The word links to `/about/`,
+where the CRT title screen and CV content now live unchanged.
+
+- **The reference was the Kuji podcast mark** (letters of parallel
+  hairlines on black, with an orange ring of text). What we kept is the
+  idea of multi-line lettering. What we did not: the ring of text, the
+  caps, the orange. The packets and the pinging node are ours, and they
+  tie the mark to the mesh-node avatar and to "routes packets".
+- **Strands are stacked strokes, not outlines.** One centre-line path per
+  stroke is drawn five times with shrinking widths, ink and background
+  alternating, so joins merge cleanly and the draw-in animation needs only
+  `stroke-dashoffset`. Every layer is written out rather than reused with
+  `<use>`: CSS animations inside `<use>` shadow trees are unreliable in
+  Safari, and the repetition gzips to almost nothing (the page is under
+  1 KB gzipped).
+- **Generated, then committed.** `tools/wordmark.py` writes `index.html`;
+  CI regenerates and compares. There is still no build step for serving.
+- **Why the word is a link.** A splash with no way forward strands visitors
+  and, less obviously, takes `/about/` and `/klad/` out of linkinator's
+  crawl, so CI would stop checking their links. The link restores both.
+- Base styles are the final frame, as on the CRT page. With reduced motion
+  the word is static and the packets and ping are hidden.
+
+### Hardening
+
+- **Headers.** Added `Cross-Origin-Embedder-Policy: require-corp`,
+  `Origin-Agent-Cluster`, `X-Permitted-Cross-Domain-Policies: none`, and
+  more denied features in `Permissions-Policy`. Everything is same-origin,
+  so full cross-origin isolation costs nothing. `/klad/` now enforces
+  Trusted Types with no policies: the game only writes `textContent`, so a
+  future `innerHTML` fails loudly instead of becoming a DOM XSS. Verified on
+  the preview that the game, its sound and the start page still work and
+  log no console errors.
+- **`/.well-known/security.txt`** (RFC 9116) and **`SECURITY.md`**. The
+  contact is GitHub private vulnerability reporting, so no email address is
+  published. That reporting has to be switched on in repository settings.
+- **Supply chain.** Actions pinned to full commit SHAs (checkout v7.0.1,
+  setup-node v7.1.0), with `persist-credentials: false` so the token does
+  not linger in `.git/config`. `html-validate` and `linkinator` pinned to
+  exact versions; `npx --yes <tool>` ran whatever was published last.
+  Nothing pinned is newer than two weeks: html-validate 11.21.0 was three
+  days old, so 11.17.0. Dependabot (`.github/dependabot.yml`, 14-day
+  cooldown) moves the pins. This supersedes the unmerged
+  `chore/update-actions` branch, which bumped the same actions by tag.
+- **CI guards** for what a careless edit could silently undo: the CSP must
+  stay deny-by-default with no `unsafe-*`, wildcard or scheme source and no
+  apex `script-src`; no inline `style`, `<style>` or `on*=` handlers; the
+  start page must match its generator; security.txt fails 30 days before it
+  expires. Each guard was tested by breaking the thing it guards.
+- **Secret scan.** Full history of both repositories swept for cloud keys,
+  tokens and private keys: nothing found. GitHub's own scanner needs
+  secret scanning enabled on the repository, which is a settings switch.
+
 ## 2026-10-30 (later still) — Game feel: no selection, no wall deaths, beeper sound
 
 Three changes from the first rounds on a real phone.

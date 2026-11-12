@@ -25,5 +25,4 @@ No build step, no dependencies, no storage. Level resume is the URL hash
 3. In `.github/workflows/ci.yml`: drop `klad/index.html` from html-validate,
    the `--exclude-dir=klad` and the klad script check in "No JavaScript", the
    `*.js` third-party grep, and the "Level sanity" step.
-4. Remove the `/klad/` links in `index.html` and the exception in `CLAUDE.md`
-   and `README.md`.
+4. Remove the `/klad/` links in `index.html` and the exception in `README.md`.

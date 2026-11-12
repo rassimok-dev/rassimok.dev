@@ -3,6 +3,21 @@
 Dated entries, newest first. Written for a reader picking this up cold —
 or a future session needing to know what already exists and why.
 
+## 2026-11-13 - Agent instructions moved out of the repository
+
+`CLAUDE.md` is removed, and its CODEOWNERS entry with it. Agent instructions
+for this site now live outside the repository, in a private workspace that
+holds every rassimok-dev project, so one set of rules covers all of them and
+a stale copy on an old branch cannot compete with it.
+
+### Decisions worth not relitigating
+
+- **Do not re-add a `CLAUDE.md` or `.claude/` here.** CI remains the
+  enforcement for the hard rules (no JavaScript on the apex, no third-party
+  requests); the instruction file was only ever a reminder of them. A cloud
+  agent session that sees this repository alone gets no instructions, and
+  that trade was accepted.
+
 ## 2026-11-12 - CI check tools pinned
 
 `html-validate` is pinned to 11.17.0 and `linkinator` to 8.1.0 in

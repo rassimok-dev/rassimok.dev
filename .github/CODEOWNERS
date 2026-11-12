@@ -19,6 +19,3 @@
 # no-JavaScript and zero-third-party guarantees; a change here can disable
 # the checks rather than pass them.
 /.github/workflows/     @rassimok-dev
-
-# Conventions the assistant and contributors follow.
-/CLAUDE.md              @rassimok-dev

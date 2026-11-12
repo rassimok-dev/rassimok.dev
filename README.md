@@ -1,16 +1,21 @@
 # rassimok.dev
 
-Personal site. Static, dependency-free, and deliberately boring.
+Personal site. Static apart from one small proxy for the game's API,
+dependency-free, and deliberately boring.
 
 This README documents *why* each decision was made, not just what it is.
 The reasoning is the point — the page itself is 800 bytes of HTML.
 
 ## Principles
 
-**Collect nothing.** No analytics, no cookies, no local storage, no logs I
-own. There is nothing to consent to, so there is no cookie banner. The
-footer says this, and CI enforces it (see below) so the claim cannot quietly
-become false.
+**Collect almost nothing.** No analytics, no tracking, no local storage. The
+home page sets no cookies. The one exception is the game at `/klad/`: once a
+player picks a nick, its API stores that nick and the player's results for
+the leaderboards (and, once accounts exist, an email address), and sets one
+HttpOnly cookie that only the game's API receives (`Path=/klad/api`). The
+cookie keeps a player's own results together and follows nobody, so there is
+still no cookie banner. The footers say this, and CI enforces what a grep can
+check (see below), so the claims cannot quietly become false.
 
 **Zero third-party requests.** Fonts are the usual leak here: loading Google
 Fonts sends every visitor's IP address to Google. This site uses the system
@@ -21,7 +26,9 @@ which is the rare case where those agree.
 an entire class of vulnerability, makes the Content-Security-Policy trivially
 strict, and means the page works identically everywhere. The one exception is
 the game at `/klad/`, which runs its own same-origin script under a
-path-scoped policy and lives in one folder so it can be removed in one go.
+path-scoped policy that also lets it call its own origin (`connect-src
+'self'`). It lives in one folder, plus the API proxy below, so it can be
+removed in one go.
 
 ## Security headers
 
@@ -35,16 +42,35 @@ Set in `_headers`, applied by Cloudflare Pages.
 | `Referrer-Policy: no-referrer` | Outbound links carry no information about where the visitor came from. |
 | `Permissions-Policy` | Explicitly denies camera, microphone, geolocation and the rest. The page needs none of them, so none should be available. |
 | `X-Frame-Options` / `frame-ancestors` | Cannot be embedded in a frame, which rules out clickjacking. |
+| `/klad/*` policy | The game's page detaches the site-wide CSP and sends its own: the same, plus `script-src 'self'` for the game's scripts and `connect-src 'self'` for its API calls. |
+
+Responses from the API proxy carry the API's own headers: Pages does not
+apply `_headers` to responses from Functions.
+
+## The game's API
+
+The game reaches its API, a separate service, through this site's own
+origin: the Cloudflare Pages Function `functions/klad/api/[[path]].js`
+forwards `/klad/api/<path>` to `<API_ORIGIN>/<path>`. Same-origin keeps the
+CSP at `connect-src 'self'`, makes the session cookie first-party, and needs
+no CORS.
+
+- The API's address lives only in the Pages environment variable
+  `API_ORIGIN`, so no URL appears in any script and check 3 below still holds.
+- The proxy passes on only the request headers `Content-Type`, `Accept`
+  and `Cookie`, and drops every other one.
+- `_routes.json` limits the Function to `/klad/api/*`. Every other request is
+  a static file and runs no code.
 
 ## CI
 
-Every push runs four checks:
+Every push runs five checks:
 
 1. **HTML validation** — catches malformed markup and missing accessibility attributes.
 2. **Link checking** — a dead link on a personal site is a cheap bad impression.
-3. **No third-party references** — fails the build if any external URL appears in HTML or CSS. This is what keeps the privacy claim honest over time.
-4. **No JavaScript** outside `/klad/` — asserts the design decision rather than trusting discipline. Inside `/klad/`, only the game's own scripts may load.
-5. **Level sanity** — every game level, in both orientations, must have a route from start to key to exit.
+3. **No third-party references** — fails the build if any external URL appears in HTML, CSS or a script, the proxy included. This is what keeps the privacy claim honest over time.
+4. **No JavaScript** in pages outside `/klad/` — asserts the design decision rather than trusting discipline. Inside `/klad/`, only the game's own scripts may load.
+5. **Level sanity** — every game level, in both orientations, must have a route from start to key to exit. The same step runs the API proxy's tests.
 
 Checks 3 and 4 exist because *intentions decay*. A future me, or an AI
 assistant helping a future me, will eventually paste in a font link or an
@@ -74,7 +100,9 @@ read as one system.
 ## Deployment
 
 Cloudflare Pages, built from `main`. There is no build step — the files in
-the repository root are the files that get served.
+the repository root are the files that get served. Pages also builds the
+one Function in `functions/` on its own; `API_ORIGIN` is set in the Pages
+project, not in the repository.
 
 ## Licence
 

@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="dark">
 <title>КЛАД — rassimok</title>
-<meta name="description" content="КЛАД: a clean-room homage to the Korvet platformer. Five levels, no analytics, no storage.">
+<meta name="description" content="КЛАД: a clean-room homage to the Korvet platformer. Five levels. No analytics, no tracking; one cookie, for the game's own API only.">
 <link rel="stylesheet" href="/klad/klad.css">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 </head>
@@ -41,8 +41,12 @@
   <footer lang="en">
     <p>A clean-room homage to <span lang="ru">«Клад»</span> (D. Ivanov, A. Shatalov, Korvet <span lang="ru">ПК-8020</span>),
     itself after <span lang="ja">ライズアウト</span> / <i>Rise Out</i> (ASCII, 1983). Own code, art and levels.
-    No analytics, no cookies, no storage; the only script is this page's own.
+    No analytics, no tracking; the only script is this page's own.
     <a href="/">← rassimok</a></p>
+    <p lang="ru">Приватность: пока вы не ввели ник, игра ничего не хранит. С ником сервер игры
+    хранит его и ваши результаты для таблиц рекордов (у аккаунта ещё email), а браузер
+    получает один файл cookie с флагом HttpOnly, только для API игры. Без аналитики,
+    без слежки, без localStorage.</p>
   </footer>
 </div>
 <script src="/klad/levels.js"></script>

@@ -38,7 +38,9 @@ where the CRT title screen and CV content now live unchanged.
 
 - **Headers.** Added `Cross-Origin-Embedder-Policy: require-corp`,
   `Origin-Agent-Cluster`, `X-Permitted-Cross-Domain-Policies: none`, and
-  more denied features in `Permissions-Policy`. Everything is same-origin,
+  more denied features in `Permissions-Policy` (only ones Chromium
+  recognises: `bluetooth` was dropped after it logged an "unrecognized
+  feature" warning on every page). Everything is same-origin,
   so full cross-origin isolation costs nothing. `/klad/` now enforces
   Trusted Types with no policies: the game only writes `textContent`, so a
   future `innerHTML` fails loudly instead of becoming a DOM XSS. Verified on

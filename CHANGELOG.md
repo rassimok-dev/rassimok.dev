@@ -3,6 +3,25 @@
 Dated entries, newest first. Written for a reader picking this up cold —
 or a future session needing to know what already exists and why.
 
+## 2026-11-12 - CI check tools pinned
+
+`html-validate` is pinned to 11.17.0 and `linkinator` to 8.1.0 in
+`.github/workflows/ci.yml`. Both checks passed with these versions locally
+on Node 24.22.3, along with the level tests.
+
+### Decisions worth not relitigating
+
+- **Pinned, not `latest`.** `npx --yes <tool>` downloads and runs whatever
+  version was published last, on every CI run and every local check. That is
+  code nobody here has reviewed, executed with the repository checked out.
+  A pin makes upgrading the tools themselves a deliberate change. Their own
+  dependencies still resolve fresh on each run: locking those would need a
+  `package.json` and lockfile, which the site deliberately does not have.
+- **Pin to a release that has been out for a while.** When these pins were
+  chosen, html-validate had published 11.21.1 that same day; 11.17.0 was the
+  newest release at least two weeks old. A fresh release is where a
+  compromised publish would surface, so let it age before adopting it.
+
 ## 2026-10-30 (later still) — Game feel: no selection, no wall deaths, beeper sound
 
 Three changes from the first rounds on a real phone.

@@ -9,14 +9,16 @@ proxy (below), it is self-contained on purpose so it can be removed in one go.
 ## Files
 | | |
 |---|---|
-| `index.html` | page: HUD, canvas, touch pad, footer, the nick prompt and boards dialogs |
+| `index.html` | page: HUD, canvas, touch pad, footer, the nick prompt, boards and lobby dialogs |
 | `klad.css` | styles; defines the palette the game reads |
 | `klad.js` | engine: movement, guards (BFS chase), shots, holes, phases, render, input; holds while a dialog is open |
 | `levels.js` | five levels, each in two shapes (landscape 24×16, portrait 16×24), with a `revision` |
 | `ticks.js` | tick constants and the time formatter (`m:ss.cc`), also loaded by the node tests |
 | `online.js` | online part: nick prompt, sending clears and runs, the boards, accounts (login by emailed code, logout); its logic half is also loaded by the node tests |
+| `lobby.js` | the lobby: who is in it, rooms by invite link, ready marks, the host's level and Start, and the one socket module (`KLAD_LOBBY.connect`) the race reuses; its logic half is also loaded by the node tests |
 | `test/levels.test.js` | `node --test`: shape, legend, key-then-exit reachability, revision, fastest clear above the API floor |
 | `test/online.test.js` | `node --test`: `online.js` against a fake `fetch`: request shapes, when results wait or go, a skip during a save, blocked cookies, login codes, verify answers and merges, the read-back after a login, a login ending a skip, logout, 400, 401, 404, 409, 429, offline |
+| `test/lobby.test.js` | `node --test`: `lobby.js` against a fake `fetch`, a fake clock and a fake `WebSocket`: the room id form and the `#room=` link, the room view and the Start condition, presence and room polls only while open and visible, the poll after an own action, 404, 409 `room_full`, the socket at `starting`, its backoff and its stop, the request budget for an hour |
 | `test/proxy.test.js` | `node --test`: the API proxy against a fake `fetch` |
 | `test/ticks.test.js` | `node --test`: the time formatter |
 | `MECHANICS.md` | the original rules as reconstructed from sources |
@@ -66,6 +68,37 @@ checks again) and plays as before.
 - Any open `<dialog>` holds the game: play pauses, timers stop and game keys
   are ignored. Closing it puts the focus back on the field.
 - Nicks come from other players, so every text is set with `textContent`.
+
+## Lobby
+`lobby.js` loads after `online.js` and opens with the "Лобби" button or a
+link `/klad/#room=<id>`. It needs a player: it reads it through
+`KLAD_ONLINE.page`, and without one it opens the nick prompt there first
+(from a link, it then joins the room). Everything is REST through
+`/klad/api` (contract section 7), and nothing is sent while the lobby is
+closed or the tab is hidden:
+
+- While it is open: `POST /presence` and then `GET /presence` (who is in
+  the lobby), at most once per 30 s each, about 240 requests an hour.
+- In a room: `GET /rooms/<id>` every 10 s, plus once right after each own
+  action (join, ready, level, start), about 360 an hour more. Leaving is
+  `POST /rooms/<id>/leave`; closing the dialog leaves too while the room is
+  in the lobby state.
+- A room id is checked against `^[A-Za-z0-9_-]{10}$` before any request;
+  a malformed one, a 404 and a 409 `room_full` each show their message.
+- When a polled room is `starting`, the lobby opens one socket to
+  `wss://<host>/klad/api/race/<id>` with `KLAD_LOBBY.connect` and hands it
+  on: it dispatches `klad:race` on `document` with `detail.room` (the polled
+  room: id, level, shape, players) and `detail.socket` (`send(object)`,
+  `on('message', listener)` for parsed JSON frames, `on('status',
+  listener)`, `status()`, `hasOpened()`, `close()`). The race listens for
+  that event; the lobby only shows a waiting line. A dropped socket tries
+  again after 0.5, 1, 2 and 4 s, then reports `offline` and stops; one that
+  never opened shows "online play is not available in this browser". The
+  lobby closes the socket on leaving and once the room is back in the
+  lobby state.
+- The room marks the caller's own entry with `you`, so the lobby finds this
+  player by it (nicks may repeat among guests). An empty room (host null,
+  no players) shows no member, like a room this player was dropped from.
 
 ## The API proxy
 `functions/klad/api/[[path]].js` is a Cloudflare Pages Function. It forwards

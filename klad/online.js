@@ -323,7 +323,7 @@ const KLAD_ONLINE = (() => {
     };
   }
 
-  return { create, boardPath, TEXT };
+  return { create, boardPath, request, TEXT };
 })();
 if (typeof module !== 'undefined') module.exports = KLAD_ONLINE;
 
@@ -608,5 +608,8 @@ if (typeof document !== 'undefined') (() => {
 
   document.addEventListener('klad:clear', (event) => online.onClear(event.detail));
   document.addEventListener('klad:run', (event) => online.onRun(event.detail));
+  /* lobby.js reads the player through these and reuses the nick prompt;
+     ask() also ends an earlier skip, so a nick saved there is kept. */
+  KLAD_ONLINE.page = { player: online.player, refresh: online.refresh, isAvailable: online.isAvailable, ask: online.ask };
   online.start();
 })();

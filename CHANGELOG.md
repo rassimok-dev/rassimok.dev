@@ -3,6 +3,101 @@
 Dated entries, newest first. Written for a reader picking this up cold —
 or a future session needing to know what already exists and why.
 
+## 2026-11-13 (seventh) - Klad lobby: online list, invite link, room and ready
+
+A "Лобби" button in the HUD opens a lobby dialog: who is in the lobby now,
+"create room" with an invite link `/klad/#room=<id>` and a Copy button, and
+the room view with each player's ready mark, the host marked, the host's
+level choice (1 to 5) and Start once everyone is ready and there are at
+least 2 players. Opening the page with `#room=<id>` opens the lobby and
+joins that room; without a nick it opens the nick prompt first and joins
+once there is one. A malformed id, an unknown room (404) and a full room
+(409 `room_full`) each show their message. All of it is REST against
+contract section 7 (`/presence`, `/rooms`), written in `klad/lobby.js`
+before the API side (RAS-31) is deployed, so it is tested only against a
+fake `fetch`. The one WebSocket client (`KLAD_LOBBY.connect`) is in the
+same file. It opens `wss://<host>/klad/api/race/<id>` only when a polled
+room is `starting`, and the lobby then only shows a waiting line; the race
+itself (RAS-34) takes the socket from there. This merges after the race
+socket (RAS-32) is live: before that, a started room would try a socket the
+API does not serve yet.
+
+### Decisions worth not relitigating
+
+- **REST polling, and nothing outside the open lobby.** The user decided
+  on 2026-11-13 that the lobby is REST, not a socket. Every request goes
+  through the Pages Function and counts against the shared 100,000 a day
+  Workers quota. So the heartbeat (`POST /presence`) and the list
+  (`GET /presence`) run only while the lobby dialog is open and the tab is
+  visible (`document.visibilityState`), at most once per 30 s each (about
+  240 requests an hour). The room poll (`GET /rooms/<id>`) runs every 10 s
+  only while the room view is open and visible (about 360 an hour more,
+  600 in all). Each poll remembers its last run, so hiding and showing the
+  tab, or closing and opening the lobby, never sends sooner; a test plays a
+  whole hour with the tab hidden and shown every 7 s. After each own action
+  (join, ready, level, start) one poll goes out at once and the 10 s count
+  starts again from it, so the view shows the action's effect without
+  waiting for the next poll.
+- **The socket opens only at race start, once.** It opens when a polled
+  room (or the host's own start answer) says `starting`, and only if none
+  is open for that race. After a drop it tries again after 0.5, 1, 2 and
+  4 s, then reports `offline` and stops: every attempt is a Workers request,
+  and the waits (7.5 s in all) stay short next to the API's 15 s wait for
+  every player at race start, which a guest's poll may see up to 10 s
+  late. A successful open resets the count. A normal close (1000)
+  from either side ends it without a retry, because the server closes the
+  sockets after the results. The lobby closes it itself on leaving and
+  when a poll shows the room back in the lobby state. A browser without
+  WebSocket, or a socket that never opened before the tries ran out, shows
+  "online play is not available in this browser"; the game is not touched.
+  The module knows nothing of the race messages (no ping, no positions):
+  contract section 8 is not written yet, and the race adds them.
+- **The hand-off is a `klad:race` event.** Like `klad:clear` and `klad:run`
+  between `klad.js` and `online.js`, the lobby dispatches `klad:race` on
+  `document` right after it creates the socket, before the first attempt,
+  with `detail.room` (the polled room: id, level, shape, players) and
+  `detail.socket` (`send`, `on('message')` with parsed JSON, `on('status')`,
+  `status()`, `hasOpened()`, `close()`). A listener attached then sees every
+  frame, and several listeners can share the socket.
+- **Closing the dialog leaves the room while it is in the lobby state.**
+  Otherwise this player's ready mark would stay for the API's minute and
+  the host could start a race with someone who is gone. While the room is
+  `starting` or `racing` closing keeps the room and the socket, because the
+  race closes this dialog to play (any open dialog holds the game). The
+  explicit "Выйти из комнаты" button leaves in any state.
+- **This player is found by the `you` mark.** The room object marks the
+  caller's own entry with `you` (contract section 7), and guests may share a
+  nick, so matching by nick and kind could pick the wrong entry. The lobby
+  now uses `you` for the own ready mark, for being host and for being in the
+  room at all. A room that a poll returns without a `you` entry (the API
+  drops a member whose lobby was hidden for over a minute, and an empty room
+  has host null and no players) ends the room view with a message; it is
+  not shown as if still joined. Joining one's own room answers 200 even when
+  it is full or not in the lobby, so a reload on `#room=<id>` shows the room
+  with no special case.
+- **The shape goes with the level choice.** A new room is level 1,
+  `landscape`. A host in portrait sends `/level` with level 1 and
+  `portrait` right after creating the room, and every level choice sends
+  the host's shape at that moment. If the host turns the phone afterwards,
+  the room keeps the last sent shape until the next level choice.
+- **A malformed `#room=` id sends nothing.** It is checked against
+  `^[A-Za-z0-9_-]{10}$` before any request, and the lobby then shows only
+  "room not found", without even the presence requests. A link opened in a
+  background tab waits until the tab is visible before it joins, or the
+  API would drop the new member before the first poll.
+- **One request helper and one nick prompt.** `online.js` now exports its
+  `request()` and, in its page half, `KLAD_ONLINE.page` (`player`,
+  `refresh`, `isAvailable`, `ask`). The lobby uses `ask()` rather than
+  opening the nick dialog itself, because `ask()` also ends an earlier skip;
+  without that, a nick saved after a skip would be deleted again. Nothing
+  else in `online.js` changed. The lobby says in its dialog that, while it
+  is open, other players see the nick and the human or agent choice in the
+  list; presence and rooms live only in the API's memory and store nothing
+  new, so the privacy notes stay as they are.
+- **Text from the API is set with `textContent` only**, as on the boards;
+  the invite link is built from `location.origin`, never written as a URL
+  in code, so the CI grep stays as it is.
+
 ## 2026-11-13 (sixth) - The API proxy passes WebSocket upgrades through
 
 The ghost race will run over a WebSocket at

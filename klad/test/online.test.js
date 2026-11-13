@@ -298,7 +298,7 @@ test('a skip while the signed-in player is being read back keeps no player', asy
 
   // when
   const saving = online.choose('test', 'agent');
-  while (server.calls.length < 2) await new Promise(setImmediate);
+  for (let turn = 0; turn < 100 && server.calls.length < 2; turn++) await new Promise(setImmediate);
   online.skip();
   server.release();
   const problem = await saving;
@@ -354,7 +354,7 @@ test('closing the prompt while the waiting results are sent deletes the new play
 
   // when
   const saving = online.choose('test', 'agent');
-  while (server.calls.length < 3) await new Promise(setImmediate);
+  for (let turn = 0; turn < 100 && server.calls.length < 3; turn++) await new Promise(setImmediate);
   const isAskingAtClose = online.isAsking();
   if (online.isAsking()) online.skip();
   server.release();
@@ -367,6 +367,38 @@ test('closing the prompt while the waiting results are sent deletes the new play
   assert.equal(online.player(), null);
   assert.equal(online.isAsking(), false);
   assert.deepEqual(page.notices, []);
+  assert.deepEqual(server.calls, [
+    READ_ME,
+    call('POST /klad/api/players', { nick: 'test', kind: 'agent' }),
+    call('POST /klad/api/clears', CLEAR),
+    call('DELETE /klad/api/players/me'),
+  ]);
+});
+
+test('a result that arrives after a skip during the save is not sent', async () => {
+  // given
+  const server = fakeServer({
+    'GET /klad/api/players/me': [NO_SESSION],
+    'POST /klad/api/players': [[201, PLAYER]],
+    'POST /klad/api/clears': [CREATED],
+    'DELETE /klad/api/players/me': [[204]],
+  }, 'POST /klad/api/clears');
+  const page = fakePage();
+  const online = KLAD_ONLINE.create(server.fetch, page);
+  await online.start();
+  await online.onClear(CLEAR);
+
+  // when
+  const saving = online.choose('test', 'agent');
+  for (let turn = 0; turn < 100 && server.calls.length < 3; turn++) await new Promise(setImmediate);
+  online.skip();
+  const late = online.onClear(CLEAR);
+  server.release();
+  await saving;
+  await late;
+
+  // then
+  assert.equal(online.player(), null);
   assert.deepEqual(server.calls, [
     READ_ME,
     call('POST /klad/api/players', { nick: 'test', kind: 'agent' }),
@@ -389,7 +421,7 @@ test('closing the prompt while a new player is read back deletes it and sends no
 
   // when
   const saving = online.choose('test', 'agent');
-  while (server.calls.length < 2) await new Promise(setImmediate);
+  for (let turn = 0; turn < 100 && server.calls.length < 2; turn++) await new Promise(setImmediate);
   const isAskingAtClose = online.isAsking();
   if (online.isAsking()) online.skip();
   server.release();
@@ -424,7 +456,7 @@ test('closing the prompt while results go to the already signed-in player forget
 
   // when
   const saving = online.choose('other', 'human');
-  while (server.calls.length < 4) await new Promise(setImmediate);
+  for (let turn = 0; turn < 100 && server.calls.length < 4; turn++) await new Promise(setImmediate);
   if (online.isAsking()) online.skip();
   server.release();
   const problem = await saving;

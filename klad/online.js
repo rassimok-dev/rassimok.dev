@@ -106,13 +106,13 @@ const KLAD_ONLINE = (() => {
 
     async function undoSave() {
       const answer = await call('DELETE', '/players/me');
-      if (!isOk(answer.status) && answer.status !== 401) page.notice(TEXT.nickKept);
+      if (answer.status === 401) isCookieBlocked = true;
+      else if (!isOk(answer.status)) page.notice(TEXT.nickKept);
     }
 
-    /* Until this returns, closing the prompt counts as a skip (isAsking stays
-       set), and a skip wins: a player this call created is deleted again.
-       Blocked cookies also count as a skip, and after them nothing more is
-       posted, because each new player would be one this browser cannot delete. */
+    /* Until this returns, closing the prompt is a skip, and a skip wins: a
+       player this call created is deleted again. After blocked cookies
+       nothing more is posted: this browser could not delete it. */
     async function choose(nick, kind) {
       if (isCookieBlocked) return TEXT.noCookie;
       const answer = await call('POST', '/players', { nick, kind });
@@ -156,6 +156,7 @@ const KLAD_ONLINE = (() => {
     function skip() {
       hasSkipped = true;
       isAsking = false;
+      player = null;
       pending = [];
     }
 
@@ -377,7 +378,7 @@ if (typeof document !== 'undefined') (() => {
   }
 
   async function openBoard() {
-    if (document.querySelector('dialog[open]')) return;
+    if (isSaving || document.querySelector('dialog[open]')) return;
     $('board-human').checked = true;
     boardShape.value = matchMedia('(orientation: portrait)').matches ? 'portrait' : 'landscape';
     meConfirm.hidden = true;

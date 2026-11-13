@@ -33,7 +33,8 @@ open, and Space or Enter on a focused HUD button now presses the button.
   again after the waiting results are sent (or the new player is read
   back), and then deletes the player it created (`DELETE /players/me`,
   which also removes results already sent). After `already_signed_in` the
-  player belongs to another tab, so this page only forgets it. If the
+  player belongs to another tab, so this page only forgets it; results it
+  already sent stay with that player. If the
   delete fails, a notice says for 20 s, not 6, that the nick may have been
   kept and that results may be recorded under it until it is deleted in the
   boards. A boards visit reads the player again and shows it with the

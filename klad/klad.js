@@ -455,12 +455,13 @@ const KLAD_GAME = (() => {
   /* ---- Race (race.js): the room's level in the host's shape, whatever this
      device's orientation. No game over, and no klad:clear or klad:run. ---- */
   function startRace(level, shape, hooks) {
-    if (!LEVELS[level - 1] || (shape !== 'landscape' && shape !== 'portrait')) return;
+    if (!LEVELS[level - 1] || (shape !== 'landscape' && shape !== 'portrait')) return false;
     race = { shape, onFinish: hooks.onFinish, ghosts: hooks.ghosts };
     S.level = level - 1; S.lives = START_LIVES; S.score = 0;
     loadLevel(S.level);
     S.ticks = 0;
     hide(); setPhase('play'); SFX.start();
+    return true;
   }
   function stopRace() {
     if (!race) return;

@@ -75,6 +75,7 @@ const KLAD_LOBBY = (() => {
     let reconnects = 0;
     let status = 'connecting';
     let hasOpened = false;
+    let hasLeft = false;
 
     function report(next) {
       status = next;
@@ -137,7 +138,8 @@ const KLAD_LOBBY = (() => {
       return isSent;
     }
 
-    function close() {
+    function close(isLeaving) {
+      hasLeft = isLeaving === true;
       clock.clearTimeout(timer);
       timer = null;
       const current = socket;
@@ -155,6 +157,7 @@ const KLAD_LOBBY = (() => {
       on(type, listener) { listeners[type].push(listener); },
       status: () => status,
       hasOpened: () => hasOpened,
+      hasLeft: () => hasLeft,
     };
   }
 
@@ -230,8 +233,8 @@ const KLAD_LOBBY = (() => {
       }
     }
 
-    function closeSocket() {
-      if (socket !== null) socket.close();
+    function closeSocket(isLeaving) {
+      if (socket !== null) socket.close(isLeaving);
       socket = null;
     }
 
@@ -260,15 +263,18 @@ const KLAD_LOBBY = (() => {
       page.race(room, socket);
     }
 
+    /* The API drops a member whose socket has not connected 15 s after
+       Start, so a socket that never opened is the reason, not another tab.
+       A reload in a race finds it racing; a reconnect within 30 s resumes. */
     function showRoom(data) {
       isRoomDown = false;
       if (!roomView(data).isMember) {
-        forgetRoom(TEXT.removed);
+        forgetRoom(socket !== null && !socket.hasOpened() ? TEXT.raceUnavailable : TEXT.removed);
       } else {
         lastSeen = clock.now();
         room = data;
         if (data.state === 'lobby') closeSocket();
-        else if (data.state === 'starting' && socket === null) startRace();
+        else if ((data.state === 'starting' || data.state === 'racing') && socket === null) startRace();
       }
     }
 
@@ -373,19 +379,21 @@ const KLAD_LOBBY = (() => {
       const answer = await call('POST', roomPath('join'));
       isBusy = false;
       isJoining = false;
+      const isNetworkFailure = answer.status === 0 || answer.status >= 500;
       if (leaveAfterJoin === id) {
         leaveAfterJoin = null;
-        if (answer.status === 200) call('POST', '/rooms/' + id + '/leave');
+        if (answer.status === 200 || isNetworkFailure) call('POST', '/rooms/' + id + '/leave');
+        page.render();
+        resume();
         return;
       }
       if (request !== roomRequest) return;
       if (!isOpen) {
-        if (answer.status === 200) leave();
+        if (answer.status === 200 || isNetworkFailure) leave();
         else forgetRoom('');
         return;
       }
       const code = errorOf(answer);
-      const isNetworkFailure = answer.status === 0 || answer.status >= 500;
       if (answer.status === 200 && answer.data && answer.data.id === id) showRoom(answer.data);
       else if (answer.status === 401) lostPlayer();
       else if (answer.status === 404) forgetRoom(TEXT.roomNotFound);
@@ -442,6 +450,7 @@ const KLAD_LOBBY = (() => {
       if (roomId === null) return Promise.resolve();
       const path = roomPath('leave');
       if (isJoining) leaveAfterJoin = roomId;
+      closeSocket(true);
       forgetRoom('');
       page.render();
       return isJoining ? Promise.resolve() : call('POST', path);
@@ -476,12 +485,13 @@ const KLAD_LOBBY = (() => {
       resume();
     }
 
-    /* A starting or running race keeps the room: the race closes this dialog
-       to play. A join still out leaves in enter(). */
+    /* A live race socket keeps the room: the race closes this dialog to
+       play. A join still out leaves in enter(). */
     function close() {
       isOpen = false;
       phase = 'closed';
-      if (!isJoining && roomId !== null && (room === null || room.state === 'lobby')) leave();
+      const isRaceLive = socket !== null && socket.status() !== 'closed' && socket.status() !== 'offline';
+      if (!isJoining && roomId !== null && !isRaceLive) leave();
       resume();
     }
 
@@ -503,7 +513,7 @@ const KLAD_LOBBY = (() => {
     function raceText() {
       let text = '';
       if (socket !== null && socket.status() === 'offline') text = socket.hasOpened() ? TEXT.offline : TEXT.raceUnavailable;
-      else if (socket !== null && socket.status() !== 'closed') text = TEXT.raceWaiting;
+      else if (socket !== null && socket.status() !== 'closed' && room !== null && room.state === 'starting') text = TEXT.raceWaiting;
       return text;
     }
 

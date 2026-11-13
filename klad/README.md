@@ -19,8 +19,8 @@ proxy (below), it is self-contained on purpose so it can be removed in one go.
 | `race.js` | the ghost race on the lobby's socket: countdown, positions, ghosts, finish, the finish screen; its logic half is also loaded by the node tests |
 | `test/levels.test.js` | `node --test`: shape, legend, key-then-exit reachability, revision, fastest clear above the API floor |
 | `test/online.test.js` | `node --test`: `online.js` against a fake `fetch`: request shapes, when results wait or go, a skip during a save, blocked cookies, login codes, verify answers and merges, the read-back after a login, a login ending a skip, logout, 400, 401, 404, 409, 429, offline |
-| `test/lobby.test.js` | `node --test`: `lobby.js` against a fake `fetch`, a fake clock and a fake `WebSocket`: the room id form and the `#room=` link, the room view and the Start condition, presence and room polls only while open and visible, the poll after an own action, 404, 409 `room_full`, the socket at `starting` (backoff, 1008, the cap in all, its stop), the re-join after the sweep (heartbeat 204 not counted, a tap on Ready, 57 s, network failures, a poll answered after a hide), another link and the leave button during a join, the answers after the close, the request budget for an hour |
-| `test/race.test.js` | `node --test`: `race.js` on the lobby's real socket module with a fake `WebSocket`, a fake clock and a fake engine: the countdown and go, a missed go, the position rate only while racing, visible and in play, one ping timer across reconnects, finish once and its resend after a reconnect, ghosts by slot, their fade and resync, the results view, close 1000, offline, a second race; and `klad.js` in a `vm` context with a stub page: the host's shape whatever the orientation, the exit and deaths in a race with no `klad:clear`, `klad:run` or game over, `stopRace`, ghosts drawn as canvas text |
+| `test/lobby.test.js` | `node --test`: `lobby.js` against a fake `fetch`, a fake clock and a fake `WebSocket`: the room id form and the `#room=` link, the room view and the Start condition, presence and room polls only while open and visible, the poll after an own action, 404, 409 `room_full`, the socket at `starting` and at `racing` after a reload, once (backoff, 1008, the cap in all, its stop), the not-available text when the API drops a player whose socket never opened, the re-join after the sweep (heartbeat 204 not counted, a tap on Ready, 57 s, network failures, a poll answered after a hide), another link and the leave button during a join, the answers after the close, the request budget for an hour |
+| `test/race.test.js` | `node --test`: `race.js` on the lobby's real socket module with a fake `WebSocket`, a fake clock and a fake engine: the countdown and go, a missed go, the position rate only while racing, visible and in play, one ping timer across reconnects, finish once and its resend after a reconnect, ghosts by slot, their fade and resync, the results view, close 1000, offline, a second race, a reload in the race and after the own finish; `race.js`'s page half in a `vm` context with stub dialogs: Escape on the finish screen leaves the room, "Назад в комнату" and go do not; and `klad.js` in a `vm` context with a stub page: the host's shape whatever the orientation, the exit and deaths in a race with no `klad:clear`, `klad:run` or game over, `stopRace`, ghosts drawn as canvas text |
 | `test/proxy.test.js` | `node --test`: the API proxy against a fake `fetch` |
 | `test/ticks.test.js` | `node --test`: the time formatter |
 | `MECHANICS.md` | the original rules as reconstructed from sources |
@@ -83,23 +83,28 @@ closed or the tab is hidden:
   the lobby), at most once per 30 s each, about 240 requests an hour.
 - In a room: `GET /rooms/<id>` every 10 s, plus once right after each own
   action (join, ready, level, start), about 360 an hour more. Leaving is
-  `POST /rooms/<id>/leave`; closing the dialog leaves too while the room is
-  in the lobby state.
+  `POST /rooms/<id>/leave`; closing the dialog leaves too unless a race socket is live.
 - A room id is checked against `^[A-Za-z0-9_-]{10}$` before any request;
   a malformed one, a 404 and a 409 `room_full` each show their message.
-- When a polled room is `starting`, the lobby opens one socket to
+- When a polled room is `starting`, or `racing` (a reload in the race; the
+  API lets a member reconnect within 30 s), and the lobby has no socket for
+  this race yet, it opens one to
   `wss://<host>/klad/api/race/<id>` with `KLAD_LOBBY.connect` and hands it
   on: it dispatches `klad:race` on `document` with `detail.room` (the polled
   room: id, level, shape, players) and `detail.socket` (`send(object)`,
   `on('message', listener)` for parsed JSON frames, `on('status',
-  listener)`, `status()`, `hasOpened()`, `close()`). The race listens for
+  listener)`, `status()`, `hasOpened()`, `close(isLeaving)`, `hasLeft()`). The race listens for
   that event; the lobby only shows a waiting line. A dropped socket tries
   again after 0.5, 1, 2 and 4 s, then reports `offline` and stops; an open
   starts the waits again, but one `connect()` reconnects at most 8 times
   in all. Close 1000 ends it as `closed` and 1008 as `offline`, both with
   no retry. One that never opened shows "online play is not available in
-  this browser". The lobby closes the socket on leaving and once the room
-  is back in the lobby state. `KLAD_LOBBY.page` (`open()`, `leave()`) lets
+  this browser", and so does a poll that no longer lists this player while
+  such a socket is still trying (the API drops a member not connected 15 s
+  after Start). The lobby closes the socket on leaving and once the room
+  is back in the lobby state. Closing the dialog leaves the room unless a
+  race socket is live (not `closed` or `offline`); the waiting line shows
+  only while the room is `starting`. `KLAD_LOBBY.page` (`open()`, `leave()`) lets
   the race's finish screen open the lobby again or leave the room.
 - The room marks the caller's own entry with `you`, so the lobby finds this
   player by it (nicks may repeat among guests). An empty room (host null,
@@ -133,7 +138,10 @@ player's game: no shared world, no collision.
   shape and each player's `slot`. `countdown` closes the lobby dialog and
   shows 3, 2, 1 a second apart in the race dialog; `go` closes it and starts
   the level fresh in the host's shape, whatever this device's orientation.
-  A `state` that says `racing` before any `go` starts it too.
+  A `state` that says `racing` before any `go` starts it too, unless it
+  shows this player finished (a reload after the finish): then the race
+  closes the lobby dialog and only waits for `results`, and the waiting line
+  has no time.
 - Sent: `ping` every 20 s from `klad:race` to the end of the race (dropped
   while the socket is not open); `pos` with `x` and `y` in cells (two
   decimals) and the attempt's `tick`, every 200 ms, only while racing, the
@@ -152,13 +160,21 @@ player's game: no shared world, no collision.
 - After the exit the top of the field says "waiting for the others" until
   `results`. The finish screen lists place, nick (marked winner, you, left)
   and time (`KLAD_TICKS.format`), with "Назад в комнату" (opens the lobby
-  again) and "Выйти из комнаты".
+  again) and "Выйти из комнаты". Closing it any other way, Escape too,
+  leaves the room, as the screen says.
+- A hostile member's input is bounded: a `pos` outside cells 0 to 24 makes no
+  ghost, and a result time over the race cap (4 minutes and 10 s) shows as
+  `-`. `startRace` returns whether it started; if not, the race ends with a
+  notice. After the player's own leave the notice says "you left the room".
+  Only one of the field notice and the race dialog's status line holds the
+  text (and is announced) at a time. The dialog says room members see the
+  runner, nick and time during the race, and nothing goes to the boards.
 - A dropped socket shows "reconnecting" and play goes on. Close 1000 before
   the results (`replaced`, `idle`, or leaving the room in the lobby) or
   `offline` after the socket opened ends the race with a note on the field
   and goes back to the title; a socket that never opened says online play
   is not available.
-- The engine hook: `KLAD_GAME.startRace(level, shape, { onFinish, ghosts })`,
+- The engine hook: `KLAD_GAME.startRace(level, shape, { onFinish, ghosts })` (true when it started),
   `KLAD_GAME.stopRace()` and `KLAD_GAME.racePosition()` (`{x, y, tick}` in
   play during a race, otherwise null).
 - Status: written before RAS-32 was deployed; it has not yet run against the

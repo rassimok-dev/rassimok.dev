@@ -689,6 +689,51 @@ test('closing the lobby while a join is out sends the leave only after the join 
   assert.equal(clock.pending(), 0);
 });
 
+test('a deferred leave is sent also when the held join fails with 5xx', async () => {
+  // given
+  const { lobby, server, clock } = setup({ ...PRESENCE, [JOIN]: [[503]], [LEAVE]: [[204]] });
+  const release = server.hold(JOIN);
+  await lobby.open(ID);
+  await settle();
+  lobby.close();
+
+  // when
+  release();
+  await clock.advance(60 * 1000);
+
+  // then
+  assert.deepEqual(roomCalls(server.calls), [JOIN, LEAVE]);
+  assert.equal(lobby.state().roomId, null);
+});
+
+test('closing the lobby after the race socket went offline leaves the room', async () => {
+  // given
+  const { lobby, server, clock, sockets } = await joined({ [LEAVE]: [[204]] });
+  server.answers[POLL] = [[200, room({ state: 'racing' })]];
+  await clock.advance(KLAD_LOBBY.ROOM_EVERY);
+  sockets.made[0].onclose({ code: 1000 });
+
+  // when
+  lobby.close();
+  await clock.advance(0);
+
+  // then
+  assert.equal(server.calls.includes(LEAVE), true);
+  assert.equal(lobby.state().roomId, null);
+});
+
+test('the waiting line shows only while the room is starting', async () => {
+  // given
+  const { lobby, server, clock } = await joined();
+  server.answers[POLL] = [[200, room({ state: 'racing' })]];
+
+  // when
+  await clock.advance(KLAD_LOBBY.ROOM_EVERY);
+
+  // then
+  assert.equal(lobby.state().race, '');
+});
+
 test('leave posts /leave, forgets the room and stops the poll while the lobby stays open', async () => {
   // given
   const { lobby, server, clock } = await joined({ [LEAVE]: [[204]] });
@@ -1256,6 +1301,68 @@ test('a socket that never opens says online play is not available after the last
   // then
   assert.equal(sockets.made.length, KLAD_LOBBY.SOCKET_TRIES + 1);
   assert.equal(lobby.state().race, TEXT.raceUnavailable);
+});
+
+test('a poll without this player while a socket that never opened still tries says online play is not available', async () => {
+  // given
+  const handshakeFailsAfter = 800;
+  const { lobby, server, clock, sockets, page } = await joined();
+  server.answers[POLL] = [[200, room({ state: 'starting' })], [200, room({ state: 'racing', players: [ANNA] })]];
+  await clock.advance(KLAD_LOBBY.ROOM_EVERY);
+  for (let i = 0; i < KLAD_LOBBY.SOCKET_TRIES - 1; i++) {
+    await clock.advance(handshakeFailsAfter);
+    sockets.made[i].onclose({ code: 1006 });
+    await clock.advance(KLAD_LOBBY.SOCKET_FIRST_WAIT * 2 ** i);
+  }
+  const statusBeforePoll = page.races[0].socket.status();
+
+  // when
+  await clock.advance(2 * KLAD_LOBBY.ROOM_EVERY - clock.now());
+
+  // then
+  assert.equal(statusBeforePoll, 'reconnecting');
+  assert.equal(count(server.calls, POLL), 3);
+  assert.equal(lobby.state().roomId, null);
+  assert.equal(lobby.state().message, TEXT.raceUnavailable);
+});
+
+test('a poll without this player after the socket opened still says the player is no longer in the room', async () => {
+  // given
+  const { lobby, server, clock, sockets } = await joined();
+  server.answers[POLL] = [[200, room({ state: 'starting' })], [200, room({ state: 'racing', players: [ANNA] })]];
+  await clock.advance(KLAD_LOBBY.ROOM_EVERY);
+  sockets.made[0].onopen();
+
+  // when
+  await clock.advance(KLAD_LOBBY.ROOM_EVERY);
+
+  // then
+  assert.equal(lobby.state().roomId, null);
+  assert.equal(lobby.state().message, TEXT.removed);
+});
+
+test('a join that answers racing (a reload in the race) opens one socket, and no later poll opens a second one', async () => {
+  // given
+  const racing = room({ state: 'racing' });
+  const { server, clock, sockets, page } = await joined({ [JOIN]: [[200, racing]], [POLL]: [[200, racing]] });
+
+  // when
+  await clock.advance(0);
+
+  // then
+  assert.equal(page.races.length, 1);
+  assert.deepEqual(page.races[0].room, racing);
+  assert.equal(sockets.made.length, 1);
+
+  // when
+  sockets.made[0].onopen();
+  sockets.made[0].onclose({ code: 1000 });
+  await clock.advance(3 * KLAD_LOBBY.ROOM_EVERY);
+
+  // then
+  assert.equal(count(server.calls, POLL), 4);
+  assert.equal(page.races.length, 1);
+  assert.equal(sockets.made.length, 1);
 });
 
 /* ---- the request budget ---- */

@@ -2,8 +2,8 @@
 /* klad/race.js without a browser, on the lobby's real socket module: a fake
    WebSocket opens, receives and drops only when a test says so, a fake clock
    runs timers only when a test advances it, and a fake engine records what
-   the race asks of it. The last part runs klad.js itself in a vm context
-   with a stub page, for what only the engine can prove. */
+   the race asks of it. The last parts run klad.js itself and race.js's page
+   half in a vm context with a stub page, for what only they can prove. */
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -69,12 +69,15 @@ function fakeEngine() {
     starts: [],
     stops: 0,
     position: null,
-    start(level, shape) { this.starts.push([level, shape]); },
+    start(level, shape) {
+      this.starts.push([level, shape]);
+      return this.isStartable !== false;
+    },
     stop() { this.stops++; },
   };
 }
 
-function setup() {
+function setup(room = ROOM) {
   const clock = fakeClock();
   const sockets = fakeSockets();
   const engine = fakeEngine();
@@ -87,7 +90,7 @@ function setup() {
     engine: { start: (level, shape) => engine.start(level, shape), stop: () => engine.stop(), position: () => engine.position },
   }, page);
   const socket = KLAD_LOBBY.connect('ws://test/klad/api/race/' + ID, sockets.FakeWebSocket, clock);
-  race.begin(ROOM, socket);
+  race.begin(room, socket);
   clock.advance(0);
   const server = () => sockets.made[sockets.made.length - 1];
   const say = (message) => server().onmessage({ data: JSON.stringify(message) });
@@ -165,6 +168,37 @@ test('a state that says racing starts a race that missed go', () => {
   // then
   assert.deepEqual(engine.starts, [[3, 'portrait']]);
   assert.equal(race.state().phase, 'racing');
+});
+
+test('a race begun in a room already racing (a reload) starts the level on the first state', () => {
+  // given
+  const { race, engine, server, say } = setup({ ...ROOM, state: 'racing' });
+  server().onopen();
+  // when
+  say({ ...STATE, state: 'racing', positions: [{ slot: 1, x: 9, y: 3, tick: 900 }] });
+  // then
+  assert.deepEqual(engine.starts, [[3, 'portrait']]);
+  assert.equal(race.state().phase, 'racing');
+  assert.equal(race.ghosts().length, 1);
+});
+
+test('a state after a reload that shows this player finished waits for the results without starting the level', () => {
+  // given
+  const { race, engine, server, say } = setup({ ...ROOM, state: 'racing' });
+  server().onopen();
+  // when
+  say({ ...STATE, state: 'racing', players: [{ ...ME, finished: true }, ANNA] });
+  race.finish(1234);
+  // then
+  assert.deepEqual(engine.starts, []);
+  assert.deepEqual(sentOf(server(), 'finish'), []);
+  assert.equal(race.state().phase, 'finished');
+  assert.equal(race.state().notice, TEXT.finishedWaiting);
+  // when
+  say({ type: 'results', places: [{ slot: 0, nick: 'test', kind: 'agent', place: 1, ticks: 1500, left: false }] });
+  // then
+  assert.equal(race.state().phase, 'results');
+  assert.equal(race.state().places[0].isMine, true);
 });
 
 /* ---- what goes out ---- */
@@ -642,4 +676,168 @@ test('klad.js: no ghosts are drawn outside a race', () => {
   run(2);
   // then
   assert.deepEqual(texts, []);
+});
+
+/* ---- race.js's page half, in a vm context with stub dialogs ---- */
+
+function loadRacePage() {
+  const documentListeners = {};
+  const elements = {};
+  const lobbyCalls = [];
+  const closeEvents = [];
+  const node = () => ({
+    textContent: '', className: '', hidden: false, open: false, listeners: {},
+    addEventListener(type, listener) { this.listeners[type] = listener; },
+    focus() {}, append() {}, replaceChildren() {},
+    createCaption: () => node(), createTHead: () => node(), createTBody: () => node(),
+    insertRow: () => node(), insertCell: () => node(),
+    showModal() { this.open = true; },
+    /* A browser fires close later, after the handler that closed the dialog. */
+    close() {
+      if (!this.open) return;
+      this.open = false;
+      closeEvents.push(() => { if (this.listeners.close) this.listeners.close(); });
+    },
+  });
+  const document = {
+    visibilityState: 'visible',
+    getElementById: (id) => elements[id] || (elements[id] = node()),
+    createElement: () => node(),
+    querySelector: () => (Object.values(elements).some((element) => element.open) ? {} : null),
+    addEventListener: (type, listener) => { documentListeners[type] = listener; },
+  };
+  const sandbox = {
+    document,
+    KLAD_LEVELS: [{ name: 'test' }, { name: 'test' }],
+    KLAD_TICKS,
+    KLAD_GAME: { startRace: () => true, stopRace() {}, racePosition: () => null },
+    KLAD_LOBBY: { page: { open: () => lobbyCalls.push('open'), leave: () => lobbyCalls.push('leave') } },
+    Date,
+    setTimeout: () => 0,
+    clearTimeout: () => {},
+  };
+  vm.createContext(sandbox);
+  vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'race.js'), 'utf8'), sandbox);
+  const messageListeners = [];
+  const socket = {
+    send: () => true,
+    on: (type, listener) => { if (type === 'message') messageListeners.push(listener); },
+    status: () => 'open',
+    hasOpened: () => true,
+  };
+  documentListeners['klad:race']({ detail: { room: ROOM, socket } });
+  const say = (message) => { for (const listener of messageListeners) listener(message); };
+  const fireCloseEvents = () => { while (closeEvents.length > 0) closeEvents.shift()(); };
+  return { elements, lobbyCalls, say, fireCloseEvents, dialog: elements.race };
+}
+
+test('race.js: closing the finish screen with Escape leaves the room', () => {
+  // given
+  const { lobbyCalls, say, fireCloseEvents, dialog } = loadRacePage();
+  say({ type: 'results', places: [] });
+  const isShown = dialog.open;
+  // when
+  dialog.close();
+  fireCloseEvents();
+  // then
+  assert.equal(isShown, true);
+  assert.deepEqual(lobbyCalls, ['leave']);
+});
+
+test('race.js: the back to room button on the finish screen opens the lobby and stays in the room', () => {
+  // given
+  const { elements, lobbyCalls, say, fireCloseEvents, dialog } = loadRacePage();
+  say({ type: 'results', places: [] });
+  // when
+  elements['race-room'].listeners.click();
+  fireCloseEvents();
+  // then
+  assert.equal(dialog.open, false);
+  assert.deepEqual(lobbyCalls, ['open']);
+});
+
+test('race.js: go closes the countdown dialog without leaving the room', () => {
+  // given
+  const { lobbyCalls, say, fireCloseEvents, dialog } = loadRacePage();
+  say({ type: 'countdown', seconds: 3 });
+  const isShown = dialog.open;
+  // when
+  say({ type: 'go', at: 1763000000000 });
+  fireCloseEvents();
+  // then
+  assert.equal(isShown, true);
+  assert.equal(dialog.open, false);
+  assert.deepEqual(lobbyCalls, []);
+});
+
+test('race.js: a reload after the own finish closes the lobby and shows the waiting line on the field', () => {
+  // given
+  const { elements, lobbyCalls, say, fireCloseEvents } = loadRacePage();
+  elements.lobby.open = true;
+  // when
+  say({ ...STATE, state: 'racing', players: [{ ...ME, finished: true }, ANNA] });
+  fireCloseEvents();
+  // then
+  assert.equal(elements.lobby.open, false);
+  assert.equal(elements['race-notice'].textContent, TEXT.finishedWaiting);
+  assert.equal(elements['race-status'].textContent, '');
+  assert.deepEqual(lobbyCalls, []);
+});
+
+/* ---- hostile and failing input ---- */
+
+test('a position outside the grid plus one cell makes no ghost', () => {
+  // given
+  const { race, say } = racing();
+
+  // when
+  say({ type: 'pos', slot: 1, nick: 'Anna', x: 25, y: 3, tick: 1 });
+  say({ type: 'pos', slot: 1, nick: 'Anna', x: 3, y: -1, tick: 1 });
+  say({ type: 'pos', slot: 2, nick: 'Anna', x: 24, y: 0, tick: 1 });
+
+  // then
+  assert.deepEqual(race.ghosts().map((ghost) => ghost.slot), [2]);
+});
+
+test('a time over the race cap shows as a dash in the results', () => {
+  // given
+  const { race, say } = racing();
+
+  // when
+  say({ type: 'results', places: [
+    { slot: 1, nick: 'Anna', place: 1, ticks: 4 * 60 * 120 + 1200 + 1, left: false },
+    { slot: 0, nick: 'test', place: 2, ticks: 1500, left: false },
+  ] });
+
+  // then
+  assert.deepEqual(race.state().places.map((entry) => entry.time), ['-', '0:12.50']);
+});
+
+test('a go the engine cannot start ends the race with a notice', () => {
+  // given
+  const { race, engine, server, say } = setup();
+  engine.isStartable = false;
+  server().onopen();
+  say(STATE);
+
+  // when
+  say({ type: 'go', at: 1763000000000 });
+
+  // then
+  assert.equal(race.state().phase, 'idle');
+  assert.equal(race.state().notice, TEXT.notStarted);
+  assert.equal(engine.stops, 1);
+});
+
+test('a socket closed by the own leave ends the race with the left notice, not the server one', () => {
+  // given
+  const { race, socket, clock } = racing();
+
+  // when
+  socket.close(true);
+  clock.advance(0);
+
+  // then
+  assert.equal(race.state().phase, 'idle');
+  assert.equal(race.state().notice, TEXT.left);
 });

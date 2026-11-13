@@ -45,7 +45,8 @@ module on a fake `WebSocket`, a fake clock and a fake engine, and run
   `starting`) and opens the race dialog, and `go` closes that. Any open
   dialog holds the game, so the title cannot be played meanwhile. Only a
   change of phase opens or closes the dialog, so one closed with Escape
-  stays closed.
+  stays closed. Racing and finished close the lobby too: a reload in the
+  race lands there straight from the lobby dialog.
 - **Positions only while racing, visible and in play.** `pos` goes every
   200 ms (the server drops more than 10 a second), rounded to two decimals
   to keep frames far under the 512-byte cap, and only while the tab is
@@ -72,6 +73,23 @@ module on a fake `WebSocket`, a fake clock and a fake engine, and run
   again and "Выйти из комнаты" leaves the room through the lobby
   (`KLAD_LOBBY.page`, like `KLAD_ONLINE.page`), so the lobby's own room
   bookkeeping stays the only one.
+- **Closing the finish screen leaves the room, unless it is "Назад в
+  комнату".** After the results the room is back in the lobby with the
+  ready marks cleared. A player who closed the screen with Escape stayed a
+  not-ready member until the API's 60 s sweep, and Start answered
+  `not_ready` for the others meanwhile. The screen now says that closing
+  leaves, like the lobby's hint. The room button's flag is cleared in the
+  `close` listener, not in the click handler, because a browser fires
+  `close` after the handler has returned; the test's stub dialog does the
+  same.
+- **A reload during a race resumes it.** The `#room=` link joins again,
+  the API answers 200 with the room in `racing`, and the lobby opens the
+  socket, so the race starts from the server's `state` (contract section
+  8). When that `state` shows this player already finished, the race does
+  not start the level again: it waits for `results`, sends no second
+  finish (the server has it), and says so without a time, which the reload
+  has lost. The host's URL still has no `#room=`, so a host who reloads
+  loses the room (an open item from the lobby's second review).
 - **Ends without results get a note, not a dialog.** Close 1000 before the
   results (`replaced`, `idle`, or the lobby's own leave button) and
   `offline` after the socket opened end the race and go back to the title
@@ -79,6 +97,22 @@ module on a fake `WebSocket`, a fake clock and a fake engine, and run
   of the lobby after a deliberate leave. A drop only shows "reconnecting":
   the lobby's module reconnects and the local game goes on. A socket that
   never opened says online play is not available.
+- **Hostile input and small texts (second fix round).** A member's `pos`
+  outside cells 0 to 24 (the larger side plus one) makes no ghost, and a
+  result time over 4 minutes and 10 s shows as `-`, so nobody can put a
+  ghost off the field or stretch the results table. Closing the lobby now
+  leaves the room unless a race socket is live, so the "closing leaves"
+  hint holds after a race too; a deferred leave also goes out when the held
+  join answers 0 or 5xx (a leave from a non-member is a harmless 204), and
+  that branch renders and resumes. `startRace` returns whether it started
+  and the race ends with a notice when not. The lobby's waiting line shows
+  only while the room is `starting`. The socket remembers an own leave
+  (`close(true)`, `hasLeft()`), so the race says "you left the room"
+  instead of the closed-by-server text. The field notice and the dialog's
+  status line are both live regions, so only the one in view gets the text
+  (the other is emptied) and it is announced once. The race dialog states
+  who sees what: room members see the runner, nick and time during the
+  race, and nothing goes to the boards.
 - **The engine itself is under test now.** A fake engine cannot show that
   `klad.js` suppresses `klad:clear`, `klad:run` and game over, so
   `test/race.test.js` also runs `klad.js` in a `vm` context with a stub
@@ -102,7 +136,8 @@ before the API side (RAS-31) was deployed. It has not yet run against the
 live API: the tests use a fake `fetch`, a fake clock and a fake
 `WebSocket`. The one WebSocket client (`KLAD_LOBBY.connect`) is in the
 same file. It opens `wss://<host>/klad/api/race/<id>` only when a polled
-room is `starting`, and the lobby then only shows a waiting line; the race
+room is `starting` (or `racing`, after a reload in the race), and the lobby
+then only shows a waiting line; the race
 itself (RAS-34) takes the socket from there. This merges together with the
 race (RAS-34), after the race socket (RAS-32) is live, never alone: without
 the race, Start would open a socket and leave the players waiting for
@@ -125,8 +160,11 @@ nothing.
   starts again from it, so the view shows the action's effect without
   waiting for the next poll.
 - **The socket opens only at race start, once.** It opens when a polled
-  room (or the host's own start answer) says `starting`, and only if none
-  is open for that race. After a drop it tries again after 0.5, 1, 2 and
+  room (or the host's own start answer) says `starting`, or `racing` after
+  a reload in the race (the API lets a member reconnect within 30 s), and
+  only if the lobby has none for that race. A socket that ended stays
+  until the room is back in the lobby, so a `racing` poll cannot open
+  another one in a loop. After a drop it tries again after 0.5, 1, 2 and
   4 s, then reports `offline` and stops: every attempt is a Workers request,
   and the waits (7.5 s in all) stay short next to the API's 15 s wait for
   every player at race start, which a guest's poll may see up to 10 s
@@ -142,7 +180,11 @@ nothing.
   lobby closes it itself on leaving and when a poll shows the room back in
   the lobby state. A browser without WebSocket, or a socket that never
   opened before the tries ran out, shows "online play is not available in
-  this browser"; the game is not touched. Contract section 8 is the
+  this browser"; the game is not touched. So does a poll that no longer
+  lists this player while such a socket is still trying: the API drops a
+  member not connected 15 s after Start, and a joiner whose poll saw
+  `starting` late gets that poll before the tries run out, where "you are
+  no longer in this room" would blame another tab. Contract section 8 is the
   protocol; the module sends and reads none of its messages, and the race
   (RAS-34) adds `ping` (every 20 s), `pos` and `finish`.
 - **The hand-off is a `klad:race` event.** Like `klad:clear` and `klad:run`

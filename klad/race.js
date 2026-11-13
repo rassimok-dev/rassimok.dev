@@ -12,12 +12,17 @@ const KLAD_RACE = (() => {
   const FADE_FOR = 1000;
   const NOTICE_FOR = 8 * 1000;
   const SLOTS = 4;
+  const LAST_CELL = 24;
+  const MAX_TICKS = (4 * 60 + 10) * 120;
   const SHAPES = ['landscape', 'portrait'];
   const ACTIVE = ['starting', 'countdown', 'racing', 'finished'];
   const TEXT = {
     reconnecting: 'Связь прервалась, подключаемся снова... Игра идёт дальше.',
     waiting: (time) => 'Финиш: ' + time + '. Ждём остальных...',
+    finishedWaiting: 'Ваш финиш уже засчитан. Ждём остальных...',
     closed: 'Гонка закрыта: её закрыл сервер, или она идёт в другой вкладке.',
+    left: 'Вы вышли из комнаты.',
+    notStarted: 'Не удалось начать гонку: этап недоступен. Обычная игра работает как прежде.',
     lost: 'Связь с сервером пропала, гонка для вас закончилась. Обычная игра работает как прежде.',
     unavailable: 'Онлайн-игра недоступна в этом браузере. Обычная игра работает как прежде.',
   };
@@ -80,7 +85,8 @@ const KLAD_RACE = (() => {
 
     function takePosition(entry, nick) {
       const isValid = isObject(entry) && Number.isInteger(entry.slot) && entry.slot >= 0 && entry.slot < SLOTS
-        && entry.slot !== mySlot && Number.isFinite(entry.x) && Number.isFinite(entry.y);
+        && entry.slot !== mySlot && Number.isFinite(entry.x) && Number.isFinite(entry.y)
+        && entry.x >= 0 && entry.x <= LAST_CELL && entry.y >= 0 && entry.y <= LAST_CELL;
       if (!isValid) return;
       const previous = ghosts.get(entry.slot);
       let direction = previous ? previous.direction : 1;
@@ -95,7 +101,10 @@ const KLAD_RACE = (() => {
       clock.clearTimeout(countdownTimer);
       countdownTimer = null;
       phase = 'racing';
-      engine.start(level, shape);
+      if (!engine.start(level, shape)) {
+        end(TEXT.notStarted);
+        return;
+      }
       positionTimer = clock.setTimeout(sendPosition, POSITION_EVERY);
       page.render();
     }
@@ -114,7 +123,8 @@ const KLAD_RACE = (() => {
     }
 
     /* Sent on every connect, so it also resyncs after a reconnect: the
-       ghosts, a finish the server has not got yet, and a missed go. */
+       ghosts, a finish the server has not got yet, and a missed go. After a
+       reload past this player's finish there is nothing left to play. */
     function takeState(data) {
       if (Number.isInteger(data.level) && data.level >= 1 && SHAPES.includes(data.shape)) {
         level = data.level;
@@ -125,10 +135,20 @@ const KLAD_RACE = (() => {
       mySlot = mine ? mine.slot : null;
       ghosts.clear();
       for (const entry of Array.isArray(data.positions) ? data.positions : []) takePosition(entry);
-      isFinishSent = Boolean(mine && mine.finished === true);
+      const hasFinished = Boolean(mine && mine.finished === true);
+      isFinishSent = hasFinished;
       sendFinish();
-      if (data.state === 'racing' && (phase === 'starting' || phase === 'countdown')) go();
+      const isBeforeGo = phase === 'starting' || phase === 'countdown';
+      if (data.state === 'racing' && isBeforeGo && hasFinished) arriveFinished();
+      else if (data.state === 'racing' && isBeforeGo) go();
       else page.render();
+    }
+
+    function arriveFinished() {
+      clock.clearTimeout(countdownTimer);
+      countdownTimer = null;
+      phase = 'finished';
+      page.render();
     }
 
     function takeResults(data) {
@@ -166,7 +186,7 @@ const KLAD_RACE = (() => {
        leaving the room) and offline end the race. */
     function changed(status) {
       if (!ACTIVE.includes(phase)) return;
-      if (status === 'closed') end(phase === 'starting' ? '' : TEXT.closed);
+      if (status === 'closed') end(phase === 'starting' ? '' : (socket.hasLeft() ? TEXT.left : TEXT.closed));
       else if (status === 'offline') end(socket.hasOpened() ? TEXT.lost : TEXT.unavailable);
       else page.render();
     }
@@ -218,13 +238,20 @@ const KLAD_RACE = (() => {
     }
 
     /* The server's order: place 1, 2, ... by the receipt of finish, then
-       those with no finish. */
+       those with no finish. A time over the race cap is shown as '-', so one
+       member cannot stretch the table. */
+    function timeOf(ticks) {
+      let time = null;
+      if (Number.isInteger(ticks)) time = ticks >= 0 && ticks <= MAX_TICKS ? environment.format(ticks) : '-';
+      return time;
+    }
+
     function placesView() {
       const order = (entry) => (Number.isInteger(entry.place) ? entry.place : SLOTS + 1);
       return [...places].sort((first, second) => order(first) - order(second)).map((entry) => ({
         place: Number.isInteger(entry.place) ? entry.place : null,
         nick: typeof entry.nick === 'string' ? entry.nick : '',
-        time: Number.isInteger(entry.ticks) ? environment.format(entry.ticks) : null,
+        time: timeOf(entry.ticks),
         isWinner: entry.place === 1,
         isMine: mySlot !== null && entry.slot === mySlot,
         hasLeft: entry.left === true,
@@ -234,6 +261,7 @@ const KLAD_RACE = (() => {
     function notice() {
       let text = message;
       if (ACTIVE.includes(phase) && socket.status() === 'reconnecting') text = TEXT.reconnecting;
+      else if (phase === 'finished' && finishTicks === null) text = TEXT.finishedWaiting;
       else if (phase === 'finished') text = TEXT.waiting(environment.format(finishTicks));
       return text;
     }
@@ -263,6 +291,7 @@ if (typeof document !== 'undefined') (() => {
     clearTimeout: (timer) => clearTimeout(timer),
   };
   let shownPhase = 'idle';
+  let isBackToRoom = false;
 
   const race = KLAD_RACE.create({
     clock,
@@ -313,12 +342,11 @@ if (typeof document !== 'undefined') (() => {
   }
 
   /* The countdown closes the lobby (any open dialog holds the game), and so
-     does a race that starts without one; go closes the countdown. Only a
-     change of phase opens or closes the dialog, so one closed with Escape
-     stays closed. */
+     does a race that starts or resumes without one; go closes the countdown.
+     Only a change of phase opens or closes the dialog, so Escape stays closed. */
   function showDialogFor(phase) {
     const isDialogPhase = phase === 'countdown' || phase === 'results';
-    if ((isDialogPhase || phase === 'racing') && lobbyDialog.open) lobbyDialog.close();
+    if ((isDialogPhase || phase === 'racing' || phase === 'finished') && lobbyDialog.open) lobbyDialog.close();
     if (isDialogPhase && !dialog.open) dialog.showModal();
     else if (!isDialogPhase && dialog.open) dialog.close();
     if (phase === 'results') roomButton.focus();
@@ -326,8 +354,6 @@ if (typeof document !== 'undefined') (() => {
 
   function render() {
     const state = race.state();
-    notice.textContent = state.notice;
-    status.textContent = state.notice;
     heading.textContent = state.phase === 'results' ? 'Итоги гонки' : 'Гонка';
     levelLine.textContent = levelText(state);
     countLine.hidden = state.phase !== 'countdown';
@@ -338,10 +364,16 @@ if (typeof document !== 'undefined') (() => {
       shownPhase = state.phase;
       showDialogFor(state.phase);
     }
+    const isInDialog = dialog.open;
+    notice.textContent = isInDialog ? '' : state.notice;
+    status.textContent = isInDialog ? state.notice : '';
   }
 
-  /* The lobby opens only when no other dialog is open, so this one closes first. */
+  /* The lobby opens only when no other dialog is open, so this one closes
+     first. Any other close of the finish screen (Escape too) leaves the room,
+     or this player blocks Start for a minute. close fires after the click. */
   roomButton.addEventListener('click', () => {
+    isBackToRoom = true;
     dialog.close();
     KLAD_LOBBY.page.open();
   });
@@ -350,6 +382,8 @@ if (typeof document !== 'undefined') (() => {
     dialog.close();
   });
   dialog.addEventListener('close', () => {
+    if (race.state().phase === 'results' && !isBackToRoom) KLAD_LOBBY.page.leave();
+    isBackToRoom = false;
     if (!document.querySelector('dialog[open]')) canvas.focus({ preventScroll: true });
   });
   document.addEventListener('klad:race', (event) => race.begin(event.detail.room, event.detail.socket));

@@ -11,12 +11,16 @@ in with it (`POST /login/verify`). A new account is the guest itself;
 logging in to an existing account moves the guest's results into it when
 both have the same kind. An account shows its email (only to itself) and
 its kind, can rename, log out (`POST /logout`) and delete itself, email
-included. The boards mark every nick `гость` or `аккаунт`. The privacy
-notes (prompt, both footer notes, the login part), the meta description and
-the README now say that an account also stores its email, that a code
-request stores the address it went to, and that an account can be deleted
-from any device after a login; the login part and the README also say that
-the address gets only login codes. Built
+included. The boards mark every nick `гость` or `аккаунт`. Both footer
+notes, the login part and the README now say that an account also stores
+its email, that a code request keeps only a hash of the address (with the
+hashed code until the code is used, replaced or expires, and with the
+request time for the limits for a day, outdated records deleted with the
+next code request, because nothing runs between requests), that the address itself is
+stored only once a login creates or opens an account, that the server mails
+nothing but login codes, and that an account can be deleted from any device
+after a login. The nick prompt says the same in short; the meta description
+says only that an account stores an email and a code request a hash. Built
 against the shared contract (sections 1, 3, 5, 6). This change merges, and
 so deploys, only after RAS-23 and RAS-24 are live on production: before
 RAS-23 every login fails, and with RAS-23 alone account nicks are not
@@ -46,18 +50,38 @@ so the login note would promise what the API does not do.
   no longer be deleted from any browser. The note says so before the code
   is entered, with the way out: delete the guest first, then log in (an
   existing account needs no guest).
-- **A code request is in the privacy notes, and only codes are mailed.**
-  The login part shows for a browser with no player too, and the API keeps
-  the requested address with the hashed code and counts the requests to it
-  for the limit of three an hour, whether or not an account follows. So the
-  notes say nothing is stored before a nick or an email, not before a nick.
-  They name no time after which the address is gone, because the contract
-  does not pin one yet. The login note and the README also promise that
-  the address gets nothing but login codes; a later mail (a login alert, a
-  deletion notice) means changing them first.
+- **A code request stores a hash, not the address, and only codes are
+  mailed.** The review found that code requests would leave addresses on
+  the server for people who never signed up, someone else's address too,
+  since anyone can type one. So before an account exists the API keeps no
+  address (decided 2026-11-13 after the review, contract section 5): a
+  code request keeps the address's SHA-256 with the hashed code until the
+  code is used, replaced or expires, and, for the limits (three codes an
+  hour per address, 80 mails a day), the hash and the time for at most a
+  day. The address itself is stored only when a login creates or opens an
+  account. Every privacy note says exactly that, at its own length. They
+  say hash, never anonymous, because the hash of a known address can be
+  matched, and they speak only for the game's server: the mail service
+  still gets the address to send the code. The notes still say nothing is
+  stored before a nick or an email, because a code request is the first
+  thing that stores a hash. The notes (all but the meta description) and
+  the README also promise that the server mails nothing but login codes; a
+  later mail (a login alert, a deletion notice) means changing them first.
+- **A login is read back, as a new nick is.** After a 200 from verify the
+  game asks `GET /players/me`. No player there means the browser dropped
+  the account's cookie, so the dialog says cookies look blocked instead of
+  "Вы в аккаунте", and, as after a nick, no further `POST /players` goes
+  out: that player could not be deleted from this browser. A network
+  failure on the read-back keeps the account, as it does for a nick.
+- **A login ends a skip.** Logout and delete count as a skip, so the page
+  does not ask for a nick again; a person who then logs in has not
+  declined one, so later results send and, if the session is lost, prompt
+  again.
 - **`no_session` keeps the code.** It means no account exists for the
   email and the browser has no guest; the dialog asks for a nick through
-  the existing prompt and then for the same code again. If the API used the
+  the existing prompt and then for the same code again. The prompt closes
+  the boards, so the text says to open "Таблицы" again before "Войти";
+  the code field keeps the code meanwhile. If the API used the
   code up, the retry answers `invalid_code`, which asks for a new one, and
   one of the three codes an hour is not spent for nothing. `nick_taken`
   (rename, then a new code) and `too_many_attempts` (the code is gone) do
@@ -66,13 +90,17 @@ so the login note would promise what the API does not do.
   rename and delete already had: a double click on "Получить код" would
   spend two of the three codes an hour.
 - **Logout works like delete on the page.** No player, nothing waits, and
-  the page does not ask for a nick again; the dialog offers a nick or a new
-  login. 401 on logout says only that this browser has no nick on the
-  server.
+  the page does not ask for a nick again until a new login; the dialog
+  offers a nick or a new login. 401 on logout says only that this browser
+  has no nick on the server.
 - **Inputs.** The email is `type="email"` with `autocomplete="email"`. The
   code is `type="text"` with `inputmode="numeric"`,
-  `autocomplete="one-time-code"` and a 6-digit pattern, and it is sent as a
-  string: `type="number"` would drop a leading zero. Text fields and
+  `autocomplete="one-time-code"` and a pattern of 6 digits with optional
+  spaces around them, and it is sent trimmed, as a string of exactly 6
+  digits: `type="number"` would drop a leading zero. It has no
+  `maxlength`: the pattern already caps the length, and a code pasted with
+  a space in front would lose its last digit and then fail the pattern
+  before the trim could run. Text fields and
   selects in the dialogs are at least 16px, because iOS Safari zooms into
   smaller ones.
 - **Where results are announced.** Login answers go to a status line in

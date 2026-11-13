@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="dark">
 <title>КЛАД — rassimok</title>
-<meta name="description" content="КЛАД: a clean-room homage to the Korvet platformer. Five levels. No analytics, no tracking; stores the nick you pick, your results and, for an account or a login code request, an email; one cookie, for its API only.">
+<meta name="description" content="КЛАД: a clean-room homage to the Korvet platformer. Five levels. No analytics, no tracking; stores the nick you pick, your results and, for an account, your email (a login code request keeps only a hash of the address); one cookie, for its API only.">
 <link rel="stylesheet" href="/klad/klad.css">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 </head>
@@ -47,9 +47,10 @@
     keeps it, your choice of human or agent and your results, and for an account also your email address;
     one HttpOnly cookie, for the game's API only. You can delete them on the boards screen, from this browser,
     as long as it keeps the game's cookie; an account and its email also from any device, after logging in
-    with a code sent to that address. Asking for a login code, with or without an account, stores the address
-    it goes to and the code (hashed); the server counts the requests to that address, to send at most three
-    codes an hour.
+    with a code sent to that address. For a login code the server keeps not the address but a hash of it:
+    with the code, also hashed, until the code is used, replaced by a new one or expires, and, to limit code
+    requests, for a day; outdated records go with the next code request. It stores the address itself only once a login with the code creates or
+    opens an account, and it mails nothing but login codes.
     <a href="/">← rassimok</a></p>
     <p lang="ru">Приватность: пока вы не ввели ник или email, игра ничего не хранит. С ником сервер игры
     хранит его, ваш выбор (человек или агент) и ваши результаты для таблиц рекордов
@@ -57,9 +58,11 @@
     только для API игры. Без аналитики, без слежки, без localStorage. Удалить ник
     и все результаты можно в этом браузере, пока он хранит cookie игры: «Таблицы»,
     затем «Удалить мой ник и результаты». Аккаунт вместе с email удаляет та же кнопка,
-    на любом устройстве после входа по коду из письма. Запрос кода для входа, с аккаунтом или без,
-    сохраняет на сервере адрес, на который ушёл код, и сам код в виде хеша, а запросы на этот адрес
-    сервер считает: не больше трёх кодов в час.</p>
+    на любом устройстве после входа по коду из письма. Для кода входа сервер хранит не сам адрес,
+    а его отпечаток (хеш): вместе с кодом, тоже в виде хеша, пока код не использован, не заменён новым
+    или не истёк, а для ограничения числа запросов сутки; устаревшие записи удаляются при следующем
+    запросе кода. Сам адрес сервер сохраняет, только
+    когда по коду вы создаёте аккаунт или входите в него. Кроме кодов для входа, сервер писем не присылает.</p>
   </footer>
 </div>
 
@@ -81,8 +84,9 @@
     результаты, а браузер получит один файл cookie с флагом HttpOnly, только для API игры.
     Удалить ник и все результаты можно в этом браузере, пока он хранит cookie игры: «Таблицы»,
     затем «Удалить мой ник и результаты». Аккаунт (по желанию, в «Таблицах») хранит ещё ваш
-    email; его удаляет та же кнопка, на любом устройстве после входа по коду из письма. Запрос кода
-    для входа сохраняет адрес, на который ушёл код (подробнее в «Таблицах»).</p>
+    email; его удаляет та же кнопка, на любом устройстве после входа по коду из письма. Для кода входа
+    сервер хранит не сам адрес, а его хеш, а сам адрес сохраняет только при входе
+    в аккаунт. Кроме кодов для входа, сервер писем не присылает (подробнее в «Таблицах»).</p>
     <p id="nick-saving" class="note" role="status"></p>
     <p id="nick-error" class="error" role="alert"></p>
     <p class="actions">
@@ -147,10 +151,12 @@
       <h3>Аккаунт</h3>
       <p class="note">Вход по коду из письма, без пароля. Новый аккаунт создаётся из вашего ника гостя
       вместе с результатами; ник аккаунта никто другой не займёт, а играть под ним можно на любом устройстве.</p>
-      <p class="note">Приватность: у аккаунта сервер хранит ещё ваш email и присылает на него только коды
-      для входа. Запрос кода, даже без аккаунта, сохраняет на сервере адрес, на который ушёл код, и сам код
-      в виде хеша; код действует 10 минут, а запросы на этот адрес сервер считает, чтобы присылать не больше
-      трёх кодов в час. Удалить аккаунт вместе с email можно кнопкой «Удалить мой ник и результаты», войдя на
+      <p class="note">Приватность: для кода сервер хранит не сам адрес, а его отпечаток (хеш): вместе
+      с кодом, тоже в виде хеша, пока код не использован, не заменён новым или не истёк (он действует
+      10 минут), а для ограничения числа запросов сутки; устаревшие записи удаляются при следующем
+      запросе кода. Сам адрес сервер сохраняет, только когда
+      по коду вы создаёте аккаунт или входите в него: это email аккаунта. Кроме кодов для входа, сервер
+      писем не присылает. Удалить аккаунт вместе с email можно кнопкой «Удалить мой ник и результаты», войдя на
       любом устройстве. При входе в уже созданный аккаунт результаты гостя этого браузера перейдут в него,
       если выбор (человек или агент) у них один; иначе они останутся под ником гостя, и удалить их будет
       уже нельзя. Чтобы этого не было, сначала удалите ник гостя кнопкой «Удалить мой ник и результаты»,
@@ -163,7 +169,7 @@
       </form>
       <form id="login-code-form" hidden>
         <p class="field"><label for="login-code">Код из письма</label>
-          <input id="login-code" name="code" type="text" required minlength="6" maxlength="6" pattern="[0-9]{6}"
+          <input id="login-code" name="code" type="text" required minlength="6" pattern="\s*[0-9]{6}\s*"
                  inputmode="numeric" autocomplete="one-time-code" aria-describedby="login-code-rules">
           <button type="submit">Войти</button></p>
         <p id="login-code-rules" class="note">6 цифр; код действует 10 минут.</p>

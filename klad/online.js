@@ -22,7 +22,7 @@ const KLAD_ONLINE = (() => {
     invalidCode: 'Код не подошёл или устарел. Проверьте его или запросите новый.',
     tooManyAttempts: 'Слишком много неверных попыток: этот код больше не действует. Запросите новый.',
     loginNickTaken: 'Ваш ник уже занят аккаунтом. Смените ник и запросите новый код.',
-    loginNoSession: 'Аккаунт создаётся из ника гостя: сначала выберите ник, потом снова нажмите «Войти».',
+    loginNoSession: 'Аккаунт создаётся из ника гостя: сначала выберите ник, потом снова откройте «Таблицы» и нажмите «Войти».',
     loggedIn: 'Вы в аккаунте.',
     merged: 'Вы в аккаунте. Результаты гостя перенесены в него.',
     otherKind: 'Вы в аккаунте. Результаты гостя не перенесены: у аккаунта другой выбор (человек или агент). ' +
@@ -229,7 +229,9 @@ const KLAD_ONLINE = (() => {
     }
 
     /* Returns the text to show. After no_session the code stays: the guest
-       is made first, and a code the API has used up answers invalid_code. */
+       is made first, and a code the API has used up answers invalid_code.
+       A login is read back like a new nick, and it ends an earlier skip or
+       logout; no player then means blocked cookies, handled as in choose(). */
     async function verify(code) {
       const guest = player && !player.account ? player : null;
       const answer = await call('POST', '/login/verify', { email: codeEmail, code });
@@ -239,7 +241,15 @@ const KLAD_ONLINE = (() => {
         const { merged: isMerged, ...account } = answer.data;
         player = account;
         codeEmail = null;
-        text = welcome(guest, account, isMerged);
+        await readPlayer();
+        if (player) {
+          hasSkipped = false;
+          text = welcome(guest, account, isMerged);
+        } else {
+          isCookieBlocked = true;
+          skip();
+          text = TEXT.noCookie;
+        }
       } else if (answer.status === 401) {
         player = null;
         text = TEXT.loginNoSession;

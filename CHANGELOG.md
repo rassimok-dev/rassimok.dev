@@ -100,7 +100,9 @@ module on a fake `WebSocket`, a fake clock and a fake engine, and run
 - **Hostile input and small texts (second fix round).** A member's `pos`
   outside cells 0 to 24 (the larger side plus one) makes no ghost, and a
   result time over 4 minutes and 10 s shows as `-`, so nobody can put a
-  ghost off the field or stretch the results table. Closing the lobby now
+  ghost far outside the field (one bound for both axes, so a position just
+  below or beside the field passes and is clipped by the canvas) or stretch
+  the results table. Closing the lobby now
   leaves the room unless a race socket is live, so the "closing leaves"
   hint holds after a race too; a deferred leave also goes out when the held
   join answers 0 or 5xx (a leave from a non-member is a harmless 204), and
@@ -192,13 +194,14 @@ nothing.
   `document` right after it creates the socket, before the first attempt,
   with `detail.room` (the polled room: id, level, shape, players) and
   `detail.socket` (`send`, `on('message')` with parsed JSON, `on('status')`,
-  `status()`, `hasOpened()`, `close()`). A listener attached then sees every
+  `status()`, `hasOpened()`, `close(isLeaving)`, `hasLeft()`). A listener attached then sees every
   frame, and several listeners can share the socket.
-- **Closing the dialog leaves the room while it is in the lobby state.**
+- **Closing the dialog leaves the room unless a race socket is live.**
   Otherwise this player's ready mark would stay for the API's minute and
-  the host could start a race with someone who is gone. While the room is
-  `starting` or `racing` closing keeps the room and the socket, because the
-  race closes this dialog to play (any open dialog holds the game). The
+  the host could start a race with someone who is gone. While a race
+  socket is live (not closed, not offline) closing keeps the room and the
+  socket, because the race closes this dialog to play (any open dialog
+  holds the game). The
   explicit "Выйти из комнаты" button leaves in any state. An answer that
   comes back after the dialog closed does not act: a room created
   meanwhile is left at once, without the portrait host's level choice,

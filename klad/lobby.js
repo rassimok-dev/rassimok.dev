@@ -1,13 +1,12 @@
-/* КЛАД lobby: who is in the lobby, rooms joined by an invite link, ready
-   marks and the race start. Plain REST through the site's /klad/api,
-   polled only while the lobby is open and the tab is visible; the
-   WebSocket opens only when a room starts. The first half has no DOM, so
-   the node tests can require it. */
+/* КЛАД lobby: presence, rooms by invite link, ready marks, race start.
+   The first half has no DOM, so the node tests can require it. The
+   interface is in klad/README.md. */
 'use strict';
 const KLAD_LOBBY = (() => {
   const PRESENCE_EVERY = 30 * 1000;
   const ROOM_EVERY = 10 * 1000;
   const SWEEP_AFTER = 60 * 1000;
+  const REJOIN_AFTER = SWEEP_AFTER - 5 * 1000;
   const SOCKET_TRIES = 4;
   const SOCKET_RECONNECTS = 8;
   const SOCKET_FIRST_WAIT = 500;
@@ -66,12 +65,8 @@ const KLAD_LOBBY = (() => {
     };
   }
 
-  /* One WebSocket with JSON text frames. A drop is tried again with doubling
-     waits, at most SOCKET_TRIES times in a row and SOCKET_RECONNECTS in all,
-     then 'offline': every attempt is a Workers request on the shared quota.
-     1000 ends it as 'closed'; 1008 is a client bug a retry would repeat, so
-     it ends as 'offline'. on('message') gets each frame parsed; on('status')
-     gets 'open', 'reconnecting', 'offline' or 'closed'. */
+  /* Every attempt is a Workers request on the shared quota, so retries are
+     capped. 1008 is a client bug a retry would repeat. */
   function connect(url, WebSocket, clock) {
     const listeners = { message: [], status: [] };
     let socket = null;
@@ -163,10 +158,8 @@ const KLAD_LOBBY = (() => {
     };
   }
 
-  /* Runs task every interval while canRun() holds, and never sooner than
-     interval after its last run however often it is stopped and started,
-     so a tab that is hidden and shown again does not raise the rate. now()
-     runs it at once, for the poll after an own action. */
+  /* Never sooner than interval after the last run, however often it is
+     stopped and started, so hiding and showing the tab does not raise the rate. */
   function every(clock, interval, canRun, task) {
     let timer = null;
     let last = -Infinity;
@@ -197,10 +190,7 @@ const KLAD_LOBBY = (() => {
     };
   }
 
-  /* environment: call(method, path, body) as in online.js, clock (now,
-     setTimeout, clearTimeout), isVisible(), player(), refreshPlayer(),
-     isAvailable(), shape() and openSocket(roomId). page: render(),
-     askNick() and race(room, socket), the hand-off at race start. */
+  /* environment and page are described in klad/README.md (Lobby). */
   function create(environment, page) {
     const { call, clock } = environment;
     let isOpen = false;
@@ -215,20 +205,19 @@ const KLAD_LOBBY = (() => {
     let isWaitingForNick = false;
     let isBusy = false;
     let isJoining = false;
+    let leaveAfterJoin = null;
     let roomRequest = 0;
     let lastSeen = -Infinity;
     let socket = null;
 
     /* No room poll while an own action is out: its answer would be dropped
-       as older, and a poll before a join's answer would not list this
-       player yet. Every action ends with a poll of its own. */
+       as older. Every action ends with a poll of its own. */
     const isActive = () => isOpen && phase === 'ready' && environment.isVisible();
     const presence = every(clock, PRESENCE_EVERY, isActive, beat);
     const roomPoll = every(clock, ROOM_EVERY, () => isActive() && roomId !== null && !isBusy, poll);
     const roomPath = (action) => '/rooms/' + roomId + (action ? '/' + action : '');
 
-    /* What runs is decided here alone: both polls only while the lobby is
-       open and the tab visible, and a room link waits for that too. */
+    /* What runs is decided here alone; a room link waits for a visible tab. */
     function resume() {
       if (isActive()) presence.start();
       else presence.stop();
@@ -263,9 +252,8 @@ const KLAD_LOBBY = (() => {
       resume();
     }
 
-    /* The race takes the socket from here, through page.race(). The lobby
-       only opens it, and closes it on leaving or once the room is back in
-       the lobby, so it never keeps reconnecting after a race. */
+    /* The lobby closes the socket once the room is back in the lobby, so it
+       never keeps reconnecting after a race. */
     function startRace() {
       socket = environment.openSocket(roomId);
       socket.on('status', () => page.render());
@@ -304,22 +292,30 @@ const KLAD_LOBBY = (() => {
     const wasDropped = (answer) => answer.status === 200 && answer.data && answer.data.id === roomId
       && answer.data.state === 'lobby' && !roomView(answer.data).isMember;
 
-    /* The API drops a lobby member unseen for 60 s, so a tab back after that
-       joins once more; inside the minute the player left in another tab. The
-       age is taken at sending: the heartbeat sent with the poll answers first. */
+    /* The API drops a member unseen for 60 s. Only a room answer that lists
+       this player counts as seen: a heartbeat answers 204 even after the
+       sweep. The margin covers the answer's round trip. */
+    const isLongUnseen = () => clock.now() - lastSeen > REJOIN_AFTER;
+
     async function poll() {
       const request = ++roomRequest;
-      const isLongUnseen = clock.now() - lastSeen > SWEEP_AFTER;
+      const wasLongUnseen = isLongUnseen();
       const answer = await call('GET', roomPath());
-      if (request === roomRequest && isLongUnseen && isActive() && wasDropped(answer)) await enter();
-      else if (request === roomRequest) take(answer, true);
+      if (request !== roomRequest) {
+        page.render();
+        return;
+      }
+      if (wasLongUnseen && wasDropped(answer)) {
+        if (isActive()) await enter();
+      } else {
+        take(answer, true);
+      }
       page.render();
     }
 
     /* POST /presence first, so the list includes this player. */
     async function beat() {
       const heartbeat = await call('POST', '/presence');
-      if (heartbeat.status === 204) lastSeen = clock.now();
       const list = heartbeat.status === 401 ? heartbeat : await call('GET', '/presence');
       if (phase !== 'ready') return;
       if (list.status === 401) {
@@ -343,6 +339,11 @@ const KLAD_LOBBY = (() => {
       page.render();
       const answer = await call('POST', roomPath(action), body);
       isBusy = false;
+      if (id === roomId && answer.status === 404 && isLongUnseen()) {
+        if (isActive()) await enter();
+        else page.render();
+        return;
+      }
       if (id === roomId) take(answer, request === roomRequest);
       page.render();
       roomPoll.now();
@@ -353,16 +354,18 @@ const KLAD_LOBBY = (() => {
         roomPoll.now();
         return;
       }
+      leave();
       forgetRoom('');
       roomId = id;
       await enter();
     }
 
-    /* Joins roomId; a re-join keeps the room shown until it answers. If the
-       lobby closed meanwhile, the leave goes out only now, after the join,
-       or the API could add the player once the leave is done. */
+    /* A re-join keeps the room shown until it answers. A leave asked for
+       meanwhile goes out only after the join answers: the API could handle
+       it first and then add the player. */
     async function enter() {
       const id = roomId;
+      const isRejoin = room !== null;
       isBusy = true;
       isJoining = true;
       const request = ++roomRequest;
@@ -370,6 +373,11 @@ const KLAD_LOBBY = (() => {
       const answer = await call('POST', roomPath('join'));
       isBusy = false;
       isJoining = false;
+      if (leaveAfterJoin === id) {
+        leaveAfterJoin = null;
+        if (answer.status === 200) call('POST', '/rooms/' + id + '/leave');
+        return;
+      }
       if (request !== roomRequest) return;
       if (!isOpen) {
         if (answer.status === 200) leave();
@@ -377,14 +385,16 @@ const KLAD_LOBBY = (() => {
         return;
       }
       const code = errorOf(answer);
+      const isNetworkFailure = answer.status === 0 || answer.status >= 500;
       if (answer.status === 200 && answer.data && answer.data.id === id) showRoom(answer.data);
       else if (answer.status === 401) lostPlayer();
       else if (answer.status === 404) forgetRoom(TEXT.roomNotFound);
       else if (code === 'room_full') forgetRoom(TEXT.roomFull);
       else if (code === 'not_in_lobby') forgetRoom(TEXT.raceRunning);
+      else if (isRejoin && isNetworkFailure) isRoomDown = true;
       else forgetRoom(TEXT.unavailable);
       page.render();
-      roomPoll.now();
+      if (!(isRejoin && isNetworkFailure)) roomPoll.now();
       resume();
     }
 
@@ -431,9 +441,10 @@ const KLAD_LOBBY = (() => {
     function leave() {
       if (roomId === null) return Promise.resolve();
       const path = roomPath('leave');
+      if (isJoining) leaveAfterJoin = roomId;
       forgetRoom('');
       page.render();
-      return call('POST', path);
+      return isJoining ? Promise.resolve() : call('POST', path);
     }
 
     /* linkId is the id from a #room= link. A malformed one sends nothing. */
@@ -465,9 +476,8 @@ const KLAD_LOBBY = (() => {
       resume();
     }
 
-    /* Closing in the lobby state leaves the room, or the ready mark would
-       stay for the API's minute. A starting or running race keeps it: the
-       race closes this dialog to play. A join still out leaves in enter(). */
+    /* A starting or running race keeps the room: the race closes this dialog
+       to play. A join still out leaves in enter(). */
     function close() {
       isOpen = false;
       phase = 'closed';
@@ -499,7 +509,7 @@ const KLAD_LOBBY = (() => {
 
     function state() {
       return {
-        phase, message, online, isOnlineDown, roomId, isRoomDown,
+        phase, message, online, isOnlineDown, roomId, isRoomDown, isBusy,
         room: room === null ? null : roomView(room),
         race: raceText(),
       };
@@ -513,7 +523,7 @@ const KLAD_LOBBY = (() => {
 
   return {
     create, connect, roomIdOf, isRoomId, raceUrl, roomView, TEXT,
-    PRESENCE_EVERY, ROOM_EVERY, SWEEP_AFTER, SOCKET_TRIES, SOCKET_RECONNECTS, SOCKET_FIRST_WAIT,
+    PRESENCE_EVERY, ROOM_EVERY, SWEEP_AFTER, REJOIN_AFTER, SOCKET_TRIES, SOCKET_RECONNECTS, SOCKET_FIRST_WAIT,
   };
 })();
 if (typeof module !== 'undefined') module.exports = KLAD_LOBBY;
@@ -605,7 +615,7 @@ if (typeof document !== 'undefined') (() => {
     }));
     levelLine.textContent = view ? levelText(view) : '';
     levelRow.hidden = !(view && view.isHost);
-    if (view && document.activeElement !== levelSelect) levelSelect.value = String(view.level);
+    if (view && (document.activeElement !== levelSelect || !state.isBusy)) levelSelect.value = String(view.level);
     levelSelect.disabled = !isLobby;
     readyButton.hidden = !view;
     readyButton.disabled = !isLobby;

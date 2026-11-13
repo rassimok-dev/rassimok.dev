@@ -14,8 +14,9 @@ joins that room; without a nick it opens the nick prompt first and joins
 once there is one. A malformed id, an unknown room (404) and a full room
 (409 `room_full`) each show their message. All of it is REST against
 contract section 7 (`/presence`, `/rooms`), written in `klad/lobby.js`
-before the API side (RAS-31) is deployed, so it is tested only against a
-fake `fetch`. The one WebSocket client (`KLAD_LOBBY.connect`) is in the
+before the API side (RAS-31) was deployed. It has not yet run against the
+live API: the tests use a fake `fetch`, a fake clock and a fake
+`WebSocket`. The one WebSocket client (`KLAD_LOBBY.connect`) is in the
 same file. It opens `wss://<host>/klad/api/race/<id>` only when a polled
 room is `starting`, and the lobby then only shows a waiting line; the race
 itself (RAS-34) takes the socket from there. This merges together with the
@@ -86,24 +87,62 @@ nothing.
   not in the lobby, so a reload on `#room=<id>` shows the room with no
   special case.
 - **A member the API swept is joined again, once.** The API drops a lobby
-  member it has not seen (no room request, no heartbeat) for 60 s, on that
-  member's own next request. A host who hides the tab to send the invite
-  from a messenger would otherwise lose the room and the link with it.
-  So a poll that shows the room in the lobby state without a `you` entry
-  sends one `POST /rooms/<id>/join`, keeps the room and polls once more,
-  if this tab's last successful room request or heartbeat is over 60 s
-  older than that poll. The view then shows whoever is host now; in an
-  empty room the player is host again, and the link already sent still
-  works. The age is taken when the poll is sent, because the heartbeat
-  that goes out with it on return answers first and would look fresh.
-  Inside the 60 s the player left in another tab (joining another room
-  leaves this one), and a re-join there would pull the player back and
-  forth between tabs, so the room view ends with a message instead. So
-  does a room in `starting` or `racing` without the player, where a join
-  gets 409. A failed re-join shows the join's own messages. A poll
-  without the player right after a re-join ends the view, so a server
-  that keeps dropping the member cannot turn the 10 s poll into a join
-  loop.
+  member it has not seen (a room request that lists the player, or a
+  heartbeat) for 60 s, on that member's own next request. A host who hides
+  the tab to send the invite from a messenger would otherwise lose the
+  room and the link with it. The rules as they now are:
+  - **What counts as seen.** Only a room answer that lists this player
+    (`you`) sets the client's `lastSeen`. A heartbeat does not: the API
+    answers 204 even when it has just swept the player, so a visible tab
+    back from an outage of over a minute would take the 204 for proof,
+    and the next poll would end the room view instead of joining again.
+  - **When to join again.** A poll that shows the room in the lobby state
+    without a `you` entry, when `lastSeen` is more than 55 s old at
+    sending (the API's 60 s minus 5 s, because the client's age is about
+    one round trip shorter than the server's), sends one
+    `POST /rooms/<id>/join`, keeps the room and polls once more. The view
+    then shows whoever is host now; in an empty room the player is host
+    again, and the link already sent still works.
+  - **An action that gets 404** (a swept member's `/ready`) with the same
+    age joins again once instead of saying "room not found". A gone room
+    answers 404 on the join too, so that message still comes. A level
+    choice or Start from a swept host gets 403 `not_host`, and the poll
+    that follows joins again by the rule above.
+  - **A join that fails on the network** (status 0 or 5xx) keeps the room
+    and shows "offline", like a failed poll. No poll goes out at once: the
+    next one, 10 s later, tries the join again, so there is at most one
+    join per poll. Other join answers (404, 409, 401) end the view with
+    their own message.
+  - **A poll answered after the tab hid again** does nothing; the room is
+    kept and the next visible poll joins.
+  - **Inside the 55 s** the player left in another tab (joining another
+    room leaves this one), and a re-join there would pull the player back
+    and forth between tabs, so the room view ends with a message. So does
+    a room in `starting` or `racing` without the player, where a join gets
+    409. A poll without the player right after a re-join ends the view, so
+    a server that keeps dropping the member cannot turn the 10 s poll into
+    a join loop.
+- **Leaving never runs in parallel with a join.** Opening a link for
+  another room while in a room now leaves the first room, instead of only
+  forgetting it: the API checks the new room before it leaves the old one,
+  so a failed join (full, gone) would otherwise leave a ghost member that
+  the heartbeat keeps seen. The "Выйти из комнаты" button during a join
+  does what closing the dialog does: the room goes from the screen at once
+  and the leave is sent after the join answers, because the API could
+  handle the leave first and then add a not-ready member who blocks Start.
+- **A hint and a small fix in the room view.** A line under the room says
+  that closing the lobby leaves the room, since a host who closes it to
+  play while waiting would otherwise leave silently. After an own action
+  answers, the level select is set from the room even when it has the
+  focus (while an action is out the focused select is left alone, so a
+  choice being made is not overwritten). The long comments in `lobby.js`
+  are cut to the why; the interface is in `klad/README.md`.
+- Tests added for each rule above, each failing on the previous version:
+  the heartbeat 204 after an outage, a tap on Ready during the return poll
+  (and the control that a 404 soon after the last sight still says "room
+  not found"), another link while in a room, the leave button during a
+  join, a join failing with 0 and with 503, a member unseen for 57 s, a
+  poll answered after the tab hid again, and the busy flag for the select.
 - **The shape goes with the level choice.** A new room is level 1,
   `landscape`. A host in portrait sends `/level` with level 1 and
   `portrait` right after creating the room, and every level choice sends

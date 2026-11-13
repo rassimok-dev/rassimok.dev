@@ -18,7 +18,7 @@ proxy (below), it is self-contained on purpose so it can be removed in one go.
 | `lobby.js` | the lobby: who is in it, rooms by invite link, ready marks, the host's level and Start, and the one socket module (`KLAD_LOBBY.connect`) the race reuses; its logic half is also loaded by the node tests |
 | `test/levels.test.js` | `node --test`: shape, legend, key-then-exit reachability, revision, fastest clear above the API floor |
 | `test/online.test.js` | `node --test`: `online.js` against a fake `fetch`: request shapes, when results wait or go, a skip during a save, blocked cookies, login codes, verify answers and merges, the read-back after a login, a login ending a skip, logout, 400, 401, 404, 409, 429, offline |
-| `test/lobby.test.js` | `node --test`: `lobby.js` against a fake `fetch`, a fake clock and a fake `WebSocket`: the room id form and the `#room=` link, the room view and the Start condition, presence and room polls only while open and visible, the poll after an own action, 404, 409 `room_full`, the socket at `starting`, its backoff and its stop, the request budget for an hour |
+| `test/lobby.test.js` | `node --test`: `lobby.js` against a fake `fetch`, a fake clock and a fake `WebSocket`: the room id form and the `#room=` link, the room view and the Start condition, presence and room polls only while open and visible, the poll after an own action, 404, 409 `room_full`, the socket at `starting` (backoff, 1008, the cap in all, its stop), the re-join after the sweep (heartbeat 204 not counted, a tap on Ready, 57 s, network failures, a poll answered after a hide), another link and the leave button during a join, the answers after the close, the request budget for an hour |
 | `test/proxy.test.js` | `node --test`: the API proxy against a fake `fetch` |
 | `test/ticks.test.js` | `node --test`: the time formatter |
 | `MECHANICS.md` | the original rules as reconstructed from sources |
@@ -101,14 +101,24 @@ closed or the tab is hidden:
 - The room marks the caller's own entry with `you`, so the lobby finds this
   player by it (nicks may repeat among guests). An empty room (host null,
   no players) shows no member, like a room this player was dropped from.
-- A lobby-state room polled without `you`, when this tab's last successful
-  room request or heartbeat is over 60 s older than the poll (the API's
-  sweep), gets one `POST /rooms/<id>/join` and one more poll; the view then
-  shows the current host. Inside the 60 s, or in a starting or running
-  race, the room view ends with a message.
-- An answer that comes back after the dialog closed does not act: a room
-  created meanwhile is left at once, and a join still out is left once it
-  answers.
+- Re-join after the API's 60 s sweep: only a room answer that lists the
+  player (`you`) counts as seen; a heartbeat's 204 does not, because the API
+  answers it even after sweeping the player. A lobby-state room polled
+  without `you`, when the last sight is over 55 s old at sending (a margin
+  below the 60 s), gets one `POST /rooms/<id>/join` and one more poll; the
+  view then shows the current host. An action that gets 404 at that age
+  joins once instead of saying "room not found". A join that fails with 0
+  or 5xx keeps the room and shows offline; the next poll tries again, at
+  most one join per poll. A poll answered after the tab hid again does
+  nothing. Inside the 55 s, or in a starting or running race, the room view
+  ends with a message.
+- Joining another room leaves the current one. Leaving (the button or
+  closing the dialog) while a join is out takes the room off the screen at
+  once and sends `POST /rooms/<id>/leave` only after the join answers. Any
+  answer that comes back after the dialog closed does not act: a room
+  created meanwhile is left at once.
+- Status: written before RAS-31 was deployed; it has not yet run against the
+  live API.
 
 ## The API proxy
 `functions/klad/api/[[path]].js` is a Cloudflare Pages Function. It forwards

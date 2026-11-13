@@ -835,6 +835,214 @@ test('a network failure on the poll shows offline, keeps the room and polls agai
   assert.equal(lobby.state().isRoomDown, false);
 });
 
+/* ---- re-join edges ---- */
+
+const READY = 'POST /klad/api/rooms/' + ID + '/ready';
+const OTHER = 'Other_id-7';
+const OTHER_JOIN = 'POST /klad/api/rooms/' + OTHER + '/join';
+const DROPPED = room({ players: [ANNA] });
+
+async function hostHiddenFor(milliseconds, answers) {
+  const run = await hosting(answers);
+  run.world.isVisible = false;
+  run.lobby.onVisibility();
+  await run.clock.advance(milliseconds);
+  return run;
+}
+
+async function showAgain({ world, lobby }) {
+  world.isVisible = true;
+  lobby.onVisibility();
+  await settle();
+}
+
+test('a heartbeat that answers 204 does not count as seen: a visible tab back from a long outage joins again', async () => {
+  // given
+  const { lobby, server, clock } = await joined({});
+  server.answers[POLL] = [[OFFLINE]];
+  await clock.advance(85 * 1000);
+
+  // when
+  server.answers[POLL] = [[200, DROPPED], [200, room()]];
+  await clock.advance(15 * 1000);
+
+  // then
+  assert.equal(count(server.calls, JOIN), 2);
+  assert.equal(lobby.state().roomId, ID);
+  assert.equal(lobby.state().message, '');
+});
+
+test('a tap on Ready while the return poll is out joins again and keeps the room', async () => {
+  // given
+  const run = await hostHiddenFor(90 * 1000, { [JOIN]: [[200, room()]] });
+  run.server.answers[POLL] = [[200, DROPPED], [200, room()]];
+  const release = run.server.hold(POLL);
+  await showAgain(run);
+
+  // when
+  const tapped = run.lobby.toggleReady();
+  await settle();
+  release();
+  await tapped;
+  await settle();
+
+  // then
+  assert.equal(count(run.server.calls, READY + ' {"ready":true}'), 1);
+  assert.equal(count(run.server.calls, JOIN), 1);
+  assert.equal(run.lobby.state().roomId, ID);
+  assert.equal(run.lobby.state().message, '');
+});
+
+test('a 404 on an action shortly after the last sight of the room still says room not found', async () => {
+  // given
+  const { lobby } = await joined({ [READY]: [[404, { error: 'not_found' }]] });
+
+  // when
+  await lobby.toggleReady();
+
+  // then
+  assert.equal(lobby.state().roomId, null);
+  assert.equal(lobby.state().message, TEXT.roomNotFound);
+});
+
+test('opening another room link leaves the room, so a failed join leaves no ghost member', async () => {
+  // given
+  const { lobby, server } = await joined({ [OTHER_JOIN]: [[409, { error: 'room_full' }]], [LEAVE]: [[204]] });
+
+  // when
+  await lobby.open(OTHER);
+  await settle();
+
+  // then
+  assert.equal(count(server.calls, LEAVE), 1);
+  assert.equal(count(server.calls, OTHER_JOIN), 1);
+  assert.equal(lobby.state().roomId, null);
+  assert.equal(lobby.state().message, TEXT.roomFull);
+});
+
+test('the leave button while a join is out sends the leave only after the join answers', async () => {
+  // given
+  const { lobby, server, clock } = setup({ ...PRESENCE, [JOIN]: [[200, room()]], [LEAVE]: [[204]] });
+  const release = server.hold(JOIN);
+  await lobby.open(ID);
+  await settle();
+
+  // when
+  lobby.leave();
+  await settle();
+
+  // then
+  assert.deepEqual(roomCalls(server.calls), [JOIN]);
+  assert.equal(lobby.state().roomId, null);
+
+  // when
+  release();
+  await clock.advance(60 * 1000);
+
+  // then
+  assert.deepEqual(roomCalls(server.calls), [JOIN, LEAVE]);
+  assert.equal(lobby.state().roomId, null);
+  assert.equal(lobby.state().isBusy, false);
+});
+
+test('a re-join that meets a network failure keeps the room, and the next poll tries once more', async () => {
+  // given
+  const run = await hostHiddenFor(90 * 1000, { [JOIN]: [[OFFLINE]] });
+  run.server.answers[POLL] = [[200, DROPPED]];
+
+  // when
+  await showAgain(run);
+
+  // then
+  assert.equal(count(run.server.calls, JOIN), 1);
+  assert.equal(count(run.server.calls, POLL), 2, 'no extra poll right after the failed join');
+  assert.equal(run.lobby.state().roomId, ID);
+  assert.equal(run.lobby.state().isRoomDown, true);
+
+  // when
+  await run.clock.advance(KLAD_LOBBY.ROOM_EVERY);
+
+  // then
+  assert.equal(count(run.server.calls, JOIN), 2);
+  assert.equal(count(run.server.calls, POLL), 3);
+  assert.equal(run.lobby.state().roomId, ID);
+});
+
+test('a re-join answered with 500 also keeps the room', async () => {
+  // given
+  const run = await hostHiddenFor(90 * 1000, { [JOIN]: [[503, { error: 'upstream' }]] });
+  run.server.answers[POLL] = [[200, DROPPED]];
+
+  // when
+  await showAgain(run);
+
+  // then
+  assert.equal(run.lobby.state().roomId, ID);
+  assert.equal(run.lobby.state().isRoomDown, true);
+});
+
+test('a member unseen for 57 s is joined again: the age is compared a few seconds below the sweep', async () => {
+  // given
+  const run = await hostHiddenFor(57 * 1000, { [JOIN]: [[200, room()]] });
+  run.server.answers[POLL] = [[200, DROPPED], [200, room()]];
+
+  // when
+  await showAgain(run);
+
+  // then
+  assert.ok(KLAD_LOBBY.REJOIN_AFTER < KLAD_LOBBY.SWEEP_AFTER);
+  assert.equal(count(run.server.calls, JOIN), 1);
+  assert.equal(run.lobby.state().roomId, ID);
+});
+
+test('a return poll answered after the tab hid again keeps the room and does nothing, then the next visible poll joins', async () => {
+  // given
+  const run = await hostHiddenFor(90 * 1000, { [JOIN]: [[200, room()]] });
+  run.server.answers[POLL] = [[200, DROPPED]];
+  const release = run.server.hold(POLL);
+  await showAgain(run);
+  run.world.isVisible = false;
+  run.lobby.onVisibility();
+
+  // when
+  release();
+  await settle();
+
+  // then
+  assert.equal(count(run.server.calls, JOIN), 0);
+  assert.equal(run.lobby.state().roomId, ID);
+  assert.equal(run.lobby.state().message, '');
+
+  // when
+  run.server.answers[POLL] = [[200, DROPPED], [200, room()]];
+  await showAgain(run);
+  await run.clock.advance(KLAD_LOBBY.ROOM_EVERY);
+
+  // then
+  assert.equal(count(run.server.calls, JOIN), 1);
+  assert.equal(run.lobby.state().roomId, ID);
+});
+
+test('state reports a held action as busy, for the level select', async () => {
+  // given
+  const { lobby, server } = await joined({ [READY]: [[200, room()]] });
+  const release = server.hold(READY);
+
+  // when
+  const tapped = lobby.toggleReady();
+  await settle();
+
+  // then
+  assert.equal(lobby.state().isBusy, true);
+
+  // when
+  release();
+  await tapped;
+
+  // then
+  assert.equal(lobby.state().isBusy, false);
+});
+
 /* ---- own actions ---- */
 
 test('an own action is followed by one poll right away, and the next poll 10 s after it', async () => {

@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="dark">
 <title>КЛАД — rassimok</title>
-<meta name="description" content="КЛАД: a clean-room homage to the Korvet platformer. Five levels. No analytics, no tracking; stores the nick you pick, your results and, for an account, its email; one cookie, for its API only.">
+<meta name="description" content="КЛАД: a clean-room homage to the Korvet platformer. Five levels. No analytics, no tracking; stores the nick you pick, your results and, for an account or a login code request, an email; one cookie, for its API only.">
 <link rel="stylesheet" href="/klad/klad.css">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 </head>
@@ -47,15 +47,19 @@
     keeps it, your choice of human or agent and your results, and for an account also your email address;
     one HttpOnly cookie, for the game's API only. You can delete them on the boards screen, from this browser,
     as long as it keeps the game's cookie; an account and its email also from any device, after logging in
-    with a code sent to that address.
+    with a code sent to that address. Asking for a login code, with or without an account, stores the address
+    it goes to and the code (hashed); the server counts the requests to that address, to send at most three
+    codes an hour.
     <a href="/">← rassimok</a></p>
-    <p lang="ru">Приватность: пока вы не ввели ник, игра ничего не хранит. С ником сервер игры
+    <p lang="ru">Приватность: пока вы не ввели ник или email, игра ничего не хранит. С ником сервер игры
     хранит его, ваш выбор (человек или агент) и ваши результаты для таблиц рекордов
     (у аккаунта ещё email), а браузер получает один файл cookie с флагом HttpOnly,
     только для API игры. Без аналитики, без слежки, без localStorage. Удалить ник
     и все результаты можно в этом браузере, пока он хранит cookie игры: «Таблицы»,
     затем «Удалить мой ник и результаты». Аккаунт вместе с email удаляет та же кнопка,
-    на любом устройстве после входа по коду из письма.</p>
+    на любом устройстве после входа по коду из письма. Запрос кода для входа, с аккаунтом или без,
+    сохраняет на сервере адрес, на который ушёл код, и сам код в виде хеша, а запросы на этот адрес
+    сервер считает: не больше трёх кодов в час.</p>
   </footer>
 </div>
 
@@ -77,7 +81,8 @@
     результаты, а браузер получит один файл cookie с флагом HttpOnly, только для API игры.
     Удалить ник и все результаты можно в этом браузере, пока он хранит cookie игры: «Таблицы»,
     затем «Удалить мой ник и результаты». Аккаунт (по желанию, в «Таблицах») хранит ещё ваш
-    email; его удаляет та же кнопка, на любом устройстве после входа по коду из письма.</p>
+    email; его удаляет та же кнопка, на любом устройстве после входа по коду из письма. Запрос кода
+    для входа сохраняет адрес, на который ушёл код (подробнее в «Таблицах»).</p>
     <p id="nick-saving" class="note" role="status"></p>
     <p id="nick-error" class="error" role="alert"></p>
     <p class="actions">
@@ -143,10 +148,13 @@
       <p class="note">Вход по коду из письма, без пароля. Новый аккаунт создаётся из вашего ника гостя
       вместе с результатами; ник аккаунта никто другой не займёт, а играть под ним можно на любом устройстве.</p>
       <p class="note">Приватность: у аккаунта сервер хранит ещё ваш email и присылает на него только коды
-      для входа. Удалить аккаунт вместе с email можно кнопкой «Удалить мой ник и результаты», войдя на
+      для входа. Запрос кода, даже без аккаунта, сохраняет на сервере адрес, на который ушёл код, и сам код
+      в виде хеша; код действует 10 минут, а запросы на этот адрес сервер считает, чтобы присылать не больше
+      трёх кодов в час. Удалить аккаунт вместе с email можно кнопкой «Удалить мой ник и результаты», войдя на
       любом устройстве. При входе в уже созданный аккаунт результаты гостя этого браузера перейдут в него,
-      если выбор (человек или агент) у них один; иначе они останутся под ником гостя, и удалить их отсюда
-      будет уже нельзя.</p>
+      если выбор (человек или агент) у них один; иначе они останутся под ником гостя, и удалить их будет
+      уже нельзя. Чтобы этого не было, сначала удалите ник гостя кнопкой «Удалить мой ник и результаты»,
+      а потом войдите.</p>
       <form id="login-email-form">
         <p class="field"><label for="login-email">Email</label>
           <input id="login-email" name="email" type="email" required maxlength="254"

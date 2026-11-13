@@ -13,7 +13,10 @@ home page sets no cookies. The one exception is the game at `/klad/`: once a
 player picks a nick, its API stores that nick, whether they play as a human
 or an agent, and their results for the leaderboards (and, for a player who
 signs up for an account, an email address), and sets one HttpOnly cookie
-that only the game's API receives (`Path=/klad/api`). The cookie keeps a
+that only the game's API receives (`Path=/klad/api`). A request for a login
+code, account or not, stores the address it goes to and the code (hashed),
+and the API counts the requests to that address for its limit of three codes
+an hour; it mails the address nothing but login codes. The cookie keeps a
 player's own results together and follows nobody, so there is still no
 cookie banner. A player can delete the nick and every result from the
 game's boards screen, in the same browser, as long as it keeps the game's

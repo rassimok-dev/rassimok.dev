@@ -13,11 +13,15 @@ both have the same kind. An account shows its email (only to itself) and
 its kind, can rename, log out (`POST /logout`) and delete itself, email
 included. The boards mark every nick `гость` or `аккаунт`. The privacy
 notes (prompt, both footer notes, the login part), the meta description and
-the README now say that an account also stores its email and that it can be
-deleted from any device after a login. Built against the shared contract
-(sections 1, 3, 5, 6); the API side (RAS-23, RAS-24) is not deployed yet,
-so until it is, every login request answers 404 and the dialog says the
-server is unavailable.
+the README now say that an account also stores its email, that a code
+request stores the address it went to, and that an account can be deleted
+from any device after a login; the login part and the README also say that
+the address gets only login codes. Built
+against the shared contract (sections 1, 3, 5, 6). This change merges, and
+so deploys, only after RAS-23 and RAS-24 are live on production: before
+RAS-23 every login fails, and with RAS-23 alone account nicks are not
+reserved yet and a guest of the same kind is left behind instead of merged,
+so the login note would promise what the API does not do.
 
 ### Decisions worth not relitigating
 
@@ -39,8 +43,18 @@ server is unavailable.
 - **A guest of another kind is left behind, and the login part warns before
   it happens.** After such a login the browser's cookie belongs to the
   account, so the old guest's nick and results stay on the boards and can
-  no longer be deleted from this browser. The note says so before the code
-  is entered.
+  no longer be deleted from any browser. The note says so before the code
+  is entered, with the way out: delete the guest first, then log in (an
+  existing account needs no guest).
+- **A code request is in the privacy notes, and only codes are mailed.**
+  The login part shows for a browser with no player too, and the API keeps
+  the requested address with the hashed code and counts the requests to it
+  for the limit of three an hour, whether or not an account follows. So the
+  notes say nothing is stored before a nick or an email, not before a nick.
+  They name no time after which the address is gone, because the contract
+  does not pin one yet. The login note and the README also promise that
+  the address gets nothing but login codes; a later mail (a login alert, a
+  deletion notice) means changing them first.
 - **`no_session` keeps the code.** It means no account exists for the
   email and the browser has no guest; the dialog asks for a nick through
   the existing prompt and then for the same code again. If the API used the

@@ -3,6 +3,111 @@
 Dated entries, newest first. Written for a reader picking this up cold —
 or a future session needing to know what already exists and why.
 
+## 2026-11-13 (later) - The game's API through the site's own origin
+
+`/klad/api/*` now reaches the game's API. A Cloudflare Pages Function,
+`functions/klad/api/[[path]].js`, forwards each request to the origin in the
+Pages variable `API_ORIGIN`, with the `/klad/api` prefix removed and the
+query string kept, and returns the API's answer unchanged; the API's own
+Quarkus endpoints under `/q` are not forwarded. `_routes.json` limits
+Functions to `/klad/api/*`, and the `/klad/*` CSP gains
+`connect-src 'self'`. Nothing calls the proxy yet; the game's online code
+comes in a later change.
+
+The privacy promise changes with it, in the README, the klad footer (plus a
+short Russian privacy note) and the klad meta description: no analytics and
+no tracking; once a player picks a nick, the API stores the nick, whether
+they play as a human or an agent, and the results (accounts will add an
+email); one HttpOnly cookie, for the game's API only. Still no localStorage,
+and the home page still ships no JavaScript and sets no cookies.
+
+### Decisions worth not relitigating
+
+- **Same origin, not a cross-origin call.** The CSP gains only
+  `connect-src 'self'`. The API's address lives in a Pages variable, so the
+  `.js` URL check in CI needs no exception. The session cookie is
+  first-party with `Path=/klad/api`, which avoids Safari's reported 7-day cap
+  on cookies from a server whose IP differs from the site's, and there is no
+  CORS to get wrong. The price: one more hop through Cloudflare, Function
+  requests count against the Workers free quota, and the site is no longer
+  purely static, since this Function is server-side code outside `klad/`.
+- **No secret between proxy and API.** The API is reachable on its own
+  anyway, so a shared secret would only prove that a request came through the
+  proxy. That protects nothing the API's per-player limits do not already
+  cover, and it would be one more secret to store and rotate.
+- **An explicit `_routes.json`.** Pages generates a routes file from
+  `functions/` when there is none, but its docs also say that once a project
+  has Functions, every request invokes them by default. The explicit file
+  removes the doubt and keeps the scope under review: static requests never
+  run the Function and never count against the free daily quota.
+- **Three headers only.** The proxy forwards `Content-Type`, `Accept` and
+  `Cookie`. Requests reaching it also carry the visitor's IP address in
+  Cloudflare's headers (`CF-Connecting-IP`, `X-Forwarded-For`), the user
+  agent and the referrer, and the API needs none of them; passing everything
+  on would hand them over. What Cloudflare itself adds to the outgoing
+  request is outside the proxy's control, so the public text promises only
+  what the proxy forwards.
+- **A prefix check, then concatenation, not resolution.** The Function first
+  answers 404 unless the parsed path is `/klad/api` or starts with
+  `/klad/api/`. Without it, cutting off nine characters turns
+  `/klad/api@other.host/x` into `@other.host/x`, and glued onto `API_ORIGIN`
+  that changes the host. Parsing also resolves dot segments, `%2e%2e`
+  included, so `/klad/api/%2e%2e/%2e%2e/aaaaaaaa@other.host/x` does the same.
+  `_routes.json` and the Pages router should never send such a path, but the
+  Function does not rely on them. After the check it concatenates:
+  `new URL(path, API_ORIGIN)` would read a path such as `//other.host/x` as a
+  new host. Together the check and the concatenation keep every request on
+  `API_ORIGIN`, so the Function cannot become an open proxy; the tests assert
+  the forwarded host for each path case, and that off-prefix paths make no
+  fetch.
+- **Quarkus's `/q` endpoints stay off the site origin.** The API serves its
+  health checks (and, in dev mode, the dev UI) under `/q`, and the readiness
+  answer can carry a database error message. The game needs none of them,
+  and the deploy check calls them on the API's own address, so the Function
+  answers 404 for `/klad/api/q` and everything under it, before any fetch.
+  The check runs on the parsed path, where dot segments are already
+  resolved, and on the percent-decoded rest of it, with any number of
+  leading slashes and either case: the API's server (Vert.x) decodes `%71`
+  to `q` and reads `//` as `/`, so a plain `startsWith('/q/')` would let
+  `/klad/api/%71/health/ready` and `/klad/api//q/health` through. `q;x`
+  counts as `q` as well, since a server may read `;` as the start of path
+  parameters. A path that
+  does not decode (`%zz`, or `%ff`, which is not UTF-8) is refused the same
+  way; the API has no path parameters, so no real request looks like that.
+  The raw path, not the decoded one, is what gets forwarded.
+- **`redirect: 'manual'`.** A redirect from the API comes back as it is,
+  instead of being followed inside the Function.
+- **Proxy errors use the API's error shape.** A path that is not `/klad/api`
+  or under `/klad/api/`, or that is under `/klad/api/q`, gives 404
+  `{"error":"not_found"}`, `API_ORIGIN` unset 503
+  `{"error":"not_configured"}`, an unreachable API 502
+  `{"error":"upstream"}`. All three carry `Cache-Control: no-store`, and the
+  tests check it. There is no fallback address: a deploy without the
+  variable, such as a branch preview before it is set there, answers 503
+  rather than guessing.
+- **`_headers` does not cover `/klad/api/*`.** Pages never applies `_headers`
+  to responses from Functions, so those responses carry only the API's own
+  headers, and the API owns them. The game page's CSP is unaffected.
+- **"No logs I own" is gone from the README.** The API runs on Cloud Run,
+  which keeps standard request logs; once the game calls it, the claim would
+  be false.
+- **The proxy test uses `test:` URLs.** Only the path and query matter to the
+  proxy, and the CI grep rejects any `http://` or `https://` in a `.js` file,
+  tests included. A non-http scheme says so openly instead of assembling a
+  URL string to slip past the grep.
+- **The home page copy is unchanged.** It still says "no cookies", which
+  stays true: the game's cookie is scoped to `/klad/api`, and the home page
+  sets none.
+- **Phones still hide the footer, privacy note included.** Short portrait
+  screens and touch screens in landscape have kept the room for the field
+  since 2026-10-30. Where the footer shows, it is now a few lines taller,
+  and the tile size pays for that. Nothing is stored before a player picks
+  a nick, so the screen that asks for the nick must show the note, on every
+  device. The Russian note is not folded into a `<details>`: the game's key
+  handler takes Space and Enter on the whole page and cancels their default
+  action, and opening the note would change the stage height without
+  refitting the canvas. Both would need changes in `klad.js`.
+
 ## 2026-11-13 - Agent instructions moved out of the repository
 
 `CLAUDE.md` is removed, and its CODEOWNERS entry with it. Agent instructions

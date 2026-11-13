@@ -1,0 +1,60 @@
+// Same-origin proxy for the game's API. The upstream origin lives only in the
+// Pages variable API_ORIGIN: CI fails on any full URL in a .js file.
+const PREFIX = '/klad/api';
+const FORWARDED_HEADERS = ['Content-Type', 'Accept', 'Cookie'];
+
+export async function onRequest({ request, env }) {
+  const url = new URL(request.url);
+  // The routing should only send paths under the prefix, but the slice below
+  // must not rely on it: /klad/api@other.host would otherwise change the host.
+  if (url.pathname !== PREFIX && !url.pathname.startsWith(PREFIX + '/')) {
+    return errorResponse(404, 'not_found');
+  }
+  const path = url.pathname.slice(PREFIX.length);
+  if (isQuarkusPath(path)) {
+    return errorResponse(404, 'not_found');
+  }
+
+  if (!env.API_ORIGIN) {
+    return errorResponse(503, 'not_configured');
+  }
+
+  // Plain concatenation, not new URL(path, origin): a path such as
+  // //other.host/x must not be able to change the upstream host.
+  const upstreamUrl = env.API_ORIGIN + path + url.search;
+
+  const headers = new Headers();
+  for (const name of FORWARDED_HEADERS) {
+    const value = request.headers.get(name);
+    if (value !== null) {
+      headers.set(name, value);
+    }
+  }
+
+  const hasBody = request.method !== 'GET' && request.method !== 'HEAD';
+  try {
+    return await fetch(upstreamUrl, {
+      method: request.method,
+      headers,
+      body: hasBody ? request.body : undefined,
+      redirect: 'manual',
+    });
+  } catch {
+    return errorResponse(502, 'upstream');
+  }
+}
+
+// Quarkus serves its health and dev endpoints under /q. Its server decodes
+// %71 to q and reads // as /, so the check runs on the decoded path, and a
+// path that does not decode counts as one too.
+function isQuarkusPath(path) {
+  try {
+    return /^\/+q(\/|;|$)/i.test(decodeURIComponent(path));
+  } catch {
+    return true;
+  }
+}
+
+function errorResponse(status, code) {
+  return Response.json({ error: code }, { status, headers: { 'Cache-Control': 'no-store' } });
+}

@@ -897,3 +897,328 @@ test('a board loads with GET, and an unavailable API gives no data', async () =>
   assert.equal(records, null);
   assert.deepEqual(server.calls, [call('GET /klad/api/boards/chests?kind=agent'), call('GET /klad/api/boards/records?kind=human')]);
 });
+
+const EMAIL = 'test@example.com';
+const CODE = '012345';
+const ACCOUNT = { nick: 'test', kind: 'agent', account: true, email: EMAIL };
+const CODE_SENT = [202, {}];
+const SEND_CODE = call('POST /klad/api/login/code', { email: EMAIL });
+const verifyCall = (code) => call('POST /klad/api/login/verify', { email: EMAIL, code });
+
+test('requestCode posts the email as JSON and 202 opens the code step', async () => {
+  // given
+  const server = fakeServer({ 'GET /klad/api/players/me': [[200, PLAYER]], 'POST /klad/api/login/code': [CODE_SENT] });
+  const online = KLAD_ONLINE.create(server.fetch, fakePage());
+  await online.start();
+
+  // when
+  const problem = await online.requestCode(EMAIL);
+
+  // then
+  assert.equal(problem, null);
+  assert.equal(online.isCodeSent(), true);
+  assert.deepEqual(server.calls, [READ_ME, SEND_CODE]);
+});
+
+for (const [answer, name, text] of [
+  [[400, { error: 'invalid_email' }], '400 invalid_email', TEXT.invalidEmail],
+  [[429, { error: 'rate_limited' }], '429 rate_limited', TEXT.codeLimited],
+  [[404, { error: 'not_found' }], '404 before the API has accounts', TEXT.unavailable],
+  [[OFFLINE], 'a network failure', TEXT.unavailable],
+]) {
+  test('requestCode answered with ' + name + ' gives its message and opens no code step', async () => {
+    // given
+    const server = fakeServer({ 'GET /klad/api/players/me': [[200, PLAYER]], 'POST /klad/api/login/code': [answer] });
+    const online = KLAD_ONLINE.create(server.fetch, fakePage());
+    await online.start();
+
+    // when
+    const problem = await online.requestCode(EMAIL);
+
+    // then
+    assert.equal(problem, text);
+    assert.equal(online.isCodeSent(), false);
+    assert.deepEqual(online.player(), PLAYER);
+  });
+}
+
+test('verify posts the email the code went to and the code as a string, and merged true says so', async () => {
+  // given
+  const server = fakeServer({
+    'GET /klad/api/players/me': [[200, PLAYER]],
+    'POST /klad/api/login/code': [CODE_SENT],
+    'POST /klad/api/login/verify': [[200, { ...ACCOUNT, merged: true }]],
+  });
+  const online = KLAD_ONLINE.create(server.fetch, fakePage());
+  await online.start();
+  await online.requestCode(EMAIL);
+
+  // when
+  const text = await online.verify(CODE);
+
+  // then
+  assert.equal(text, TEXT.merged);
+  assert.deepEqual(online.player(), ACCOUNT);
+  assert.equal(online.isCodeSent(), false);
+  assert.deepEqual(server.calls, [READ_ME, SEND_CODE, verifyCall(CODE)]);
+});
+
+test('verify with merged false and a guest of another kind says why the results stayed', async () => {
+  // given
+  const human = { nick: 'owner', kind: 'human', account: true, email: EMAIL };
+  const server = fakeServer({
+    'GET /klad/api/players/me': [[200, PLAYER]],
+    'POST /klad/api/login/code': [CODE_SENT],
+    'POST /klad/api/login/verify': [[200, { ...human, merged: false }]],
+  });
+  const online = KLAD_ONLINE.create(server.fetch, fakePage());
+  await online.start();
+  await online.requestCode(EMAIL);
+
+  // when
+  const text = await online.verify(CODE);
+
+  // then
+  assert.equal(text, TEXT.otherKind);
+  assert.deepEqual(online.player(), human);
+});
+
+test('verify with merged false and a guest of the same kind says the results stayed with its nick', async () => {
+  // given
+  const server = fakeServer({
+    'GET /klad/api/players/me': [[200, PLAYER]],
+    'POST /klad/api/login/code': [CODE_SENT],
+    'POST /klad/api/login/verify': [[200, { ...ACCOUNT, merged: false }]],
+  });
+  const online = KLAD_ONLINE.create(server.fetch, fakePage());
+  await online.start();
+  await online.requestCode(EMAIL);
+
+  // when
+  const text = await online.verify(CODE);
+
+  // then
+  assert.equal(text, TEXT.kept('test'));
+  assert.deepEqual(online.player(), ACCOUNT);
+});
+
+test('verify without a guest logs in to the account and later results go to it', async () => {
+  // given
+  const server = fakeServer({
+    'GET /klad/api/players/me': [NO_SESSION],
+    'POST /klad/api/login/code': [CODE_SENT],
+    'POST /klad/api/login/verify': [[200, { ...ACCOUNT, merged: false }]],
+    'POST /klad/api/clears': [CREATED],
+  });
+  const page = fakePage();
+  const online = KLAD_ONLINE.create(server.fetch, page);
+  await online.start();
+  await online.requestCode(EMAIL);
+
+  // when
+  const text = await online.verify(CODE);
+  await online.onClear(CLEAR);
+
+  // then
+  assert.equal(text, TEXT.loggedIn);
+  assert.deepEqual(online.player(), ACCOUNT);
+  assert.equal(page.asked, 0);
+  assert.deepEqual(server.calls, [READ_ME, SEND_CODE, verifyCall(CODE), call('POST /klad/api/clears', CLEAR)]);
+});
+
+test('invalid_code on verify keeps the guest and the code step for another try', async () => {
+  // given
+  const server = fakeServer({
+    'GET /klad/api/players/me': [[200, PLAYER]],
+    'POST /klad/api/login/code': [CODE_SENT],
+    'POST /klad/api/login/verify': [[400, { error: 'invalid_code' }]],
+  });
+  const online = KLAD_ONLINE.create(server.fetch, fakePage());
+  await online.start();
+  await online.requestCode(EMAIL);
+
+  // when
+  const text = await online.verify('999999');
+
+  // then
+  assert.equal(text, TEXT.invalidCode);
+  assert.equal(online.isCodeSent(), true);
+  assert.deepEqual(online.player(), PLAYER);
+});
+
+test('too_many_attempts on verify keeps the guest and asks for a new code', async () => {
+  // given
+  const server = fakeServer({
+    'GET /klad/api/players/me': [[200, PLAYER]],
+    'POST /klad/api/login/code': [CODE_SENT],
+    'POST /klad/api/login/verify': [[429, { error: 'too_many_attempts' }]],
+  });
+  const online = KLAD_ONLINE.create(server.fetch, fakePage());
+  await online.start();
+  await online.requestCode(EMAIL);
+
+  // when
+  const text = await online.verify('999999');
+
+  // then
+  assert.equal(text, TEXT.tooManyAttempts);
+  assert.equal(online.isCodeSent(), false);
+  assert.deepEqual(online.player(), PLAYER);
+});
+
+for (const [answer, name] of [[[502, { error: 'upstream' }], '502'], [[OFFLINE], 'a network failure']]) {
+  test('verify answered with ' + name + ' keeps the guest and the code step', async () => {
+    // given
+    const server = fakeServer({
+      'GET /klad/api/players/me': [[200, PLAYER]],
+      'POST /klad/api/login/code': [CODE_SENT],
+      'POST /klad/api/login/verify': [answer],
+    });
+    const online = KLAD_ONLINE.create(server.fetch, fakePage());
+    await online.start();
+    await online.requestCode(EMAIL);
+
+    // when
+    const text = await online.verify(CODE);
+
+    // then
+    assert.equal(text, TEXT.unavailable);
+    assert.equal(online.isCodeSent(), true);
+    assert.deepEqual(online.player(), PLAYER);
+  });
+}
+
+test('no_session on verify asks for a nick first, and the same code then makes the account', async () => {
+  // given
+  const server = fakeServer({
+    'GET /klad/api/players/me': [NO_SESSION, [200, PLAYER]],
+    'POST /klad/api/login/code': [CODE_SENT],
+    'POST /klad/api/login/verify': [NO_SESSION, [200, { ...ACCOUNT, merged: false }]],
+    'POST /klad/api/players': [[201, PLAYER]],
+  });
+  const online = KLAD_ONLINE.create(server.fetch, fakePage());
+  await online.start();
+  await online.requestCode(EMAIL);
+
+  // when
+  const first = await online.verify(CODE);
+  const isCodeKept = online.isCodeSent();
+  online.ask();
+  await online.choose('test', 'agent');
+  const second = await online.verify(CODE);
+
+  // then
+  assert.equal(first, TEXT.loginNoSession);
+  assert.equal(isCodeKept, true);
+  assert.equal(second, TEXT.kept('test'));
+  assert.deepEqual(online.player(), ACCOUNT);
+  assert.deepEqual(server.calls, [
+    READ_ME,
+    SEND_CODE,
+    verifyCall(CODE),
+    call('POST /klad/api/players', { nick: 'test', kind: 'agent' }),
+    READ_ME,
+    verifyCall(CODE),
+  ]);
+});
+
+test('nick_taken on verify asks for a new nick, then a new code makes the account', async () => {
+  // given
+  const renamed = { ...PLAYER, nick: 'test2' };
+  const account = { ...ACCOUNT, nick: 'test2' };
+  const server = fakeServer({
+    'GET /klad/api/players/me': [[200, PLAYER]],
+    'POST /klad/api/login/code': [CODE_SENT],
+    'POST /klad/api/login/verify': [[409, { error: 'nick_taken' }], [200, { ...account, merged: false }]],
+    'PATCH /klad/api/players/me': [[200, renamed]],
+  });
+  const online = KLAD_ONLINE.create(server.fetch, fakePage());
+  await online.start();
+  await online.requestCode(EMAIL);
+
+  // when
+  const first = await online.verify(CODE);
+  const isCodeKept = online.isCodeSent();
+  await online.rename('test2');
+  await online.requestCode(EMAIL);
+  const second = await online.verify('654321');
+
+  // then
+  assert.equal(first, TEXT.loginNickTaken);
+  assert.equal(isCodeKept, false);
+  assert.equal(second, TEXT.kept('test2'));
+  assert.deepEqual(online.player(), account);
+  assert.deepEqual(server.calls, [
+    READ_ME,
+    SEND_CODE,
+    verifyCall(CODE),
+    call('PATCH /klad/api/players/me', { nick: 'test2' }),
+    SEND_CODE,
+    verifyCall('654321'),
+  ]);
+});
+
+test('logout posts /logout without a body, the page has no player and asks for no nick', async () => {
+  // given
+  const server = fakeServer({ 'GET /klad/api/players/me': [[200, ACCOUNT]], 'POST /klad/api/logout': [[204]] });
+  const page = fakePage();
+  const online = KLAD_ONLINE.create(server.fetch, page);
+  await online.start();
+
+  // when
+  const problem = await online.logout();
+  await online.onClear(CLEAR);
+
+  // then
+  assert.equal(problem, null);
+  assert.equal(online.player(), null);
+  assert.equal(page.asked, 0);
+  assert.deepEqual(server.calls, [READ_ME, call('POST /klad/api/logout')]);
+});
+
+test('401 on logout forgets the player and says this browser has no nick', async () => {
+  // given
+  const server = fakeServer({ 'GET /klad/api/players/me': [[200, ACCOUNT]], 'POST /klad/api/logout': [NO_SESSION] });
+  const online = KLAD_ONLINE.create(server.fetch, fakePage());
+  await online.start();
+
+  // when
+  const problem = await online.logout();
+
+  // then
+  assert.equal(problem, TEXT.noPlayer);
+  assert.equal(online.player(), null);
+});
+
+test('a logout that fails keeps the account and says so', async () => {
+  // given
+  const server = fakeServer({ 'GET /klad/api/players/me': [[200, ACCOUNT]], 'POST /klad/api/logout': [[OFFLINE]] });
+  const online = KLAD_ONLINE.create(server.fetch, fakePage());
+  await online.start();
+
+  // when
+  const problem = await online.logout();
+
+  // then
+  assert.equal(problem, TEXT.unavailable);
+  assert.deepEqual(online.player(), ACCOUNT);
+});
+
+test('deleting the guest while a code is out closes the code step', async () => {
+  // given
+  const server = fakeServer({
+    'GET /klad/api/players/me': [[200, PLAYER]],
+    'POST /klad/api/login/code': [CODE_SENT],
+    'DELETE /klad/api/players/me': [[204]],
+  });
+  const online = KLAD_ONLINE.create(server.fetch, fakePage());
+  await online.start();
+  await online.requestCode(EMAIL);
+
+  // when
+  await online.remove();
+
+  // then
+  assert.equal(online.isCodeSent(), false);
+  assert.equal(online.player(), null);
+});

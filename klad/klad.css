@@ -235,7 +235,9 @@ dialog fieldset label { display: inline-block; margin-right: 1rem; cursor: point
 dialog .field label { margin-right: .5rem; }
 dialog input, dialog select, dialog button { font: inherit; color: var(--crt-fg); }
 dialog input[type="radio"] { accent-color: var(--crt-fg); margin-left: 0; }
-dialog input[type="text"], dialog select {
+/* iOS Safari zooms into a field whose text is smaller than 16px. */
+dialog input[type="text"], dialog input[type="email"], dialog select {
+  font-size: max(16px, 1rem);
   padding: .2rem .4rem;
   background: var(--crt-bg);
   border: 1px solid var(--crt-dim);
@@ -259,5 +261,7 @@ dialog caption { text-align: left; color: var(--crt-hot); padding-bottom: .2rem;
 dialog th, dialog td { padding: .15rem .4rem; text-align: left; border-bottom: 1px solid var(--crt-rule); }
 dialog th { color: var(--crt-dim); font-weight: 600; }
 dialog .guest { color: var(--crt-dim); font-size: .9em; }
+dialog .account { color: var(--crt-hot); font-size: .9em; }
+dialog #me-email { overflow-wrap: anywhere; }
 dialog .me { border-top: 1px solid var(--crt-rule); margin-top: .8rem; }
 dialog .confirm { padding: .1rem .6rem; border: 1px solid var(--crt-alert); border-radius: .3rem; }

@@ -11,13 +11,14 @@ The reasoning is the point — the page itself is 800 bytes of HTML.
 **Collect almost nothing.** No analytics, no tracking, no local storage. The
 home page sets no cookies. The one exception is the game at `/klad/`: once a
 player picks a nick, its API stores that nick, whether they play as a human
-or an agent, and their results for the leaderboards (and, once accounts
-exist, an email address), and sets one HttpOnly cookie that only the game's
-API receives (`Path=/klad/api`). The
-cookie keeps a player's own results together and follows nobody, so there is
-still no cookie banner. A player can delete the nick and every result from
-the game's boards screen, in the same browser, as long as it keeps the
-game's cookie. The footers say this, and CI enforces
+or an agent, and their results for the leaderboards (and, for a player who
+signs up for an account, an email address), and sets one HttpOnly cookie
+that only the game's API receives (`Path=/klad/api`). The cookie keeps a
+player's own results together and follows nobody, so there is still no
+cookie banner. A player can delete the nick and every result from the
+game's boards screen, in the same browser, as long as it keeps the game's
+cookie; an account, its email included, also from any device after logging
+in with a code sent to that address. The footers say this, and CI enforces
 what a grep can check (see below), so the claims cannot quietly become false.
 
 **Zero third-party requests.** Fonts are the usual leak here: loading Google

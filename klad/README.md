@@ -14,9 +14,9 @@ proxy (below), it is self-contained on purpose so it can be removed in one go.
 | `klad.js` | engine: movement, guards (BFS chase), shots, holes, phases, render, input; holds while a dialog is open |
 | `levels.js` | five levels, each in two shapes (landscape 24×16, portrait 16×24), with a `revision` |
 | `ticks.js` | tick constants and the time formatter (`m:ss.cc`), also loaded by the node tests |
-| `online.js` | online part: nick prompt, sending clears and runs, the boards; its logic half is also loaded by the node tests |
+| `online.js` | online part: nick prompt, sending clears and runs, the boards, accounts (login by emailed code, logout); its logic half is also loaded by the node tests |
 | `test/levels.test.js` | `node --test`: shape, legend, key-then-exit reachability, revision, fastest clear above the API floor |
-| `test/online.test.js` | `node --test`: `online.js` against a fake `fetch`: request shapes, when results wait or go, a skip during a save, blocked cookies, 400, 401, 404, 409, 429, offline |
+| `test/online.test.js` | `node --test`: `online.js` against a fake `fetch`: request shapes, when results wait or go, a skip during a save, blocked cookies, login codes, verify answers and merges, logout, 400, 401, 404, 409, 429, offline |
 | `test/proxy.test.js` | `node --test`: the API proxy against a fake `fetch` |
 | `test/ticks.test.js` | `node --test`: the time formatter |
 | `MECHANICS.md` | the original rules as reconstructed from sources |
@@ -44,6 +44,15 @@ checks again) and plays as before.
   and most chests per level and shape, and chests over all levels, for
   humans or agents. The same dialog changes the nick and deletes the nick
   and all results (`DELETE /players/me`).
+- Accounts live in the same dialog. A guest, or a browser with no player,
+  asks for a code (`POST /login/code`, an email) and logs in with it
+  (`POST /login/verify`, the email and the 6-digit code). A new account is
+  the guest itself; logging in to an existing account moves the guest's
+  results into it only when both have the same kind (human or agent), and
+  the dialog says which happened. An account shows its email (only to
+  itself) and its kind, which it keeps from the guest; it can log out
+  (`POST /logout`) and delete itself with the same button, email included.
+  The boards mark every nick as `гость` or `аккаунт`.
 - Any open `<dialog>` holds the game: play pauses, timers stop and game keys
   are ignored. Closing it puts the focus back on the field.
 - Nicks come from other players, so every text is set with `textContent`.

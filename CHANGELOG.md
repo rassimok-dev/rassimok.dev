@@ -3,6 +3,76 @@
 Dated entries, newest first. Written for a reader picking this up cold —
 or a future session needing to know what already exists and why.
 
+## 2026-11-13 (fifth) - Klad accounts: sign-up and login by emailed code
+
+The boards dialog gains an "Аккаунт" part. A guest, or a browser with no
+player, enters an email, gets a 6-digit code (`POST /login/code`) and logs
+in with it (`POST /login/verify`). A new account is the guest itself;
+logging in to an existing account moves the guest's results into it when
+both have the same kind. An account shows its email (only to itself) and
+its kind, can rename, log out (`POST /logout`) and delete itself, email
+included. The boards mark every nick `гость` or `аккаунт`. The privacy
+notes (prompt, both footer notes, the login part), the meta description and
+the README now say that an account also stores its email and that it can be
+deleted from any device after a login. Built against the shared contract
+(sections 1, 3, 5, 6); the API side (RAS-23, RAS-24) is not deployed yet,
+so until it is, every login request answers 404 and the dialog says the
+server is unavailable.
+
+### Decisions worth not relitigating
+
+- **In the boards dialog, not a dialog of its own.** One dialog open at a
+  time keeps the hold rule in `klad.js` as it is, and the login sits next
+  to the nick it turns into an account. The login part shows only for a
+  guest or no player: an account logs out first, because switching from
+  one account to another is not in the contract.
+- **The code is checked against the address it went to.** The logic half
+  keeps that email in memory, so editing the field after "Получить код"
+  cannot send a valid code with the wrong address.
+- **What the result says.** `merged: true` says the guest's results moved.
+  `merged: false` with a guest of another kind says why (the kinds differ)
+  and that the guest stays under its own nick. With a guest of the same
+  kind it says "the results of nick X stayed with it", which is true for a
+  sign-up (the guest became the account) and for a login against an API
+  that does not merge yet; the contract does not say which `merged` a
+  sign-up returns. Without a guest it says only that the login worked.
+- **A guest of another kind is left behind, and the login part warns before
+  it happens.** After such a login the browser's cookie belongs to the
+  account, so the old guest's nick and results stay on the boards and can
+  no longer be deleted from this browser. The note says so before the code
+  is entered.
+- **`no_session` keeps the code.** It means no account exists for the
+  email and the browser has no guest; the dialog asks for a nick through
+  the existing prompt and then for the same code again. If the API used the
+  code up, the retry answers `invalid_code`, which asks for a new one, and
+  one of the three codes an hour is not spent for nothing. `nick_taken`
+  (rename, then a new code) and `too_many_attempts` (the code is gone) do
+  need a new code, as the contract says.
+- **One request at a time.** Code, verify and logout share the guard that
+  rename and delete already had: a double click on "Получить код" would
+  spend two of the three codes an hour.
+- **Logout works like delete on the page.** No player, nothing waits, and
+  the page does not ask for a nick again; the dialog offers a nick or a new
+  login. 401 on logout says only that this browser has no nick on the
+  server.
+- **Inputs.** The email is `type="email"` with `autocomplete="email"`. The
+  code is `type="text"` with `inputmode="numeric"`,
+  `autocomplete="one-time-code"` and a 6-digit pattern, and it is sent as a
+  string: `type="number"` would drop a leading zero. Text fields and
+  selects in the dialogs are at least 16px, because iOS Safari zooms into
+  smaller ones.
+- **Where results are announced.** Login answers go to a status line in
+  the login part (`role="status"`, `aria-live="polite"`). A successful
+  login hides that part, and text in a hidden live region is not read, so
+  that message goes to the note above it, and the focus moves to the nick
+  field. After logout or delete the email line is emptied and the login
+  forms are reset, so the address does not linger in a hidden node.
+- **The account marker is a word**, `аккаунт`, like `гость`, shown only
+  when `guest` is `false`, so a screen reader reads it as text. An
+  `aria-label` on a span is not reliably announced.
+- **Delete keeps one button.** The confirmation names the email for an
+  account, and the privacy notes point to the same button for both.
+
 ## 2026-11-13 (fourth) - Klad goes online: nick prompt, results and boards
 
 New `klad/online.js`, loaded after `klad.js`, connects the game to its API

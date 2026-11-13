@@ -1,7 +1,8 @@
 'use strict';
 /* The /klad/api proxy (functions/klad/api/[[path]].js) against a fake fetch.
-   Only the path and query of the request URL matter to the proxy, so the
-   test URLs use a test: scheme instead of a full site URL. The origin is
+   Plain requests use a test: scheme, as only their path and query matter.
+   Upgrade requests use a ws: URL, because the proxy compares Origin with the
+   origin of the request URL and a test: URL has none. The API origin is
    URL-shaped so that each test can check the host the proxy would reach. */
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -173,12 +174,12 @@ test('proxy answers 503 when API_ORIGIN is not set', async (t) => {
   assert.equal(fetchMock.mock.callCount(), 0);
 });
 
-// Split for the CI grep, like the proxy's own constant, and written out here
-// rather than imported, so a typo in the proxy fails these tests.
-const SITE_ORIGIN = 'https:' + '//rassimok.dev';
+// The origin of the upgrade requests below (ws:, as CI fails on http: and
+// https: URLs in .js files).
+const SITE_ORIGIN = 'ws://site.test';
 
 function upgradeRequest(path, headers) {
-  return new Request('test:' + path, { headers: { Upgrade: 'websocket', ...headers } });
+  return new Request(SITE_ORIGIN + path, { headers: { Upgrade: 'websocket', ...headers } });
 }
 
 test('proxy forwards a WebSocket upgrade from the site and returns the 101 as is', async (t) => {
@@ -224,12 +225,12 @@ test('proxy passes on Sec-WebSocket-Protocol with an upgrade', async (t) => {
 for (const origin of [
   undefined,
   'null',
-  SITE_ORIGIN.replace('https:', 'http:'),
+  SITE_ORIGIN.replace('ws:', 'wss:'),
   SITE_ORIGIN + '/',
-  SITE_ORIGIN + ':443',
+  SITE_ORIGIN + ':8080',
   SITE_ORIGIN.replace('//', '//www.'),
   SITE_ORIGIN + '.other.host',
-  SITE_ORIGIN.replace('rassimok.dev', 'other.host'),
+  SITE_ORIGIN.replace('site.test', 'other.host'),
 ]) {
   test(`proxy answers 403 without a fetch for an upgrade with Origin ${origin}`, async (t) => {
     const fetchMock = fakeFetch(t);
@@ -246,7 +247,7 @@ for (const origin of [
 
 test('proxy reads the Upgrade value in either case', async (t) => {
   const fetchMock = fakeFetch(t);
-  const request = new Request('test:/klad/api/race/echo', { headers: { Upgrade: 'WebSocket' } });
+  const request = new Request(SITE_ORIGIN + '/klad/api/race/echo', { headers: { Upgrade: 'WebSocket' } });
 
   const response = await onRequest({ request, env });
 
@@ -255,7 +256,7 @@ test('proxy reads the Upgrade value in either case', async (t) => {
 });
 
 for (const path of ['/klad/api/q', '/klad/api/%71/health/ready', '/klad/api@other.host/x']) {
-  for (const origin of [SITE_ORIGIN, SITE_ORIGIN.replace('rassimok.dev', 'other.host')]) {
+  for (const origin of [SITE_ORIGIN, SITE_ORIGIN.replace('site.test', 'other.host')]) {
     test(`proxy answers 404 without a fetch for an upgrade to ${path} from ${origin}`, async (t) => {
       const fetchMock = fakeFetch(t);
       const request = upgradeRequest(path, { Origin: origin });
@@ -296,7 +297,7 @@ test('proxy neither checks nor forwards Origin without a WebSocket upgrade', asy
   const fetchMock = fakeFetch(t);
   const request = new Request('test:/klad/api/status', {
     headers: {
-      'Origin': SITE_ORIGIN.replace('rassimok.dev', 'other.host'),
+      'Origin': SITE_ORIGIN.replace('site.test', 'other.host'),
       'Upgrade': 'h2c',
       'Sec-WebSocket-Protocol': 'klad',
       'Cookie': 'klad_session=token',

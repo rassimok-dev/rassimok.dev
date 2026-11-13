@@ -87,7 +87,8 @@ A WebSocket upgrade (`Upgrade: websocket`, either case) goes through the same
 path rules and errors, and is forwarded with `fetch` to the same address,
 adding only the `Upgrade`, `Origin` and, if present, `Sec-WebSocket-Protocol`
 headers; the Workers runtime does the handshake itself. Its `Origin` must be
-exactly `https://rassimok.dev`, otherwise the proxy answers 403
+exactly the origin of the request itself (the page that opens the socket is
+served by the same host as the Function), otherwise the proxy answers 403
 `{"error":"forbidden_origin"}` (also `no-store`) without calling the API:
 WebSockets have no CORS, so the check is what keeps other sites' pages from
 opening a socket with a player's cookie. The browser's `Origin` goes on

@@ -5,9 +5,6 @@ const FORWARDED_HEADERS = ['Content-Type', 'Accept', 'Cookie'];
 // The runtime does the WebSocket handshake itself (Sec-WebSocket-Key and the
 // rest), so an upgrade adds only these. Origin goes on for the API's own check.
 const UPGRADE_HEADERS = ['Upgrade', 'Origin', 'Sec-WebSocket-Protocol'];
-// The site's own origin, compared and never fetched. Split in two because CI
-// fails on any full URL in a .js file.
-const SITE_ORIGIN = 'https:' + '//rassimok.dev';
 
 export async function onRequest({ request, env }) {
   const url = new URL(request.url);
@@ -22,9 +19,10 @@ export async function onRequest({ request, env }) {
   }
 
   // WebSockets have no CORS, so any page could open one with the player's
-  // cookie; only the site's own pages may.
+  // cookie; only pages served from this host may. The API checks the exact
+  // production origin again.
   const isUpgrade = (request.headers.get('Upgrade') ?? '').toLowerCase() === 'websocket';
-  if (isUpgrade && request.headers.get('Origin') !== SITE_ORIGIN) {
+  if (isUpgrade && request.headers.get('Origin') !== url.origin) {
     return errorResponse(403, 'forbidden_origin');
   }
 

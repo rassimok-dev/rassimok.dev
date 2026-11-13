@@ -11,7 +11,7 @@ with `Upgrade: websocket` (either case) to the same upstream URL as any
 other, through the same path checks and the same 404, 503 and 502 answers.
 It adds the `Upgrade`, `Origin` and, if present, `Sec-WebSocket-Protocol`
 headers to the usual `Content-Type`, `Accept` and `Cookie`. An upgrade whose
-`Origin` is not exactly `https://rassimok.dev` gets 403
+`Origin` differs from the origin of the request itself gets 403
 `{"error":"forbidden_origin"}` with `Cache-Control: no-store`, and the API
 is not called. Requests without the upgrade behave exactly as before.
 
@@ -51,12 +51,16 @@ known.
   `Sec-WebSocket-Version` or `Sec-WebSocket-Extensions`; each side of the
   proxy negotiates its own. `Sec-WebSocket-Protocol` goes on so a later
   subprotocol would reach the API.
-- **The origin constant is split in two** (`'https:' + '//rassimok.dev'`)
-  because the CI grep fails on any full URL in a `.js` file. It is the
-  site's own origin and is only compared, never fetched. A Pages variable
-  would add deploy config and one more way to fail; a CI exemption would
-  weaken the check. The test writes the same string out on its own, so a
-  typo in the proxy fails it.
+- **The upgrade's Origin must equal the request's own origin**
+  (`new URL(request.url).origin`). The page that opens the socket is served
+  by the same host as the Function, so no site origin is written in code:
+  no URL literal and no split string to get past the CI grep (an earlier
+  version of this ticket split `'https:' + '//rassimok.dev'`, which worked
+  around the guard and was removed). A preview host passes the proxy but the
+  API, which still checks the exact production origin, refuses it. The
+  tests send upgrades to a `ws:` URL (a `test:` URL has no origin, and the
+  CI grep only looks for `http:` and `https:`) and cover a foreign Origin
+  and a missing one, both 403 with no fetch.
 
 ## 2026-11-13 (fifth) - Klad accounts: sign-up and login by emailed code
 

@@ -12,9 +12,11 @@ proxy (below), it is self-contained on purpose so it can be removed in one go.
 | `index.html` | page: HUD, canvas, touch pad, footer |
 | `klad.css` | styles; defines the palette the game reads |
 | `klad.js` | engine: movement, guards (BFS chase), shots, holes, phases, render, input |
-| `levels.js` | five levels, each in two shapes (landscape 24×16, portrait 16×24) |
-| `test/levels.test.js` | `node --test`: shape, legend, key-then-exit reachability |
+| `levels.js` | five levels, each in two shapes (landscape 24×16, portrait 16×24), with a `revision` |
+| `ticks.js` | tick constants and the time formatter (`m:ss.cc`), also loaded by the node tests |
+| `test/levels.test.js` | `node --test`: shape, legend, key-then-exit reachability, revision, fastest clear above the API floor |
 | `test/proxy.test.js` | `node --test`: the API proxy against a fake `fetch` |
+| `test/ticks.test.js` | `node --test`: the time formatter |
 | `MECHANICS.md` | the original rules as reconstructed from sources |
 
 No build step, no dependencies, no localStorage. Level resume is the URL

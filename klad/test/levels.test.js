@@ -5,6 +5,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const LEVELS = require('../levels.js');
+const KLAD_TICKS = require('../ticks.js');
 
 const DIMS = { landscape: [24, 16], portrait: [16, 24] };
 const LEGEND = new Set('.=#H-~$KLDEPG');
@@ -33,6 +34,44 @@ function reach(rows, hasKey, sx, sy) {
   return cells;
 }
 
+/* Cheapest key-then-exit route in ticks, from the speeds in klad.js: walking
+   5 cells/s, climbing 4.5, falling 9, no shooting. A lower bound for any real clear. */
+const TICKS_PER_CELL = { walk: 120 / 5, climb: 120 / 4.5, fall: 120 / 9 };
+
+function cheapest(rows, hasKey, sx, sy) {
+  const H = rows.length, W = rows[0].length;
+  const at = (x, y) => (x < 0 || x >= W || y < 0 || y >= H) ? '=' : rows[y][x];
+  const solid = (x, y) => { const c = at(x, y); return c === '=' || c === '#' || (c === 'D' && !hasKey); };
+  const ladder = (x, y) => at(x, y) === 'H' || at(x, y) === 'E';
+  const best = new Map([[`${sx},${sy},0`, 0]]), open = [[0, sx, sy, 0]], cost = new Map();
+  while (open.length) {
+    open.sort((a, b) => a[0] - b[0]);
+    const [ticks, x, y, fell] = open.shift();
+    if (ticks > best.get(`${x},${y},${fell}`) || at(x, y) === '~') continue;
+    if (!cost.has(`${x},${y}`)) cost.set(`${x},${y}`, ticks);
+    const go = (nx, ny, nf, step) => {
+      if (solid(nx, ny)) return;
+      const k = `${nx},${ny},${nf}`, total = ticks + step;
+      if (!best.has(k) || total < best.get(k)) { best.set(k, total); open.push([total, nx, ny, nf]); }
+    };
+    const supported = ladder(x, y) || y + 1 >= H || solid(x, y + 1) || ladder(x, y + 1) || (at(x, y + 1) === '-' && !fell);
+    if (!supported) { go(x, y + 1, 1, TICKS_PER_CELL.fall); continue; }
+    go(x - 1, y, 0, TICKS_PER_CELL.walk); go(x + 1, y, 0, TICKS_PER_CELL.walk);
+    if (ladder(x, y)) go(x, y - 1, 0, TICKS_PER_CELL.climb);
+    if (ladder(x, y) || ladder(x, y + 1)) go(x, y + 1, 0, TICKS_PER_CELL.climb);
+  }
+  return cost;
+}
+
+function fastestClear(rows) {
+  const [px, py] = find(rows, 'P')[0];
+  const [kx, ky] = find(rows, 'K')[0];
+  const toKey = cheapest(rows, false, px, py).get(`${kx},${ky}`);
+  const fromKey = cheapest(rows, true, kx, ky);
+  const exits = find(rows, 'E').filter(([, y]) => y === 0).map(([x, y]) => fromKey.get(`${x},${y}`));
+  return Math.ceil(toKey + Math.min(...exits));
+}
+
 const find = (rows, ch) => {
   const out = [];
   rows.forEach((r, y) => [...r].forEach((c, x) => { if (c === ch) out.push([x, y]); }));
@@ -40,6 +79,9 @@ const find = (rows, ch) => {
 };
 
 LEVELS.forEach((level, i) => {
+  test(`level ${i + 1} has a revision`, () => {
+    assert.ok(Number.isInteger(level.revision) && level.revision >= 1, 'revision is an integer from 1');
+  });
   for (const shape of Object.keys(DIMS)) {
     test(`level ${i + 1} (${level.name}) ${shape}`, () => {
       const rows = level[shape];
@@ -63,6 +105,9 @@ LEVELS.forEach((level, i) => {
       assert.ok(before.has(`${kx},${ky}`), 'key reachable without shooting');
       const after = reach(rows, true, kx, ky);
       assert.ok(exits.some(([x, y]) => after.has(`${x},${y}`)), 'exit reachable with the key');
+
+      const fastest = fastestClear(rows);
+      assert.ok(fastest > KLAD_TICKS.MIN_CLEAR_TICKS, `fastest clear ${fastest} is not above the API floor`);
 
       const all = new Set([...before, ...after]);
       const chests = [...find(rows, '$'), ...find(rows, 'L')];

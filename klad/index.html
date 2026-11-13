@@ -29,6 +29,7 @@
       <p id="msg-body">загрузка</p>
     </div>
     <p id="online-notice" class="notice" role="status"></p>
+    <p id="race-notice" class="notice race-notice" role="status"></p>
   </main>
 
   <div class="pad" role="group" aria-label="Управление">
@@ -221,10 +222,26 @@
   </div>
   <p class="actions"><button type="button" id="lobby-close">Закрыть</button></p>
 </dialog>
+
+<dialog id="race" aria-labelledby="race-title">
+  <h2 id="race-title">Гонка</h2>
+  <p id="race-level"></p>
+  <p id="race-count" class="count" role="status" hidden></p>
+  <p id="race-status" class="note" role="status"></p>
+  <div id="race-results" hidden>
+    <div id="race-places"></div>
+    <p class="note">Побеждает тот, чей финиш сервер получил первым; время показано для сведения.</p>
+    <p class="actions">
+      <button type="button" id="race-room">Назад в комнату</button>
+      <button type="button" id="race-leave">Выйти из комнаты</button>
+    </p>
+  </div>
+</dialog>
 <script src="/klad/levels.js"></script>
 <script src="/klad/ticks.js"></script>
 <script src="/klad/klad.js"></script>
 <script src="/klad/online.js"></script>
 <script src="/klad/lobby.js"></script>
+<script src="/klad/race.js"></script>
 </body>
 </html>

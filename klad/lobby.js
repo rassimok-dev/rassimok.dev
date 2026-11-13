@@ -696,5 +696,7 @@ if (typeof document !== 'undefined') (() => {
 
   document.addEventListener('visibilitychange', () => lobby.onVisibility());
   addEventListener('hashchange', openLink);
+  /* race.js opens the lobby again and leaves the room from its finish screen. */
+  KLAD_LOBBY.page = { open: () => showLobby(), leave: () => lobby.leave() };
   openLink();
 })();

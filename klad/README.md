@@ -9,16 +9,18 @@ proxy (below), it is self-contained on purpose so it can be removed in one go.
 ## Files
 | | |
 |---|---|
-| `index.html` | page: HUD, canvas, touch pad, footer, the nick prompt, boards and lobby dialogs |
+| `index.html` | page: HUD, canvas, touch pad, footer, the nick prompt, boards, lobby and race dialogs |
 | `klad.css` | styles; defines the palette the game reads |
-| `klad.js` | engine: movement, guards (BFS chase), shots, holes, phases, render, input; holds while a dialog is open |
+| `klad.js` | engine: movement, guards (BFS chase), shots, holes, phases, render, input; holds while a dialog is open; the race hook `KLAD_GAME` |
 | `levels.js` | five levels, each in two shapes (landscape 24×16, portrait 16×24), with a `revision` |
 | `ticks.js` | tick constants and the time formatter (`m:ss.cc`), also loaded by the node tests |
 | `online.js` | online part: nick prompt, sending clears and runs, the boards, accounts (login by emailed code, logout); its logic half is also loaded by the node tests |
 | `lobby.js` | the lobby: who is in it, rooms by invite link, ready marks, the host's level and Start, and the one socket module (`KLAD_LOBBY.connect`) the race reuses; its logic half is also loaded by the node tests |
+| `race.js` | the ghost race on the lobby's socket: countdown, positions, ghosts, finish, the finish screen; its logic half is also loaded by the node tests |
 | `test/levels.test.js` | `node --test`: shape, legend, key-then-exit reachability, revision, fastest clear above the API floor |
 | `test/online.test.js` | `node --test`: `online.js` against a fake `fetch`: request shapes, when results wait or go, a skip during a save, blocked cookies, login codes, verify answers and merges, the read-back after a login, a login ending a skip, logout, 400, 401, 404, 409, 429, offline |
 | `test/lobby.test.js` | `node --test`: `lobby.js` against a fake `fetch`, a fake clock and a fake `WebSocket`: the room id form and the `#room=` link, the room view and the Start condition, presence and room polls only while open and visible, the poll after an own action, 404, 409 `room_full`, the socket at `starting` (backoff, 1008, the cap in all, its stop), the re-join after the sweep (heartbeat 204 not counted, a tap on Ready, 57 s, network failures, a poll answered after a hide), another link and the leave button during a join, the answers after the close, the request budget for an hour |
+| `test/race.test.js` | `node --test`: `race.js` on the lobby's real socket module with a fake `WebSocket`, a fake clock and a fake engine: the countdown and go, a missed go, the position rate only while racing, visible and in play, one ping timer across reconnects, finish once and its resend after a reconnect, ghosts by slot, their fade and resync, the results view, close 1000, offline, a second race; and `klad.js` in a `vm` context with a stub page: the host's shape whatever the orientation, the exit and deaths in a race with no `klad:clear`, `klad:run` or game over, `stopRace`, ghosts drawn as canvas text |
 | `test/proxy.test.js` | `node --test`: the API proxy against a fake `fetch` |
 | `test/ticks.test.js` | `node --test`: the time formatter |
 | `MECHANICS.md` | the original rules as reconstructed from sources |
@@ -97,7 +99,8 @@ closed or the tab is hidden:
   in all. Close 1000 ends it as `closed` and 1008 as `offline`, both with
   no retry. One that never opened shows "online play is not available in
   this browser". The lobby closes the socket on leaving and once the room
-  is back in the lobby state.
+  is back in the lobby state. `KLAD_LOBBY.page` (`open()`, `leave()`) lets
+  the race's finish screen open the lobby again or leave the room.
 - The room marks the caller's own entry with `you`, so the lobby finds this
   player by it (nicks may repeat among guests). An empty room (host null,
   no players) shows no member, like a room this player was dropped from.
@@ -118,6 +121,47 @@ closed or the tab is hidden:
   answer that comes back after the dialog closed does not act: a room
   created meanwhile is left at once.
 - Status: written before RAS-31 was deployed; it has not yet run against the
+  live API.
+
+## Race
+`race.js` loads after `lobby.js` and takes over at `klad:race`. It speaks
+contract section 8 (JSON in text frames) on the lobby's socket and has no
+socket or reconnect loop of its own. Other players cannot change this
+player's game: no shared world, no collision.
+
+- The server's `state` (sent on every connect) gives the level, the host's
+  shape and each player's `slot`. `countdown` closes the lobby dialog and
+  shows 3, 2, 1 a second apart in the race dialog; `go` closes it and starts
+  the level fresh in the host's shape, whatever this device's orientation.
+  A `state` that says `racing` before any `go` starts it too.
+- Sent: `ping` every 20 s from `klad:race` to the end of the race (dropped
+  while the socket is not open); `pos` with `x` and `y` in cells (two
+  decimals) and the attempt's `tick`, every 200 ms, only while racing, the
+  tab is visible and the game is in play (not paused, dead or held by a
+  dialog); `finish` once at the exit with the attempt's ticks. A finish
+  made while the socket reconnects goes out with the next `state` that
+  shows this player unfinished.
+- Ghosts: one per other slot, in a fixed colour per slot
+  (`--crt-ghost-0` to `--crt-ghost-3`; guests may share a nick), the runner
+  sprite at 0.55 opacity with the nick drawn on the canvas, from the latest
+  position. With no update for 2 s a ghost fades out over 1 s. A `state`
+  after a reconnect replaces them with its `positions`.
+- In a race a death costs no life and there is no game over. The race
+  dispatches no `klad:clear` or `klad:run`, so it never reaches the boards,
+  and it leaves the URL hash alone.
+- After the exit the top of the field says "waiting for the others" until
+  `results`. The finish screen lists place, nick (marked winner, you, left)
+  and time (`KLAD_TICKS.format`), with "Назад в комнату" (opens the lobby
+  again) and "Выйти из комнаты".
+- A dropped socket shows "reconnecting" and play goes on. Close 1000 before
+  the results (`replaced`, `idle`, or leaving the room in the lobby) or
+  `offline` after the socket opened ends the race with a note on the field
+  and goes back to the title; a socket that never opened says online play
+  is not available.
+- The engine hook: `KLAD_GAME.startRace(level, shape, { onFinish, ghosts })`,
+  `KLAD_GAME.stopRace()` and `KLAD_GAME.racePosition()` (`{x, y, tick}` in
+  play during a race, otherwise null).
+- Status: written before RAS-32 was deployed; it has not yet run against the
   live API.
 
 ## The API proxy

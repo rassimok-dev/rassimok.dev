@@ -3,6 +3,90 @@
 Dated entries, newest first. Written for a reader picking this up cold —
 or a future session needing to know what already exists and why.
 
+## 2026-11-13 (eighth) - Klad ghost race: countdown, ghosts, finish screen
+
+When the host starts, every player in the room plays the same level on
+their own copy and sees the others as coloured, see-through runners with
+their nicks. `klad/race.js` takes the lobby's socket at `klad:race` and
+speaks contract section 8 on it: the server's `countdown` shows 3, 2, 1 in
+a race dialog (which closes the lobby), `go` starts the level fresh in the
+host's shape, positions go out about 5 times a second, `finish` goes once at
+the exit with the attempt's ticks, the top of the field says "waiting for
+the others" until `results`, and the finish screen shows the places, nicks
+(winner, you, left marked) and times, with "Назад в комнату" and "Выйти из
+комнаты". `klad.js` gains a small race hook (`KLAD_GAME`). Written before
+the server side (RAS-32) was deployed: the tests use the lobby's real socket
+module on a fake `WebSocket`, a fake clock and a fake engine, and run
+`klad.js` itself in a `vm` context. It merges together with the lobby
+(RAS-33), after RAS-32 is live.
+
+### Decisions worth not relitigating
+
+- **Forcing the host's shape is a flag, not an engine change.** `loadLevel`
+  took its shape from the orientation in one line, and `resize()` already
+  fits any width and height into the stage, so a portrait level on a
+  landscape screen just gets smaller tiles. The race keeps its shape for the
+  whole race (a death reloads the level through `intro()`), and the pad
+  layout still follows the device.
+- **A race is the engine in race mode, nothing more.** `KLAD_GAME.startRace`
+  sets one `race` object; while it is set a death costs no life and there is
+  no game over (retries are unlimited), the exit hands the ticks to the race
+  and parks the game in a `finish` phase instead of `klad:clear` and the
+  next level, so neither `klad:clear` nor `klad:run` is ever dispatched and
+  a race never reaches the boards. The level is not written into the URL
+  hash, which may hold the room link. `stopRace()` clears the flag and goes
+  back to the title; a test proves a lost game after a race reports its run
+  again, because a leaked flag would silently switch off game over and the
+  boards.
+- **The countdown has its own dialog and closes the lobby.** The countdown
+  arrives while the lobby dialog is open, and the field behind a modal is
+  hidden by its backdrop; the lobby rewrites its own race line on every
+  render. So `countdown` closes the lobby (which keeps the room while it is
+  `starting`) and opens the race dialog, and `go` closes that. Any open
+  dialog holds the game, so the title cannot be played meanwhile. Only a
+  change of phase opens or closes the dialog, so one closed with Escape
+  stays closed.
+- **Positions only while racing, visible and in play.** `pos` goes every
+  200 ms (the server drops more than 10 a second), rounded to two decimals
+  to keep frames far under the 512-byte cap, and only while the tab is
+  visible and the game is in its play phase. A paused, dead or
+  dialog-held player sends nothing, so their ghost fades on the others'
+  screens, as the ticket accepts for a hidden tab. `ping` runs on one timer
+  per race from `klad:race`, however often the socket reconnects.
+- **A finish is never lost to a reconnect.** `send` returns false while the
+  socket is not open; a finish made then waits, and the `state` the server
+  sends on every connect decides: this player unfinished there means send it
+  now, finished means the server has it.
+- **Ghosts by slot, drawn on the canvas.** Four fixed colours
+  (`--crt-ghost-0` to `--crt-ghost-3`, none green like the player or red
+  like the guards) by the server's `slot`, because guests may share a nick.
+  The nick is drawn with `fillText`, never put in HTML. A ghost is drawn
+  from the latest position at 0.55 opacity, fades out over 1 s after 2 s
+  with no update, and has no collision. Ghosts are drawn under this
+  player's own runner, so the player stays readable in a crowd. A `state`
+  after a reconnect replaces the ghosts with its `positions`, and a `state`
+  that says `racing` before any `go` starts the race (a missed `go`).
+- **Waiting for the others is a line on the field, not a dialog.** The
+  player can watch the remaining ghosts run to the exit. The finish screen
+  is a dialog, since it has buttons; "Назад в комнату" opens the lobby
+  again and "Выйти из комнаты" leaves the room through the lobby
+  (`KLAD_LOBBY.page`, like `KLAD_ONLINE.page`), so the lobby's own room
+  bookkeeping stays the only one.
+- **Ends without results get a note, not a dialog.** Close 1000 before the
+  results (`replaced`, `idle`, or the lobby's own leave button) and
+  `offline` after the socket opened end the race and go back to the title
+  with a note at the top of the field for 8 s; a dialog would land on top
+  of the lobby after a deliberate leave. A drop only shows "reconnecting":
+  the lobby's module reconnects and the local game goes on. A socket that
+  never opened says online play is not available.
+- **The engine itself is under test now.** A fake engine cannot show that
+  `klad.js` suppresses `klad:clear`, `klad:run` and game over, so
+  `test/race.test.js` also runs `klad.js` in a `vm` context with a stub
+  page and a test level whose two shapes put the exit next to the start,
+  drives it with key events and frames,
+  and checks the forced shape, the exit, deaths, `stopRace` and the ghost
+  text.
+
 ## 2026-11-13 (seventh) - Klad lobby: online list, invite link, room and ready
 
 A "Лобби" button in the HUD opens a lobby dialog: who is in the lobby now,

@@ -50,3 +50,7 @@ ameblo «ライズアウト (MSX)» player write-up; idpixel. MobyGames, GoodOld
   instead of killing them (Lode Runner kills; the original is undocumented here).
 - Sound is synthesised square waves in the spirit of the Korvet beeper, not
   recordings of the original.
+- Ghost race (online, from the lobby): every player runs the same level on
+  their own copy, the host's shape for all; the others are see-through
+  ghosts with no effect on the game. In a race a death costs no life and
+  there is no game over; the first finish the server receives wins.

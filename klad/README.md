@@ -92,13 +92,23 @@ closed or the tab is hidden:
   `on('message', listener)` for parsed JSON frames, `on('status',
   listener)`, `status()`, `hasOpened()`, `close()`). The race listens for
   that event; the lobby only shows a waiting line. A dropped socket tries
-  again after 0.5, 1, 2 and 4 s, then reports `offline` and stops; one that
-  never opened shows "online play is not available in this browser". The
-  lobby closes the socket on leaving and once the room is back in the
-  lobby state.
+  again after 0.5, 1, 2 and 4 s, then reports `offline` and stops; an open
+  starts the waits again, but one `connect()` reconnects at most 8 times
+  in all. Close 1000 ends it as `closed` and 1008 as `offline`, both with
+  no retry. One that never opened shows "online play is not available in
+  this browser". The lobby closes the socket on leaving and once the room
+  is back in the lobby state.
 - The room marks the caller's own entry with `you`, so the lobby finds this
   player by it (nicks may repeat among guests). An empty room (host null,
   no players) shows no member, like a room this player was dropped from.
+- A lobby-state room polled without `you`, when this tab's last successful
+  room request or heartbeat is over 60 s older than the poll (the API's
+  sweep), gets one `POST /rooms/<id>/join` and one more poll; the view then
+  shows the current host. Inside the 60 s, or in a starting or running
+  race, the room view ends with a message.
+- An answer that comes back after the dialog closed does not act: a room
+  created meanwhile is left at once, and a join still out is left once it
+  answers.
 
 ## The API proxy
 `functions/klad/api/[[path]].js` is a Cloudflare Pages Function. It forwards

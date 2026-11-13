@@ -7,9 +7,12 @@
 const KLAD_LOBBY = (() => {
   const PRESENCE_EVERY = 30 * 1000;
   const ROOM_EVERY = 10 * 1000;
+  const SWEEP_AFTER = 60 * 1000;
   const SOCKET_TRIES = 4;
+  const SOCKET_RECONNECTS = 8;
   const SOCKET_FIRST_WAIT = 500;
   const NORMAL_CLOSE = 1000;
+  const POLICY_CLOSE = 1008;
   const FIRST_SHAPE = 'landscape';
   const ROOM_LINK = '#room=';
   const ROOM_ID = /^[A-Za-z0-9_-]{10}$/;
@@ -20,7 +23,7 @@ const KLAD_LOBBY = (() => {
     roomNotFound: 'Комната не найдена. Комнаты живут, только пока сервер не уснул, так что старая ссылка может не работать.',
     roomFull: 'Комната заполнена: в ней уже 4 игрока.',
     raceRunning: 'В этой комнате уже идёт гонка. Зайдите по ссылке, когда она закончится.',
-    removed: 'Вы больше не в комнате: лобби было закрыто или скрыто дольше минуты.',
+    removed: 'Вы больше не в этой комнате: вы вышли из неё в другой вкладке, или гонка началась без вас.',
     tooManyRooms: 'Сейчас открыто слишком много комнат. Попробуйте позже.',
     notHost: 'Это может только хозяин комнаты.',
     notInLobby: 'Гонка уже начинается.',
@@ -63,17 +66,18 @@ const KLAD_LOBBY = (() => {
     };
   }
 
-  /* One WebSocket with JSON text frames. After a drop it tries again with
-     doubling waits, at most SOCKET_TRIES times in a row, then reports
-     'offline' and stops: every attempt is a Workers request on the shared
-     free quota. A normal close (1000) from either side ends it as 'closed'.
-     on('message', listener) gets each frame parsed; on('status', listener)
+  /* One WebSocket with JSON text frames. A drop is tried again with doubling
+     waits, at most SOCKET_TRIES times in a row and SOCKET_RECONNECTS in all,
+     then 'offline': every attempt is a Workers request on the shared quota.
+     1000 ends it as 'closed'; 1008 is a client bug a retry would repeat, so
+     it ends as 'offline'. on('message') gets each frame parsed; on('status')
      gets 'open', 'reconnecting', 'offline' or 'closed'. */
   function connect(url, WebSocket, clock) {
     const listeners = { message: [], status: [] };
     let socket = null;
     let timer = null;
     let tries = 0;
+    let reconnects = 0;
     let status = 'connecting';
     let hasOpened = false;
 
@@ -97,11 +101,12 @@ const KLAD_LOBBY = (() => {
       socket = null;
       if (code === NORMAL_CLOSE) {
         report('closed');
-      } else if (tries >= SOCKET_TRIES) {
+      } else if (code === POLICY_CLOSE || tries >= SOCKET_TRIES || reconnects >= SOCKET_RECONNECTS) {
         report('offline');
       } else {
         timer = clock.setTimeout(attempt, SOCKET_FIRST_WAIT * 2 ** tries);
         tries++;
+        reconnects++;
         report('reconnecting');
       }
     }
@@ -209,7 +214,9 @@ const KLAD_LOBBY = (() => {
     let pendingRoom = null;
     let isWaitingForNick = false;
     let isBusy = false;
+    let isJoining = false;
     let roomRequest = 0;
+    let lastSeen = -Infinity;
     let socket = null;
 
     /* No room poll while an own action is out: its answer would be dropped
@@ -270,6 +277,7 @@ const KLAD_LOBBY = (() => {
       if (!roomView(data).isMember) {
         forgetRoom(TEXT.removed);
       } else {
+        lastSeen = clock.now();
         room = data;
         if (data.state === 'lobby') closeSocket();
         else if (data.state === 'starting' && socket === null) startRace();
@@ -293,16 +301,25 @@ const KLAD_LOBBY = (() => {
       }
     }
 
+    const wasDropped = (answer) => answer.status === 200 && answer.data && answer.data.id === roomId
+      && answer.data.state === 'lobby' && !roomView(answer.data).isMember;
+
+    /* The API drops a lobby member unseen for 60 s, so a tab back after that
+       joins once more; inside the minute the player left in another tab. The
+       age is taken at sending: the heartbeat sent with the poll answers first. */
     async function poll() {
       const request = ++roomRequest;
+      const isLongUnseen = clock.now() - lastSeen > SWEEP_AFTER;
       const answer = await call('GET', roomPath());
-      if (request === roomRequest) take(answer, true);
+      if (request === roomRequest && isLongUnseen && isActive() && wasDropped(answer)) await enter();
+      else if (request === roomRequest) take(answer, true);
       page.render();
     }
 
     /* POST /presence first, so the list includes this player. */
     async function beat() {
       const heartbeat = await call('POST', '/presence');
+      if (heartbeat.status === 204) lastSeen = clock.now();
       const list = heartbeat.status === 401 ? heartbeat : await call('GET', '/presence');
       if (phase !== 'ready') return;
       if (list.status === 401) {
@@ -338,12 +355,27 @@ const KLAD_LOBBY = (() => {
       }
       forgetRoom('');
       roomId = id;
+      await enter();
+    }
+
+    /* Joins roomId; a re-join keeps the room shown until it answers. If the
+       lobby closed meanwhile, the leave goes out only now, after the join,
+       or the API could add the player once the leave is done. */
+    async function enter() {
+      const id = roomId;
       isBusy = true;
+      isJoining = true;
       const request = ++roomRequest;
       page.render();
       const answer = await call('POST', roomPath('join'));
       isBusy = false;
+      isJoining = false;
       if (request !== roomRequest) return;
+      if (!isOpen) {
+        if (answer.status === 200) leave();
+        else forgetRoom('');
+        return;
+      }
       const code = errorOf(answer);
       if (answer.status === 200 && answer.data && answer.data.id === id) showRoom(answer.data);
       else if (answer.status === 401) lostPlayer();
@@ -357,7 +389,8 @@ const KLAD_LOBBY = (() => {
     }
 
     /* A new room is level 1 in the landscape shape; a host in portrait
-       sends its shape with that first level choice. */
+       sends its shape with that first level choice. A room made after the
+       lobby closed is left at once. */
     async function createRoom() {
       if (isBusy || roomId !== null) return;
       isBusy = true;
@@ -368,8 +401,10 @@ const KLAD_LOBBY = (() => {
       if (answer.status === 201 && answer.data && isRoomId(answer.data.id)) {
         forgetRoom('');
         roomId = answer.data.id;
+        lastSeen = clock.now();
         const shape = environment.shape();
-        if (shape !== FIRST_SHAPE) await act('level', { level: 1, shape });
+        if (!isOpen) leave();
+        else if (shape !== FIRST_SHAPE) await act('level', { level: 1, shape });
         else roomPoll.now();
       } else if (answer.status === 401) {
         lostPlayer();
@@ -432,11 +467,11 @@ const KLAD_LOBBY = (() => {
 
     /* Closing in the lobby state leaves the room, or the ready mark would
        stay for the API's minute. A starting or running race keeps it: the
-       race closes this dialog to play. */
+       race closes this dialog to play. A join still out leaves in enter(). */
     function close() {
       isOpen = false;
       phase = 'closed';
-      if (roomId !== null && (room === null || room.state === 'lobby')) leave();
+      if (!isJoining && roomId !== null && (room === null || room.state === 'lobby')) leave();
       resume();
     }
 
@@ -478,7 +513,7 @@ const KLAD_LOBBY = (() => {
 
   return {
     create, connect, roomIdOf, isRoomId, raceUrl, roomView, TEXT,
-    PRESENCE_EVERY, ROOM_EVERY, SOCKET_TRIES, SOCKET_FIRST_WAIT,
+    PRESENCE_EVERY, ROOM_EVERY, SWEEP_AFTER, SOCKET_TRIES, SOCKET_RECONNECTS, SOCKET_FIRST_WAIT,
   };
 })();
 if (typeof module !== 'undefined') module.exports = KLAD_LOBBY;

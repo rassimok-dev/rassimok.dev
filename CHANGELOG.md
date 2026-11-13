@@ -18,9 +18,10 @@ before the API side (RAS-31) is deployed, so it is tested only against a
 fake `fetch`. The one WebSocket client (`KLAD_LOBBY.connect`) is in the
 same file. It opens `wss://<host>/klad/api/race/<id>` only when a polled
 room is `starting`, and the lobby then only shows a waiting line; the race
-itself (RAS-34) takes the socket from there. This merges after the race
-socket (RAS-32) is live: before that, a started room would try a socket the
-API does not serve yet.
+itself (RAS-34) takes the socket from there. This merges together with the
+race (RAS-34), after the race socket (RAS-32) is live, never alone: without
+the race, Start would open a socket and leave the players waiting for
+nothing.
 
 ### Decisions worth not relitigating
 
@@ -44,14 +45,21 @@ API does not serve yet.
   4 s, then reports `offline` and stops: every attempt is a Workers request,
   and the waits (7.5 s in all) stay short next to the API's 15 s wait for
   every player at race start, which a guest's poll may see up to 10 s
-  late. A successful open resets the count. A normal close (1000)
-  from either side ends it without a retry, because the server closes the
-  sockets after the results. The lobby closes it itself on leaving and
-  when a poll shows the room back in the lobby state. A browser without
-  WebSocket, or a socket that never opened before the tries ran out, shows
-  "online play is not available in this browser"; the game is not touched.
-  The module knows nothing of the race messages (no ping, no positions):
-  contract section 8 is not written yet, and the race adds them.
+  late. A successful open starts the waits from 0.5 s again, but one
+  `connect()` makes at most 8 reconnects in all: a socket the server
+  accepts and then drops at once (a repeated policy close, or a proxy
+  that loses the connection after the 101) would otherwise reconnect
+  every half second for the whole race. A normal close (1000) from
+  either side ends it as `closed` without a retry, because the server
+  closes the sockets after the results. A policy close (1008) ends it as
+  `offline` without a retry: contract section 8 makes it a client bug,
+  such as a message over 512 bytes, which a retry would only repeat. The
+  lobby closes it itself on leaving and when a poll shows the room back in
+  the lobby state. A browser without WebSocket, or a socket that never
+  opened before the tries ran out, shows "online play is not available in
+  this browser"; the game is not touched. Contract section 8 is the
+  protocol; the module sends and reads none of its messages, and the race
+  (RAS-34) adds `ping` (every 20 s), `pos` and `finish`.
 - **The hand-off is a `klad:race` event.** Like `klad:clear` and `klad:run`
   between `klad.js` and `online.js`, the lobby dispatches `klad:race` on
   `document` right after it creates the socket, before the first attempt,
@@ -64,17 +72,38 @@ API does not serve yet.
   the host could start a race with someone who is gone. While the room is
   `starting` or `racing` closing keeps the room and the socket, because the
   race closes this dialog to play (any open dialog holds the game). The
-  explicit "Выйти из комнаты" button leaves in any state.
+  explicit "Выйти из комнаты" button leaves in any state. An answer that
+  comes back after the dialog closed does not act: a room created
+  meanwhile is left at once, without the portrait host's level choice,
+  and a join still out at the close is left once it answers, not in
+  parallel, because the API could handle the leave first and then add a
+  not-ready member who blocks Start until the sweep.
 - **This player is found by the `you` mark.** The room object marks the
   caller's own entry with `you` (contract section 7), and guests may share a
   nick, so matching by nick and kind could pick the wrong entry. The lobby
   now uses `you` for the own ready mark, for being host and for being in the
-  room at all. A room that a poll returns without a `you` entry (the API
-  drops a member whose lobby was hidden for over a minute, and an empty room
-  has host null and no players) ends the room view with a message; it is
-  not shown as if still joined. Joining one's own room answers 200 even when
-  it is full or not in the lobby, so a reload on `#room=<id>` shows the room
-  with no special case.
+  room at all. Joining one's own room answers 200 even when it is full or
+  not in the lobby, so a reload on `#room=<id>` shows the room with no
+  special case.
+- **A member the API swept is joined again, once.** The API drops a lobby
+  member it has not seen (no room request, no heartbeat) for 60 s, on that
+  member's own next request. A host who hides the tab to send the invite
+  from a messenger would otherwise lose the room and the link with it.
+  So a poll that shows the room in the lobby state without a `you` entry
+  sends one `POST /rooms/<id>/join`, keeps the room and polls once more,
+  if this tab's last successful room request or heartbeat is over 60 s
+  older than that poll. The view then shows whoever is host now; in an
+  empty room the player is host again, and the link already sent still
+  works. The age is taken when the poll is sent, because the heartbeat
+  that goes out with it on return answers first and would look fresh.
+  Inside the 60 s the player left in another tab (joining another room
+  leaves this one), and a re-join there would pull the player back and
+  forth between tabs, so the room view ends with a message instead. So
+  does a room in `starting` or `racing` without the player, where a join
+  gets 409. A failed re-join shows the join's own messages. A poll
+  without the player right after a re-join ends the view, so a server
+  that keeps dropping the member cannot turn the 10 s poll into a join
+  loop.
 - **The shape goes with the level choice.** A new room is level 1,
   `landscape`. A host in portrait sends `/level` with level 1 and
   `portrait` right after creating the room, and every level choice sends
@@ -91,9 +120,11 @@ API does not serve yet.
   opening the nick dialog itself, because `ask()` also ends an earlier skip;
   without that, a nick saved after a skip would be deleted again. Nothing
   else in `online.js` changed. The lobby says in its dialog that, while it
-  is open, other players see the nick and the human or agent choice in the
-  list; presence and rooms live only in the API's memory and store nothing
-  new, so the privacy notes stay as they are.
+  is open and for about a minute after (the API lists a player for 60 s
+  after the last heartbeat), other players see the nick, the human or
+  agent choice and whether it is a guest or an account; presence and rooms
+  live only in the API's memory and store nothing new, so the privacy
+  notes stay as they are.
 - **Text from the API is set with `textContent` only**, as on the boards;
   the invite link is built from `location.origin`, never written as a URL
   in code, so the CI grep stays as it is.

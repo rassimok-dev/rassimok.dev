@@ -644,6 +644,51 @@ test('closing the lobby in a lobby-state room leaves it and stops the poll', asy
   assert.equal(clock.pending(), 0);
 });
 
+test('closing the lobby while POST /rooms is out sends no level choice and leaves the new room', async () => {
+  // given
+  const { lobby, server, clock } = setup({ ...PRESENCE, [CREATE]: [[201, { id: ID }]], [LEAVE]: [[204]] }, { shape: 'portrait' });
+  await lobby.open();
+  await settle();
+  const release = server.hold(CREATE);
+  const creating = lobby.createRoom();
+  await settle();
+
+  // when
+  lobby.close();
+  release();
+  await creating;
+  await clock.advance(60 * 1000);
+
+  // then
+  assert.deepEqual(roomCalls(server.calls), [CREATE, LEAVE]);
+  assert.equal(lobby.state().roomId, null);
+  assert.equal(clock.pending(), 0);
+});
+
+test('closing the lobby while a join is out sends the leave only after the join answers', async () => {
+  // given
+  const { lobby, server, clock } = setup({ ...PRESENCE, [JOIN]: [[200, room()]], [LEAVE]: [[204]] });
+  const release = server.hold(JOIN);
+  await lobby.open(ID);
+  await settle();
+
+  // when
+  lobby.close();
+  await settle();
+
+  // then
+  assert.deepEqual(roomCalls(server.calls), [JOIN]);
+
+  // when
+  release();
+  await clock.advance(60 * 1000);
+
+  // then
+  assert.deepEqual(roomCalls(server.calls), [JOIN, LEAVE]);
+  assert.equal(lobby.state().roomId, null);
+  assert.equal(clock.pending(), 0);
+});
+
 test('leave posts /leave, forgets the room and stops the poll while the lobby stays open', async () => {
   // given
   const { lobby, server, clock } = await joined({ [LEAVE]: [[204]] });
@@ -672,7 +717,7 @@ test('a room that expired (404 on a poll) says room not found and the poll stops
   assert.equal(lobby.state().message, TEXT.roomNotFound);
 });
 
-test('a poll that no longer lists this player ends the room view', async () => {
+test('a poll that no longer lists this player within a minute of the last one ends the room view, with no re-join', async () => {
   // given
   const { lobby, server, clock } = await joined({ [POLL]: [[200, room()], [200, room({ players: [ANNA] })]] });
 
@@ -681,9 +726,95 @@ test('a poll that no longer lists this player ends the room view', async () => {
   await clock.advance(60 * 1000);
 
   // then
-  assert.equal(count(server.calls, POLL), 2);
+  assert.deepEqual(roomCalls(server.calls), [JOIN, POLL, POLL]);
   assert.equal(lobby.state().roomId, null);
   assert.equal(lobby.state().message, TEXT.removed);
+});
+
+test('a host back after 90 s hidden joins the room once more, keeps it and sees the new host', async () => {
+  // given
+  const { lobby, server, clock, world } = await hosting({ [JOIN]: [[200, room()]] });
+  server.answers[POLL] = [[200, room({ players: [ANNA] })], [200, room()]];
+  world.isVisible = false;
+  lobby.onVisibility();
+  await clock.advance(90 * 1000);
+  const release = server.hold(POLL);
+
+  // when
+  world.isVisible = true;
+  lobby.onVisibility();
+  await settle();
+  release();
+  await settle();
+
+  // then
+  assert.equal(count(server.calls, HEARTBEAT), 2, 'a heartbeat went out on return, next to the held poll');
+  assert.deepEqual(roomCalls(server.calls), [CREATE, POLL, POLL, JOIN, POLL]);
+  assert.equal(lobby.state().roomId, ID);
+  assert.equal(lobby.state().message, '');
+  assert.equal(lobby.state().room.isHost, false);
+  assert.deepEqual(lobby.state().room.players.map((player) => player.isHost), [true, false]);
+});
+
+test('a re-join answered with room_full says room is full and polls no more', async () => {
+  // given
+  const full = room({ players: [ANNA, { ...ANNA, host: false }, { ...ANNA, host: false }, { ...ANNA, host: false }] });
+  const { lobby, server, clock, world } = await hosting({ [JOIN]: [[409, { error: 'room_full' }]] });
+  server.answers[POLL] = [[200, full]];
+  world.isVisible = false;
+  lobby.onVisibility();
+  await clock.advance(90 * 1000);
+
+  // when
+  world.isVisible = true;
+  lobby.onVisibility();
+  await settle();
+  await clock.advance(60 * 1000);
+
+  // then
+  assert.deepEqual(roomCalls(server.calls), [CREATE, POLL, POLL, JOIN]);
+  assert.equal(lobby.state().roomId, null);
+  assert.equal(lobby.state().message, TEXT.roomFull);
+});
+
+test('a re-join is tried once: a poll right after it that still misses this player ends the room view', async () => {
+  // given
+  const { lobby, server, clock, world } = await hosting({ [JOIN]: [[200, room()]] });
+  server.answers[POLL] = [[200, room({ players: [ANNA] })]];
+  world.isVisible = false;
+  lobby.onVisibility();
+  await clock.advance(90 * 1000);
+
+  // when
+  world.isVisible = true;
+  lobby.onVisibility();
+  await settle();
+  await clock.advance(60 * 1000);
+
+  // then
+  assert.deepEqual(roomCalls(server.calls), [CREATE, POLL, POLL, JOIN, POLL]);
+  assert.equal(lobby.state().roomId, null);
+  assert.equal(lobby.state().message, TEXT.removed);
+});
+
+test('a room already starting without this player is not joined again', async () => {
+  // given
+  const { lobby, server, clock, world, sockets } = await hosting({ [JOIN]: [[200, room()]] });
+  server.answers[POLL] = [[200, room({ state: 'starting', players: [ANNA] })]];
+  world.isVisible = false;
+  lobby.onVisibility();
+  await clock.advance(90 * 1000);
+
+  // when
+  world.isVisible = true;
+  lobby.onVisibility();
+  await settle();
+
+  // then
+  assert.deepEqual(roomCalls(server.calls), [CREATE, POLL, POLL]);
+  assert.equal(lobby.state().roomId, null);
+  assert.equal(lobby.state().message, TEXT.removed);
+  assert.deepEqual(sockets.made, []);
 });
 
 test('a network failure on the poll shows offline, keeps the room and polls again', async () => {
@@ -1081,6 +1212,42 @@ test('a normal close from the server ends the socket without a reconnect', async
   assert.equal(sockets.made.length, 1);
   assert.deepEqual(statuses, ['open', 'closed']);
   assert.equal(socket.send({ type: 'ping' }), false);
+});
+
+test('a policy close (1008) ends the socket as offline without a reconnect', async () => {
+  // given
+  const { clock, sockets, socket, statuses } = socketSetup();
+  await clock.advance(0);
+  sockets.made[0].onopen();
+
+  // when
+  sockets.made[0].onclose({ code: 1008 });
+  await clock.advance(10 * 60 * 1000);
+
+  // then
+  assert.equal(sockets.made.length, 1);
+  assert.deepEqual(statuses, ['open', 'offline']);
+  assert.equal(socket.hasOpened(), true);
+  assert.equal(clock.pending(), 0);
+});
+
+test('a socket that opens and drops again and again stops after the maximum reconnects in all', async () => {
+  // given
+  const { clock, sockets, socket } = socketSetup();
+  await clock.advance(0);
+
+  // when
+  for (let i = 0; i <= KLAD_LOBBY.SOCKET_RECONNECTS; i++) {
+    sockets.made[i].onopen();
+    sockets.made[i].onclose({ code: 1006 });
+    await clock.advance(KLAD_LOBBY.SOCKET_FIRST_WAIT);
+  }
+  await clock.advance(10 * 60 * 1000);
+
+  // then
+  assert.equal(sockets.made.length, KLAD_LOBBY.SOCKET_RECONNECTS + 1);
+  assert.equal(socket.status(), 'offline');
+  assert.equal(clock.pending(), 0);
 });
 
 test('close() during a wait stops the reconnects and closes nothing twice', async () => {

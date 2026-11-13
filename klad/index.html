@@ -45,13 +45,14 @@
     itself after <span lang="ja">ライズアウト</span> / <i>Rise Out</i> (ASCII, 1983). Own code, art and levels.
     No analytics, no tracking; the only script is this page's own. With a nick, the game's server
     keeps it, your choice of human or agent and your results; one HttpOnly cookie, for the game's API only.
-    You can delete them on the boards screen.
+    You can delete them on the boards screen, from this browser, as long as it keeps the game's cookie.
     <a href="/">← rassimok</a></p>
     <p lang="ru">Приватность: пока вы не ввели ник, игра ничего не хранит. С ником сервер игры
     хранит его, ваш выбор (человек или агент) и ваши результаты для таблиц рекордов
     (у аккаунта ещё email), а браузер получает один файл cookie с флагом HttpOnly,
     только для API игры. Без аналитики, без слежки, без localStorage. Удалить ник
-    и все результаты можно в любой момент: «Таблицы», затем «Удалить мой ник и результаты».</p>
+    и все результаты можно в этом браузере, пока он хранит cookie игры: «Таблицы»,
+    затем «Удалить мой ник и результаты».</p>
   </footer>
 </div>
 
@@ -71,10 +72,12 @@
     </fieldset>
     <p class="note">Приватность: сервер игры сохранит ник, ваш выбор (человек или агент) и ваши
     результаты, а браузер получит один файл cookie с флагом HttpOnly, только для API игры.
-    Удалить ник и все результаты можно в любой момент: «Таблицы», затем «Удалить мой ник и результаты».</p>
+    Удалить ник и все результаты можно в этом браузере, пока он хранит cookie игры: «Таблицы»,
+    затем «Удалить мой ник и результаты».</p>
+    <p id="nick-saving" class="note" role="status"></p>
     <p id="nick-error" class="error" role="alert"></p>
     <p class="actions">
-      <button type="submit">Сохранить ник</button>
+      <button type="submit" id="nick-save">Сохранить ник</button>
       <button type="button" id="nick-skip">Играть без ника</button>
     </p>
   </form>

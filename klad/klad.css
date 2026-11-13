@@ -225,7 +225,7 @@ dialog h3 { margin: 1rem 0 .3rem; font-size: .85rem; color: var(--crt-hot); }
 dialog p { margin: .5rem 0; }
 dialog .note { color: var(--crt-dim); }
 dialog .error { color: var(--crt-alert); }
-dialog .error:empty { margin: 0; }
+dialog .error:empty, dialog .note:empty { margin: 0; }
 dialog fieldset {
   margin: .5rem 0;
   padding: .3rem .6rem .4rem;
@@ -249,6 +249,7 @@ dialog button {
   cursor: pointer;
 }
 dialog button[type="submit"] { color: var(--crt-hot); border-color: var(--crt-hot); }
+dialog button:disabled { color: var(--crt-dim); border-color: var(--crt-rule); cursor: default; }
 dialog button:active { background: var(--crt-rule); }
 dialog :focus-visible { outline: 2px solid var(--crt-hot); outline-offset: 2px; }
 dialog .actions { display: flex; flex-wrap: wrap; gap: .5rem; margin-bottom: 0; }

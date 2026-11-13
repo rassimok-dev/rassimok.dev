@@ -14,7 +14,7 @@ The boards dialog also changes the nick and deletes the nick and every
 result (`DELETE /players/me`); the footer's privacy notes and the README say
 so. The page gains two `<dialog>` elements, a "Таблицы" button in the HUD
 and a short notice line on the stage. `klad.js` holds while a dialog is
-open, and Space or Enter on a focused button now presses the button.
+open, and Space or Enter on a focused HUD button now presses the button.
 
 ### Decisions worth not relitigating
 
@@ -25,6 +25,13 @@ open, and Space or Enter on a focused button now presses the button.
   once the nick is saved. Skipping drops them and the game does not ask
   again on that page; the boards dialog has "Выбрать ник" for a change of
   mind. A reload loses waiting results, which is the price of no storage.
+- **A skip always means no nick.** A slow save is likely (the database
+  wakes up in 2 to 3 s), so while the nick is being saved the prompt says
+  "сохранение...", both buttons are off and Escape is held back. A repeated
+  Escape cannot always be held back, so `choose()` also checks for a skip
+  when the answer arrives and then deletes the new player again
+  (`DELETE /players/me`). If that delete fails, a notice says the nick may
+  have been kept and points to the boards, where it can be deleted.
 - **No storage in the browser.** The API's HttpOnly cookie is the only
   identity, so `online.js` cannot see it; it calls `GET /players/me` on load
   instead. Only 401 means "no player yet". Any other answer (404, as
@@ -34,11 +41,16 @@ open, and Space or Enter on a focused button now presses the button.
   the boards asks again, so the game recovers without a reload.
 - **Answers.** 401 on a send: the player is gone (expired or deleted
   elsewhere), so the result goes back to waiting and the prompt opens again.
-  A 401 right after creating the player means the browser blocks cookies;
-  the prompt says so instead of looping. 409 `already_signed_in`: this
-  browser already has a player, so it reads that player and sends the
-  waiting results. 429 and 400 drop the result with a short notice, no
-  retry. Sends never block or stop the game.
+  A 401 right after creating the player means the browser blocks cookies.
+  The waiting results show it or, with nothing waiting, one read of the
+  player does. The prompt says so, counts as a skip and keeps "Сохранить
+  ник" off for the visit, and no further `POST /players` is sent, because
+  each would make a player this browser can never delete. 401 on a rename
+  or a delete says only that this browser has no nick on the server any
+  more: 401 means no valid session, not that the nick is gone. 409
+  `already_signed_in`: this browser already has a player, so it reads that
+  player and sends the waiting results. 429 and 400 drop the result with a
+  short notice, no retry. Sends never block or stop the game.
 - **Any open dialog holds the game.** `klad.js` checks for `dialog[open]`
   instead of listening for a new event, so there is no extra contract
   between the two scripts and nothing to get out of step. While held, play
@@ -49,9 +61,18 @@ open, and Space or Enter on a focused button now presses the button.
   meaning, and the title screen lists it. Like the other keys it is read by
   `e.code`, so it is the same physical key on a Russian layout. Touch
   players use the HUD button.
-- **Space and Enter on a button press the button.** The game took them as
-  fire even on a focused HUD button, which made the new button unusable from
-  the keyboard; the sound button gains the same fix.
+- **Space and Enter on a HUD button press the button.** The game took them
+  as fire even on a focused HUD button, which made the new button unusable
+  from the keyboard; the sound button gains the same fix. The touch-pad
+  buttons are left out: they react to pointer events only, so on them the
+  keys still play.
+- **Deletion is promised for this browser only.** The privacy notes say the
+  nick and results can be deleted from this browser while it keeps the
+  game's cookie, not "at any time": deleting needs the session, and after a
+  closed private window, cleared cookies or 90 days away nothing is left to
+  show who is asking.
+- **The boards' status line ends on "готово"**, not empty, so a screen
+  reader hears that the tables arrived, also after each switch.
 - **Focus goes back to the field after a dialog closes**, as after the sound
   button, so the next Space fires instead of reopening the boards.
 - **Native `<dialog>` with `showModal()`** gives the focus trap, Escape and

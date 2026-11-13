@@ -16,7 +16,8 @@ exist, an email address), and sets one HttpOnly cookie that only the game's
 API receives (`Path=/klad/api`). The
 cookie keeps a player's own results together and follows nobody, so there is
 still no cookie banner. A player can delete the nick and every result from
-the game's boards screen at any time. The footers say this, and CI enforces
+the game's boards screen, in the same browser, as long as it keeps the
+game's cookie. The footers say this, and CI enforces
 what a grep can check (see below), so the claims cannot quietly become false.
 
 **Zero third-party requests.** Fonts are the usual leak here: loading Google

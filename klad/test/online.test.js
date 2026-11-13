@@ -1,8 +1,9 @@
 'use strict';
 /* klad/online.js without a browser. The fake server answers by method and
    path, in order, repeating its last answer; a path it does not know gets
-   404, as production does until the API is deployed. The fake page counts nick
-   prompts and records notices. */
+   404, as production does until the API is deployed. The held request, if
+   one is named, waits for release(). The fake page counts nick prompts and
+   records notices. */
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const KLAD_ONLINE = require('../online.js');
@@ -16,8 +17,10 @@ const CLEAR = { level: 2, shape: 'portrait', revision: 1, ticks: 1500, chests: 3
 const RUN = { fromLevelOne: true, levelsCleared: 2, score: 1700, ticks: 4000 };
 const RUN_BODY = { levelsCleared: 2, score: 1700, ticks: 4000 };
 
-function fakeServer(answers) {
+function fakeServer(answers, heldRequest) {
   const calls = [];
+  let release;
+  const released = new Promise((resolve) => { release = resolve; });
   async function fetch(url, options) {
     const request = options.method + ' ' + url;
     calls.push({
@@ -25,12 +28,13 @@ function fakeServer(answers) {
       contentType: options.headers && options.headers['Content-Type'],
       body: options.body === undefined ? undefined : JSON.parse(options.body),
     });
+    if (request === heldRequest) await released;
     const queue = answers[request] || [[404, { error: 'not_found' }]];
     const [status, body] = queue.length > 1 ? queue.shift() : queue[0];
     if (status === OFFLINE) throw new TypeError('fetch failed');
     return new Response(body === undefined ? null : JSON.stringify(body), { status });
   }
-  return { fetch, calls };
+  return { fetch, calls, release };
 }
 
 function fakePage() {
@@ -170,6 +174,169 @@ test('skipping the prompt drops the waiting results and asks no more', async () 
   assert.deepEqual(server.calls, [READ_ME]);
 });
 
+test('ask after a skip opens the prompt again and only later results wait for the nick', async () => {
+  // given
+  const server = fakeServer({
+    'GET /klad/api/players/me': [NO_SESSION],
+    'POST /klad/api/players': [[201, PLAYER]],
+    'POST /klad/api/runs': [CREATED],
+  });
+  const page = fakePage();
+  const online = KLAD_ONLINE.create(server.fetch, page);
+  await online.start();
+  await online.onClear(CLEAR);
+  online.skip();
+
+  // when
+  online.ask();
+  await online.onRun(RUN);
+  const problem = await online.choose('test', 'agent');
+
+  // then
+  assert.equal(problem, null);
+  assert.equal(page.asked, 2);
+  assert.deepEqual(server.calls, [
+    READ_ME,
+    call('POST /klad/api/players', { nick: 'test', kind: 'agent' }),
+    call('POST /klad/api/runs', RUN_BODY),
+  ]);
+});
+
+test('skipping while the nick is being saved deletes the new player and sends nothing', async () => {
+  // given
+  const server = fakeServer({
+    'GET /klad/api/players/me': [NO_SESSION],
+    'POST /klad/api/players': [[201, PLAYER]],
+    'DELETE /klad/api/players/me': [[204]],
+    'POST /klad/api/clears': [CREATED],
+  }, 'POST /klad/api/players');
+  const page = fakePage();
+  const online = KLAD_ONLINE.create(server.fetch, page);
+  await online.start();
+  await online.onClear(CLEAR);
+
+  // when
+  const saving = online.choose('test', 'agent');
+  online.skip();
+  server.release();
+  const problem = await saving;
+  await online.onClear(CLEAR);
+
+  // then
+  assert.equal(problem, null);
+  assert.equal(online.player(), null);
+  assert.equal(page.asked, 1);
+  assert.deepEqual(page.notices, []);
+  assert.deepEqual(server.calls, [
+    READ_ME,
+    call('POST /klad/api/players', { nick: 'test', kind: 'agent' }),
+    call('DELETE /klad/api/players/me'),
+  ]);
+});
+
+test('an undo that fails after a skip during the save says the nick was kept', async () => {
+  // given
+  const server = fakeServer({
+    'GET /klad/api/players/me': [NO_SESSION],
+    'POST /klad/api/players': [[201, PLAYER]],
+    'DELETE /klad/api/players/me': [[OFFLINE]],
+  }, 'POST /klad/api/players');
+  const page = fakePage();
+  const online = KLAD_ONLINE.create(server.fetch, page);
+  await online.start();
+  await online.onClear(CLEAR);
+
+  // when
+  const saving = online.choose('test', 'agent');
+  online.skip();
+  server.release();
+  await saving;
+  await online.onClear(CLEAR);
+
+  // then
+  assert.equal(online.player(), null);
+  assert.deepEqual(page.notices, [TEXT.nickKept]);
+  assert.deepEqual(server.calls, [
+    READ_ME,
+    call('POST /klad/api/players', { nick: 'test', kind: 'agent' }),
+    call('DELETE /klad/api/players/me'),
+  ]);
+});
+
+test('an undo answered 401 after a skip during the save shows no notice', async () => {
+  // given
+  const server = fakeServer({
+    'GET /klad/api/players/me': [NO_SESSION],
+    'POST /klad/api/players': [[201, PLAYER]],
+    'DELETE /klad/api/players/me': [NO_SESSION],
+  }, 'POST /klad/api/players');
+  const page = fakePage();
+  const online = KLAD_ONLINE.create(server.fetch, page);
+  await online.start();
+  await online.onClear(CLEAR);
+
+  // when
+  const saving = online.choose('test', 'agent');
+  online.skip();
+  server.release();
+  await saving;
+
+  // then
+  assert.equal(online.player(), null);
+  assert.deepEqual(page.notices, []);
+});
+
+test('a skip while the signed-in player is being read back keeps no player', async () => {
+  // given
+  const server = fakeServer({
+    'GET /klad/api/players/me': [[200, PLAYER]],
+    'POST /klad/api/players': [[409, { error: 'already_signed_in' }]],
+    'POST /klad/api/clears': [CREATED],
+  }, 'GET /klad/api/players/me');
+  const page = fakePage();
+  const online = KLAD_ONLINE.create(server.fetch, page);
+
+  // when
+  const saving = online.choose('test', 'agent');
+  while (server.calls.length < 2) await new Promise(setImmediate);
+  online.skip();
+  server.release();
+  const problem = await saving;
+  await online.onClear(CLEAR);
+
+  // then
+  assert.equal(problem, null);
+  assert.equal(online.player(), null);
+  assert.deepEqual(page.notices, []);
+  assert.deepEqual(server.calls, [call('POST /klad/api/players', { nick: 'test', kind: 'agent' }), READ_ME]);
+});
+
+test('skipping while already_signed_in is being answered keeps no player and sends nothing', async () => {
+  // given
+  const server = fakeServer({
+    'GET /klad/api/players/me': [NO_SESSION, [200, PLAYER]],
+    'POST /klad/api/players': [[409, { error: 'already_signed_in' }]],
+    'POST /klad/api/clears': [CREATED],
+  }, 'POST /klad/api/players');
+  const page = fakePage();
+  const online = KLAD_ONLINE.create(server.fetch, page);
+  await online.start();
+  await online.onClear(CLEAR);
+
+  // when
+  const saving = online.choose('test', 'agent');
+  online.skip();
+  server.release();
+  const problem = await saving;
+  await online.onClear(CLEAR);
+
+  // then
+  assert.equal(problem, null);
+  assert.equal(online.player(), null);
+  assert.deepEqual(page.notices, []);
+  assert.deepEqual(server.calls, [READ_ME, call('POST /klad/api/players', { nick: 'test', kind: 'agent' })]);
+});
+
 test('404 on GET /players/me means online is unavailable: no prompt, nothing sent', async () => {
   // given
   const server = fakeServer({});
@@ -205,6 +372,24 @@ test('a network failure at start leaves the game playing offline', async () => {
   assert.deepEqual(server.calls, [READ_ME]);
 });
 
+test('a refresh that finds the API back up lets the next result open the prompt', async () => {
+  // given
+  const server = fakeServer({ 'GET /klad/api/players/me': [[502, { error: 'upstream' }], NO_SESSION] });
+  const page = fakePage();
+  const online = KLAD_ONLINE.create(server.fetch, page);
+  await online.start();
+  await online.onClear(CLEAR);
+
+  // when
+  await online.refresh();
+  await online.onClear(CLEAR);
+
+  // then
+  assert.equal(online.isAvailable(), true);
+  assert.equal(page.asked, 1);
+  assert.deepEqual(server.calls, [READ_ME, READ_ME]);
+});
+
 test('a network failure on a send shows a notice and keeps the player', async () => {
   // given
   const server = fakeServer({ 'GET /klad/api/players/me': [[200, PLAYER]], 'POST /klad/api/clears': [[OFFLINE]] });
@@ -218,6 +403,26 @@ test('a network failure on a send shows a notice and keeps the player', async ()
   // then
   assert.deepEqual(page.notices, [TEXT.notSaved]);
   assert.deepEqual(online.player(), PLAYER);
+});
+
+test('400 invalid_result on a send drops the result with a notice and keeps the player', async () => {
+  // given
+  const server = fakeServer({
+    'GET /klad/api/players/me': [[200, PLAYER]],
+    'POST /klad/api/clears': [[400, { error: 'invalid_result' }]],
+  });
+  const page = fakePage();
+  const online = KLAD_ONLINE.create(server.fetch, page);
+  await online.start();
+
+  // when
+  await online.onClear(CLEAR);
+
+  // then
+  assert.deepEqual(page.notices, [TEXT.notSaved]);
+  assert.deepEqual(online.player(), PLAYER);
+  assert.equal(page.asked, 0);
+  assert.deepEqual(server.calls, [READ_ME, call('POST /klad/api/clears', CLEAR)]);
 });
 
 test('401 on a send forgets the player, keeps the result and asks again', async () => {
@@ -246,16 +451,92 @@ test('401 on a send forgets the player, keeps the result and asks again', async 
   ]);
 });
 
-test('401 right after the player was created reports blocked cookies and keeps asking', async () => {
+test('401 right after the player was created reports blocked cookies and counts as a skip', async () => {
   // given
   const server = fakeServer({
     'GET /klad/api/players/me': [NO_SESSION],
     'POST /klad/api/players': [[201, PLAYER]],
     'POST /klad/api/clears': [NO_SESSION],
   });
-  const online = KLAD_ONLINE.create(server.fetch, fakePage());
+  const page = fakePage();
+  const online = KLAD_ONLINE.create(server.fetch, page);
   await online.start();
   await online.onClear(CLEAR);
+
+  // when
+  const problem = await online.choose('test', 'agent');
+  const askedAfterChoose = page.asked;
+  await online.onClear(CLEAR);
+
+  // then
+  assert.equal(problem, TEXT.noCookie);
+  assert.equal(online.player(), null);
+  assert.equal(online.isAsking(), false);
+  assert.equal(online.isCookieBlocked(), true);
+  assert.equal(page.asked, askedAfterChoose);
+  assert.deepEqual(server.calls, [
+    READ_ME,
+    call('POST /klad/api/players', { nick: 'test', kind: 'agent' }),
+    call('POST /klad/api/clears', CLEAR),
+  ]);
+});
+
+test('after blocked cookies a save from the boards posts no second player', async () => {
+  // given
+  const server = fakeServer({
+    'GET /klad/api/players/me': [NO_SESSION],
+    'POST /klad/api/players': [[201, PLAYER]],
+    'POST /klad/api/clears': [NO_SESSION],
+  });
+  const page = fakePage();
+  const online = KLAD_ONLINE.create(server.fetch, page);
+  await online.start();
+  await online.onClear(CLEAR);
+  await online.choose('test', 'agent');
+
+  // when
+  online.ask();
+  const problem = await online.choose('test2', 'agent');
+
+  // then
+  assert.equal(problem, TEXT.noCookie);
+  assert.deepEqual(server.calls, [
+    READ_ME,
+    call('POST /klad/api/players', { nick: 'test', kind: 'agent' }),
+    call('POST /klad/api/clears', CLEAR),
+  ]);
+});
+
+test('a nick chosen with nothing waiting is read back once and kept', async () => {
+  // given
+  const server = fakeServer({
+    'GET /klad/api/players/me': [NO_SESSION, [200, PLAYER]],
+    'POST /klad/api/players': [[201, PLAYER]],
+  });
+  const page = fakePage();
+  const online = KLAD_ONLINE.create(server.fetch, page);
+  await online.start();
+  online.ask();
+
+  // when
+  const problem = await online.choose('test', 'agent');
+
+  // then
+  assert.equal(problem, null);
+  assert.deepEqual(online.player(), PLAYER);
+  assert.equal(online.isAsking(), false);
+  assert.deepEqual(server.calls, [READ_ME, call('POST /klad/api/players', { nick: 'test', kind: 'agent' }), READ_ME]);
+});
+
+test('a nick chosen with nothing waiting that reads back 401 reports blocked cookies at once', async () => {
+  // given
+  const server = fakeServer({
+    'GET /klad/api/players/me': [NO_SESSION],
+    'POST /klad/api/players': [[201, PLAYER]],
+  });
+  const online = KLAD_ONLINE.create(server.fetch, fakePage());
+  await online.start();
+  online.ask();
 
   // when
   const problem = await online.choose('test', 'agent');
@@ -263,7 +544,9 @@ test('401 right after the player was created reports blocked cookies and keeps a
   // then
   assert.equal(problem, TEXT.noCookie);
   assert.equal(online.player(), null);
-  assert.equal(online.isAsking(), true);
+  assert.equal(online.isAsking(), false);
+  assert.equal(online.isCookieBlocked(), true);
+  assert.deepEqual(server.calls, [READ_ME, call('POST /klad/api/players', { nick: 'test', kind: 'agent' }), READ_ME]);
 });
 
 test('409 already_signed_in reads the signed-in player and sends the waiting results', async () => {
@@ -312,6 +595,32 @@ test('invalid_nick keeps the prompt open and sends nothing else', async () => {
   assert.equal(online.player(), null);
   assert.deepEqual(server.calls, [READ_ME, call('POST /klad/api/players', { nick: 'ab', kind: 'human' })]);
 });
+
+for (const [status, error, text] of [
+  [409, 'nick_taken', TEXT.nickTaken],
+  [400, 'invalid_kind', TEXT.invalidKind],
+  [503, 'not_configured', TEXT.unavailable],
+]) {
+  test('choose answers ' + status + ' ' + error + ' with its message and keeps the prompt open', async () => {
+    // given
+    const server = fakeServer({
+      'GET /klad/api/players/me': [NO_SESSION],
+      'POST /klad/api/players': [[status, { error }]],
+    });
+    const online = KLAD_ONLINE.create(server.fetch, fakePage());
+    await online.start();
+    await online.onClear(CLEAR);
+
+    // when
+    const problem = await online.choose('test', 'human');
+
+    // then
+    assert.equal(problem, text);
+    assert.equal(online.isAsking(), true);
+    assert.equal(online.player(), null);
+    assert.deepEqual(server.calls, [READ_ME, call('POST /klad/api/players', { nick: 'test', kind: 'human' })]);
+  });
+}
 
 test('429 drops the result with a notice and the next result is still sent', async () => {
   // given
@@ -366,6 +675,20 @@ test('nick_taken on rename keeps the old nick', async () => {
   assert.deepEqual(online.player(), PLAYER);
 });
 
+test('401 on rename forgets the player and says only that this browser has no nick', async () => {
+  // given
+  const server = fakeServer({ 'GET /klad/api/players/me': [[200, PLAYER]], 'PATCH /klad/api/players/me': [NO_SESSION] });
+  const online = KLAD_ONLINE.create(server.fetch, fakePage());
+  await online.start();
+
+  // when
+  const problem = await online.rename('test2');
+
+  // then
+  assert.equal(problem, TEXT.noPlayer);
+  assert.equal(online.player(), null);
+});
+
 test('remove sends DELETE /players/me without a body and the game stops sending', async () => {
   // given
   const server = fakeServer({ 'GET /klad/api/players/me': [[200, PLAYER]], 'DELETE /klad/api/players/me': [[204]] });
@@ -396,6 +719,24 @@ test('remove that fails keeps the player and says so', async () => {
   // then
   assert.equal(problem, TEXT.unavailable);
   assert.deepEqual(online.player(), PLAYER);
+});
+
+test('401 on remove forgets the player and stops sending, without claiming a delete', async () => {
+  // given
+  const server = fakeServer({ 'GET /klad/api/players/me': [[200, PLAYER]], 'DELETE /klad/api/players/me': [NO_SESSION] });
+  const page = fakePage();
+  const online = KLAD_ONLINE.create(server.fetch, page);
+  await online.start();
+
+  // when
+  const problem = await online.remove();
+  await online.onClear(CLEAR);
+
+  // then
+  assert.equal(problem, TEXT.noPlayer);
+  assert.equal(online.player(), null);
+  assert.equal(page.asked, 0);
+  assert.deepEqual(server.calls, [READ_ME, call('DELETE /klad/api/players/me')]);
 });
 
 test('board paths carry the kind, and the level and shape for a level board', () => {

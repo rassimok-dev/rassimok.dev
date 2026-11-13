@@ -16,7 +16,7 @@ proxy (below), it is self-contained on purpose so it can be removed in one go.
 | `ticks.js` | tick constants and the time formatter (`m:ss.cc`), also loaded by the node tests |
 | `online.js` | online part: nick prompt, sending clears and runs, the boards; its logic half is also loaded by the node tests |
 | `test/levels.test.js` | `node --test`: shape, legend, key-then-exit reachability, revision, fastest clear above the API floor |
-| `test/online.test.js` | `node --test`: `online.js` against a fake `fetch`: request shapes, when results wait or go, 401, 404, 409, 429, offline |
+| `test/online.test.js` | `node --test`: `online.js` against a fake `fetch`: request shapes, when results wait or go, a skip during a save, blocked cookies, 400, 401, 404, 409, 429, offline |
 | `test/proxy.test.js` | `node --test`: the API proxy against a fake `fetch` |
 | `test/ticks.test.js` | `node --test`: the time formatter |
 | `MECHANICS.md` | the original rules as reconstructed from sources |
@@ -36,7 +36,8 @@ never asks for a nick and plays as before.
 - The first result without a player opens the nick prompt (nick, human or
   agent, the privacy note). Results wait in memory until the player saves a
   nick (then they are sent) or skips (then they are dropped, and the game
-  does not ask again until the page is reloaded).
+  does not ask again until the page is reloaded). A skip while the nick is
+  still being saved deletes the new player again.
 - A run is sent only when it started at level 1 (`fromLevelOne`).
 - The boards open with `T` or the "Таблицы" button: records, fastest clear
   and most chests per level and shape, and chests over all levels, for

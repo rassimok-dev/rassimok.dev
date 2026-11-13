@@ -445,8 +445,10 @@
     } else if (action === 'restart' && S.phase === 'play') die();
   }
   const isTyping = (e) => /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName);
-  /* Space and Enter on a focused button press the button, not fire. */
-  const isPressingButton = (e) => e.target.tagName === 'BUTTON' && (e.code === 'Space' || e.code === 'Enter');
+  /* Space and Enter on a focused HUD button press the button, not fire. The
+     pad buttons have no click handler, so keys on them still play. */
+  const isPressingButton = (e) => e.target.tagName === 'BUTTON' && !e.target.dataset.k &&
+    (e.code === 'Space' || e.code === 'Enter');
   addEventListener('keydown', (e) => {
     if (isHeld() || isTyping(e) || isPressingButton(e)) return;
     if (e.repeat) { if (KEYMAP[e.code]) e.preventDefault(); return; }

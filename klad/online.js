@@ -11,8 +11,9 @@ const KLAD_ONLINE = (() => {
     invalidNick: 'Такой ник не подойдёт: нужно от 3 до 16 знаков, латинские или русские буквы (не вперемешку), цифры, _ и -.',
     invalidKind: 'Выберите, кто играет: человек или агент.',
     nickTaken: 'Этот ник занят аккаунтом. Выберите другой.',
-    noPlayer: 'Этого ника на сервере больше нет. Выберите новый.',
+    noPlayer: 'У этого браузера больше нет ника на сервере.',
     noCookie: 'Сервер не узнал этот браузер: похоже, cookie заблокированы. Можно играть без ника.',
+    nickKept: 'Ник мог остаться на сервере: проверьте «Таблицы», там его можно удалить.',
     signedIn: 'Этот браузер уже играет под ником ',
   };
   const isOk = (status) => status >= 200 && status < 300;
@@ -46,6 +47,7 @@ const KLAD_ONLINE = (() => {
     let pending = [];
     let hasSkipped = false;
     let isAsking = false;
+    let isCookieBlocked = false;
 
     /* Only 401 means "no player yet"; anything else but 200 means the API
        is not there, and then the game never asks for a nick. */
@@ -101,15 +103,25 @@ const KLAD_ONLINE = (() => {
       else settle();
     }
 
+    /* A skip while this waits wins: the new player is deleted again. Blocked
+       cookies also count as a skip, and after them nothing more is posted,
+       because each new player would be one this browser cannot delete. */
     async function choose(nick, kind) {
+      if (isCookieBlocked) return TEXT.noCookie;
       const answer = await call('POST', '/players', { nick, kind });
       const code = errorOf(answer);
       let problem = null;
-      if (answer.status === 201) {
+      if (hasSkipped) {
+        if (answer.status === 201) {
+          const undo = await call('DELETE', '/players/me');
+          if (!isOk(undo.status) && undo.status !== 401) page.notice(TEXT.nickKept);
+        }
+      } else if (answer.status === 201) {
         player = answer.data;
       } else if (code === 'already_signed_in') {
         await readPlayer();
-        if (player) page.notice(TEXT.signedIn + player.nick + '.');
+        if (hasSkipped) player = null;
+        else if (player) page.notice(TEXT.signedIn + player.nick + '.');
         else problem = TEXT.unavailable;
       } else if (code === 'invalid_nick') {
         problem = TEXT.invalidNick;
@@ -120,10 +132,15 @@ const KLAD_ONLINE = (() => {
       } else {
         problem = TEXT.unavailable;
       }
-      if (!problem) {
+      if (!problem && !hasSkipped) {
         isAsking = false;
-        await flush();
-        if (isAsking) problem = TEXT.noCookie;
+        if (pending.length) await flush();
+        else if (answer.status === 201) await readPlayer();
+        if (!player) {
+          isCookieBlocked = true;
+          skip();
+          problem = TEXT.noCookie;
+        }
       }
       return problem;
     }
@@ -159,16 +176,19 @@ const KLAD_ONLINE = (() => {
       return problem;
     }
 
-    /* 401 means there is nothing left to delete, which is what was asked. */
+    /* 401 only says this browser has no session any more, so the player is
+       gone for it, but the message must not claim the nick was deleted. */
     async function remove() {
       const answer = await call('DELETE', '/players/me');
-      let problem = TEXT.unavailable;
-      if (isOk(answer.status) || answer.status === 401) {
+      const isGone = isOk(answer.status) || answer.status === 401;
+      let problem = null;
+      if (isGone) {
         player = null;
         hasSkipped = true;
         pending = [];
-        problem = null;
       }
+      if (answer.status === 401) problem = TEXT.noPlayer;
+      else if (!isGone) problem = TEXT.unavailable;
       return problem;
     }
 
@@ -192,6 +212,7 @@ const KLAD_ONLINE = (() => {
       player: () => player,
       isAvailable: () => server === 'up',
       isAsking: () => isAsking,
+      isCookieBlocked: () => isCookieBlocked,
     };
   }
 
@@ -203,7 +224,8 @@ if (typeof module !== 'undefined') module.exports = KLAD_ONLINE;
 if (typeof document !== 'undefined') (() => {
   const $ = (id) => document.getElementById(id);
   const canvas = $('game'), notice = $('online-notice');
-  const nickDialog = $('nick'), nickForm = $('nick-form'), nickName = $('nick-name'), nickError = $('nick-error');
+  const nickDialog = $('nick'), nickForm = $('nick-form'), nickName = $('nick-name'), nickError = $('nick-error'),
+        nickSaving = $('nick-saving'), nickSave = $('nick-save'), nickSkip = $('nick-skip');
   const board = $('board'), boardView = $('board-view'), boardShape = $('board-shape'),
         boardShapeRow = $('board-shape-row'), boardStatus = $('board-status'), boardTables = $('board-tables');
   const me = $('me'), meNone = $('me-none'), meSome = $('me-some'), meLine = $('me-line'), meForm = $('me-form'),
@@ -216,7 +238,7 @@ if (typeof document !== 'undefined') (() => {
     askNick() {
       if (nickDialog.open) return;
       nickForm.reset();
-      nickError.textContent = '';
+      nickError.textContent = online.isCookieBlocked() ? KLAD_ONLINE.TEXT.noCookie : '';
       nickDialog.showModal();
       nickName.focus();
     },
@@ -233,17 +255,28 @@ if (typeof document !== 'undefined') (() => {
     if (!document.querySelector('dialog[open]')) canvas.focus({ preventScroll: true });
   }
 
+  /* While the nick is being saved the prompt cannot be skipped. The logic
+     half still undoes the save if a repeated Escape closes it anyway. */
   nickForm.addEventListener('submit', async (event) => {
     event.preventDefault();
     if (isSaving) return;
     isSaving = true;
+    nickSave.disabled = true;
+    nickSkip.disabled = true;
     nickError.textContent = '';
+    nickSaving.textContent = 'сохранение...';
     const problem = await online.choose(nickName.value.trim(), nickForm.elements.kind.value);
     isSaving = false;
-    if (problem) nickError.textContent = problem;
-    else nickDialog.close();
+    nickSaving.textContent = '';
+    nickSkip.disabled = false;
+    nickSave.disabled = online.isCookieBlocked();
+    if (problem) {
+      nickError.textContent = problem;
+      (nickSave.disabled ? nickSkip : nickName).focus();
+    } else nickDialog.close();
   });
-  $('nick-skip').addEventListener('click', () => nickDialog.close());
+  nickSkip.addEventListener('click', () => nickDialog.close());
+  nickDialog.addEventListener('cancel', (event) => { if (isSaving) event.preventDefault(); });
   nickDialog.addEventListener('close', () => {
     if (online.isAsking()) online.skip();
     backToGame();
@@ -312,7 +345,7 @@ if (typeof document !== 'undefined') (() => {
     boardTables.replaceChildren();
     const data = await online.loadBoard(kind, view, boardShape.value);
     if (request !== boardRequest) return;
-    boardStatus.textContent = data ? '' : 'Таблицы сейчас недоступны. Игра работает и без них.';
+    boardStatus.textContent = data ? 'готово' : 'Таблицы сейчас недоступны. Игра работает и без них.';
     if (data) boardTables.append(...tablesFor(view, data));
   }
 
@@ -324,8 +357,12 @@ if (typeof document !== 'undefined') (() => {
     if (player) {
       meLine.textContent = 'Вы: ' + player.nick + ' · ' + (KIND[player.kind] || player.kind) +
         (player.account ? '' : ' · гость');
-      meNick.value = player.nick;
     }
+  }
+
+  /* Only here and after a rename, so a rejected nick stays in the field. */
+  function fillNick() {
+    if (online.player()) meNick.value = online.player().nick;
   }
 
   async function openBoard() {
@@ -337,7 +374,7 @@ if (typeof document !== 'undefined') (() => {
     me.hidden = true;
     board.showModal();
     $('board-human').focus();
-    await Promise.all([online.refresh().then(showMe), showBoard()]);
+    await Promise.all([online.refresh().then(() => { showMe(); fillNick(); }), showBoard()]);
   }
 
   for (const input of board.querySelectorAll('input[name="board-kind"]')) input.addEventListener('change', showBoard);
@@ -363,7 +400,7 @@ if (typeof document !== 'undefined') (() => {
     const problem = await online.rename(meNick.value.trim());
     showMe();
     meNote.textContent = problem || 'Ник изменён.';
-    if (!problem) showBoard();
+    if (!problem) { fillNick(); showBoard(); }
   });
   meDelete.addEventListener('click', () => {
     meConfirm.hidden = false;
@@ -378,7 +415,7 @@ if (typeof document !== 'undefined') (() => {
     meConfirm.hidden = true;
     showMe();
     meNote.textContent = problem || 'Ник и результаты удалены.';
-    if (problem) meDelete.focus();
+    if (online.player()) meDelete.focus();
     else { $('me-choose').focus(); showBoard(); }
   });
 

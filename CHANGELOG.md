@@ -3,6 +3,45 @@
 Dated entries, newest first. Written for a reader picking this up cold —
 or a future session needing to know what already exists and why.
 
+## 2026-11-13 (later still) - Klad counts engine ticks and reports clears and runs
+
+`klad.js` counts fixed 1/120 s update steps per level attempt and dispatches
+two events on `document`: `klad:clear` `{level, shape, revision, ticks,
+chests, chestsTotal}` when a level is cleared and `klad:run` `{fromLevelOne,
+levelsCleared, score, ticks}` at game over or after the last level. Nothing
+is sent or shown yet; the leaderboard tickets listen for the events (shared
+contract, section 6). New `klad/ticks.js` holds the formatter
+(`KLAD_TICKS.format`, `m:ss.cc`) and `MIN_CLEAR_TICKS`; every level in
+`levels.js` has `revision: 1`. `klad.js` also ignores keydown events whose
+target is an input, textarea or select.
+
+### Decisions worth not relitigating
+
+- **Ticks, not wall time.** The counter increments only inside the play
+  phase of `tick()`, so pause, menus, the title and death screens, tab
+  switches and frame rate do not matter: the same play gives the same number
+  on any machine, which a leaderboard needs. The counter restarts in
+  `intro()`, so a death starts the level's attempt from zero; the clear
+  result is the attempt that reached the exit.
+- **`revision` per level.** A layout edit changes what a fast time means.
+  Bump the level's `revision` whenever either shape changes, so the board
+  can keep old and new times apart. `levels.test.js` requires it.
+- **A run "from level 1"** is one that began at level 1 (`startGame(0)`:
+  the title with level 1 selected, or restart after game over or a win). A
+  start from the URL hash or a digit key is not. Run ticks add up every
+  play-phase step of the run, failed attempts included, since the run is the
+  whole session of lives.
+- **Time formatter in its own file.** `klad.js` is a DOM-touching IIFE node
+  cannot require, and `levels.js` exports the level array. `ticks.js` follows
+  the `levels.js` dual-export pattern and loads with an exact script tag.
+- **API floor.** `MIN_CLEAR_TICKS = 600` (5 s) mirrors the API. A test
+  computes the cheapest key-then-exit route per layout from the movement
+  speeds (walk 24, climb 26.7, fall 13.3 ticks per cell, no shooting) and
+  requires it above the floor. Today the fastest are 1238 ticks (level 4
+  landscape) to 1848 (level 3 landscape). Shooting through a brick could
+  shorten a route, so the figure bounds unshot play only.
+- **Typing guard on keydown only.** Keyup still releases movement keys, so
+  a key held while focus moves into a field cannot stay stuck.
 ## 2026-11-13 (later) - The game's API through the site's own origin
 
 `/klad/api/*` now reaches the game's API. A Cloudflare Pages Function,

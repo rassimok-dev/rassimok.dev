@@ -17,6 +17,7 @@
 const KLAD_LEVELS = [
   {
     name: 'замуруй хранителя',
+    revision: 1,
     guardSpeed: 3.0,
     landscape: [
       '......................E.',
@@ -65,6 +66,7 @@ const KLAD_LEVELS = [
   },
   {
     name: 'обгони хранителей',
+    revision: 1,
     guardSpeed: 3.9,
     landscape: [
       'E.......................',
@@ -113,6 +115,7 @@ const KLAD_LEVELS = [
   },
   {
     name: 'замуруй всех',
+    revision: 1,
     guardSpeed: 3.3,
     landscape: [
       '...........E............',
@@ -161,6 +164,7 @@ const KLAD_LEVELS = [
   },
   {
     name: 'обмани хранителя',
+    revision: 1,
     guardSpeed: 3.6,
     landscape: [
       '...........E............',
@@ -209,6 +213,7 @@ const KLAD_LEVELS = [
   },
   {
     name: 'всё сразу',
+    revision: 1,
     guardSpeed: 3.8,
     landscape: [
       'E.......................',

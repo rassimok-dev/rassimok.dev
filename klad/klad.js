@@ -103,7 +103,8 @@
 
   /* ---- State ---- */
   const S = { phase: 'title', level: 0, lives: START_LIVES, score: 0, hasKey: false,
-              chestsLeft: 0, total: 0, t: 0, timer: 0, shape: 'landscape' };
+              chestsLeft: 0, total: 0, t: 0, timer: 0, shape: 'landscape', ticks: 0 };
+  let run = { fromLevelOne: true, levelsCleared: 0, ticks: 0 };
   let grid = [], W = 0, H = 0, player = null, guards = [], shot = null;
   const holes = new Map(), chests = new Map();
   const keys = { up: false, down: false, left: false, right: false };
@@ -301,10 +302,12 @@
 
   function startGame(level) {
     S.level = level; S.lives = START_LIVES; S.score = 0;
+    run = { fromLevelOne: level === 0, levelsCleared: 0, ticks: 0 };
     intro();
   }
   function intro() {
     loadLevel(S.level);
+    S.ticks = 0;
     history.replaceState(null, '', '#' + (S.level + 1));
     show('ЭТАП ' + (S.level + 1), LEVELS[S.level].name);
     setPhase('intro', 1.4);
@@ -316,8 +319,12 @@
     setPhase('dead', 1.4);
     SFX.die();
   }
+  function report(name, detail) { document.dispatchEvent(new CustomEvent(name, { detail })); }
   function levelClear() {
     S.score += SCORE.clear;
+    run.levelsCleared++;
+    report('klad:clear', { level: S.level + 1, shape: S.shape, revision: LEVELS[S.level].revision,
+      ticks: S.ticks, chests: S.total - S.chestsLeft, chestsTotal: S.total });
     show('ЭТАП ПРОЙДЕН', S.chestsLeft === 0 ? 'все клады собраны' : 'кладов осталось: ' + S.chestsLeft);
     setPhase('clear', 1.8);
     SFX.clear();
@@ -335,12 +342,13 @@
     if (S.phase === 'intro') { hide(); setPhase('play'); }
     else if (S.phase === 'dead') {
       S.lives--;
-      if (S.lives < 0) { show('ИГРА ОКОНЧЕНА', 'счёт ' + S.score + ' · ОГОНЬ или Enter — заново'); setPhase('over'); }
+      if (S.lives < 0) { report('klad:run', { ...run, score: S.score }); show('ИГРА ОКОНЧЕНА', 'счёт ' + S.score + ' · ОГОНЬ или Enter — заново'); setPhase('over'); }
       else intro();
     } else if (S.phase === 'clear') {
       S.level++;
       if (S.level >= LEVELS.length) {
         S.level = 0;
+        report('klad:run', { ...run, score: S.score });
         show('ТЫ ВЫБРАЛСЯ', 'все пять этапов пройдены · счёт ' + S.score);
         setPhase('won');
       } else intro();
@@ -350,6 +358,7 @@
   function tick(dt) {
     S.t += dt;
     if (S.phase !== 'play') { if (S.timer > 0) timers(dt); return; }
+    S.ticks++; run.ticks++;
     updateEntity(player, dt, decidePlayer);
     if (S.phase !== 'play') return;
     for (const g of guards) {
@@ -430,7 +439,9 @@
       else { hide(); setPhase('play'); }
     } else if (action === 'restart' && S.phase === 'play') die();
   }
+  const isTyping = (e) => /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName);
   addEventListener('keydown', (e) => {
+    if (isTyping(e)) return;
     if (e.repeat) { if (KEYMAP[e.code]) e.preventDefault(); return; }
     audio();
     if (e.code === 'KeyM') { setMuted(!muted); return; }

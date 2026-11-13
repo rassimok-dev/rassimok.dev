@@ -57,8 +57,8 @@ so the login note would promise what the API does not do.
   address (decided 2026-11-13 after the review, contract section 5): a
   code request keeps the address's SHA-256 with the hashed code until the
   code is used, replaced or expires, and, for the limits (three codes an
-  hour per address, 80 mails a day), the hash and the time for at most a
-  day. The address itself is stored only when a login creates or opens an
+  hour per address, 80 mails a day), the hash and the time for a day
+  (outdated rows go with the next code request). The address itself is stored only when a login creates or opens an
   account. Every privacy note says exactly that, at its own length. They
   say hash, never anonymous, because the hash of a known address can be
   matched, and they speak only for the game's server: the mail service

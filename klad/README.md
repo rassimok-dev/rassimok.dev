@@ -37,7 +37,8 @@ checks again) and plays as before.
 - The first result without a player opens the nick prompt (nick, human or
   agent, the privacy note). Results wait in memory until the player saves a
   nick (then they are sent) or skips (then they are dropped, and the game
-  does not ask again until the page is reloaded). A skip while the nick is
+  does not ask again until the page is reloaded, a nick is chosen in the
+  boards, or a login). A skip while the nick is
   still being saved deletes the new player again.
 - A run is sent only when it started at level 1 (`fromLevelOne`).
 - The boards open with `T` or the "Таблицы" button: records, fastest clear
@@ -61,8 +62,7 @@ checks again) and plays as before.
   the next code request. It stores the
   address itself only once a login creates or opens an account, and it
   mails nothing but login codes. Both footers and the login part say so in
-  full, the nick prompt in short; the meta description names only the hash
-  and the day.
+  full, the nick prompt in short; the meta description names only the hash.
 - Any open `<dialog>` holds the game: play pauses, timers stop and game keys
   are ignored. Closing it puts the focus back on the field.
 - Nicks come from other players, so every text is set with `textContent`.

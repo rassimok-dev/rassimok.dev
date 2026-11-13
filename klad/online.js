@@ -26,7 +26,7 @@ const KLAD_ONLINE = (() => {
     loggedIn: 'Вы в аккаунте.',
     merged: 'Вы в аккаунте. Результаты гостя перенесены в него.',
     otherKind: 'Вы в аккаунте. Результаты гостя не перенесены: у аккаунта другой выбор (человек или агент). ' +
-      'Они остались под ником гостя, и удалить их из этого браузера больше нельзя.',
+      'Они остались под ником гостя, и удалить их больше нельзя.',
     kept: (nick) => 'Вы в аккаунте. Результаты ника «' + nick + '» остались с ним.',
   };
   const isOk = (status) => status >= 200 && status < 300;
@@ -219,6 +219,7 @@ const KLAD_ONLINE = (() => {
     /* The code is checked against the address it went to, so editing the
        email field afterwards does not break the login. */
     async function requestCode(email) {
+      if (isCookieBlocked) return TEXT.noCookie;
       const answer = await call('POST', '/login/code', { email });
       let problem = null;
       if (answer.status === 202) codeEmail = email;
@@ -243,6 +244,7 @@ const KLAD_ONLINE = (() => {
         codeEmail = null;
         await readPlayer();
         if (player) {
+          server = 'up';
           hasSkipped = false;
           text = welcome(guest, account, isMerged);
         } else {

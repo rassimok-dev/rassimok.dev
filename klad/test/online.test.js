@@ -1305,4 +1305,5 @@ test('a login whose read-back fails on the network keeps the account', async () 
   assert.equal(text, TEXT.loggedIn);
   assert.deepEqual(online.player(), ACCOUNT);
   assert.equal(online.isCookieBlocked(), false);
+  assert.equal(online.isAvailable(), true);
 });

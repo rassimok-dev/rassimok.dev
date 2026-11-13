@@ -4,11 +4,17 @@ const PREFIX = '/klad/api';
 const FORWARDED_HEADERS = ['Content-Type', 'Accept', 'Cookie'];
 
 export async function onRequest({ request, env }) {
+  const url = new URL(request.url);
+  // The routing should only send paths under the prefix, but the slice below
+  // must not rely on it: /klad/api@other.host would otherwise change the host.
+  if (url.pathname !== PREFIX && !url.pathname.startsWith(PREFIX + '/')) {
+    return errorResponse(404, 'not_found');
+  }
+
   if (!env.API_ORIGIN) {
     return errorResponse(503, 'not_configured');
   }
 
-  const url = new URL(request.url);
   // Plain concatenation, not new URL(path, origin): a path such as
   // //other.host/x must not be able to change the upstream host.
   const upstreamUrl = env.API_ORIGIN + url.pathname.slice(PREFIX.length) + url.search;

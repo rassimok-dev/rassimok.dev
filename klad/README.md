@@ -28,7 +28,9 @@ returns the API's answer unchanged. `API_ORIGIN` is a Pages environment
 variable, set per environment (Production, Preview); a deploy without it
 answers 503 `{"error":"not_configured"}`. If the API cannot be reached, the
 proxy answers 502 `{"error":"upstream"}`. `_routes.json` keeps every other
-path off the Function.
+path off the Function; should one reach it anyway, a path that is not
+`/klad/api` or under `/klad/api/` gets 404 `{"error":"not_found"}` and never
+reaches the API.
 
 ## To remove the game entirely
 1. `git rm -r klad/ functions/klad/api/ _routes.json`

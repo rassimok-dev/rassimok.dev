@@ -15,10 +15,10 @@ comes in a later change.
 
 The privacy promise changes with it, in the README, the klad footer (plus a
 short Russian privacy note) and the klad meta description: no analytics and
-no tracking; once a player picks a nick, the API stores the nick and the
-results (accounts will add an email); one HttpOnly cookie, for the game's API
-only. Still no localStorage, and the home page still ships no JavaScript and
-sets no cookies.
+no tracking; once a player picks a nick, the API stores the nick, whether
+they play as a human or an agent, and the results (accounts will add an
+email); one HttpOnly cookie, for the game's API only. Still no localStorage,
+and the home page still ships no JavaScript and sets no cookies.
 
 ### Decisions worth not relitigating
 
@@ -46,15 +46,25 @@ sets no cookies.
   on would hand them over. What Cloudflare itself adds to the outgoing
   request is outside the proxy's control, so the public text promises only
   what the proxy forwards.
-- **The upstream URL is concatenated, not resolved.** `new URL(path,
-  API_ORIGIN)` reads a path such as `//other.host/x` as a new host, which
-  would make the Function an open proxy. Concatenation keeps every request on
-  `API_ORIGIN`, and a test covers it.
+- **A prefix check, then concatenation, not resolution.** The Function first
+  answers 404 unless the parsed path is `/klad/api` or starts with
+  `/klad/api/`. Without it, cutting off nine characters turns
+  `/klad/api@other.host/x` into `@other.host/x`, and glued onto `API_ORIGIN`
+  that changes the host. Parsing also resolves dot segments, `%2e%2e`
+  included, so `/klad/api/%2e%2e/%2e%2e/aaaaaaaa@other.host/x` does the same.
+  `_routes.json` and the Pages router should never send such a path, but the
+  Function does not rely on them. After the check it concatenates:
+  `new URL(path, API_ORIGIN)` would read a path such as `//other.host/x` as a
+  new host. Together the check and the concatenation keep every request on
+  `API_ORIGIN`, so the Function cannot become an open proxy; the tests assert
+  the forwarded host for each path case, and that off-prefix paths make no
+  fetch.
 - **`redirect: 'manual'`.** A redirect from the API comes back as it is,
   instead of being followed inside the Function.
-- **Proxy errors use the API's error shape.** `API_ORIGIN` unset gives 503
-  `{"error":"not_configured"}`, an unreachable API 502 `{"error":"upstream"}`,
-  both `Cache-Control: no-store`. There is no fallback address: a deploy
+- **Proxy errors use the API's error shape.** A path that is not `/klad/api`
+  or under `/klad/api/` gives 404 `{"error":"not_found"}`, `API_ORIGIN`
+  unset 503 `{"error":"not_configured"}`, an unreachable API 502
+  `{"error":"upstream"}`, all `Cache-Control: no-store`. There is no fallback address: a deploy
   without the variable, such as a branch preview before it is set there,
   answers 503 rather than guessing.
 - **`_headers` does not cover `/klad/api/*`.** Pages never applies `_headers`

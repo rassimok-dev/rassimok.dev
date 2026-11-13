@@ -10,9 +10,10 @@ The reasoning is the point — the page itself is 800 bytes of HTML.
 
 **Collect almost nothing.** No analytics, no tracking, no local storage. The
 home page sets no cookies. The one exception is the game at `/klad/`: once a
-player picks a nick, its API stores that nick and the player's results for
-the leaderboards (and, once accounts exist, an email address), and sets one
-HttpOnly cookie that only the game's API receives (`Path=/klad/api`). The
+player picks a nick, its API stores that nick, whether they play as a human
+or an agent, and their results for the leaderboards (and, once accounts
+exist, an email address), and sets one HttpOnly cookie that only the game's
+API receives (`Path=/klad/api`). The
 cookie keeps a player's own results together and follows nobody, so there is
 still no cookie banner. The footers say this, and CI enforces what a grep can
 check (see below), so the claims cannot quietly become false.

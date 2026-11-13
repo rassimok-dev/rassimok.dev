@@ -1,12 +1,13 @@
 'use strict';
 /* The /klad/api proxy (functions/klad/api/[[path]].js) against a fake fetch.
    Only the path and query of the request URL matter to the proxy, so the
-   test URLs use a test: scheme instead of a full site URL. */
+   test URLs use a test: scheme instead of a full site URL. The origin is
+   URL-shaped so that each test can check the host the proxy would reach. */
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { onRequest } = require('../../functions/klad/api/[[path]].js');
 
-const API_ORIGIN = 'api-origin';
+const API_ORIGIN = 'test://api.origin';
 const env = { API_ORIGIN };
 
 function fakeFetch(t, upstreamResponse = new Response('{}')) {
@@ -16,6 +17,7 @@ function fakeFetch(t, upstreamResponse = new Response('{}')) {
 function forwarded(fetchMock) {
   assert.equal(fetchMock.mock.callCount(), 1);
   const [url, init] = fetchMock.mock.calls[0].arguments;
+  assert.equal(new URL(url).host, 'api.origin');
   return { url, init };
 }
 
@@ -36,6 +38,24 @@ test('proxy keeps a double slash in the path on the configured origin', async (t
 
   assert.equal(forwarded(fetchMock).url, API_ORIGIN + '//other.host/status');
 });
+
+for (const path of [
+  '/klad/api@other.host/x',
+  '/klad/api.other.host/x',
+  '/klad/apix',
+  '/klad/api/%2e%2e/%2e%2e/aaaaaaaa@other.host/x',
+]) {
+  test(`proxy answers 404 without a fetch for ${path}`, async (t) => {
+    const fetchMock = fakeFetch(t);
+    const request = new Request('test:' + path);
+
+    const response = await onRequest({ request, env });
+
+    assert.equal(response.status, 404);
+    assert.deepEqual(await response.json(), { error: 'not_found' });
+    assert.equal(fetchMock.mock.callCount(), 0);
+  });
+}
 
 test('proxy passes on the method and the body', async (t) => {
   const fetchMock = fakeFetch(t);

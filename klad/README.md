@@ -14,9 +14,9 @@ proxy (below), it is self-contained on purpose so it can be removed in one go.
 | `klad.js` | engine: movement, guards (BFS chase), shots, holes, phases, render, input; holds while a dialog is open |
 | `levels.js` | five levels, each in two shapes (landscape 24×16, portrait 16×24), with a `revision` |
 | `ticks.js` | tick constants and the time formatter (`m:ss.cc`), also loaded by the node tests |
-| `online.js` | online part: nick prompt, sending clears and runs, the boards; its logic half is also loaded by the node tests |
+| `online.js` | online part: nick prompt, sending clears and runs, the boards, accounts (login by emailed code, logout); its logic half is also loaded by the node tests |
 | `test/levels.test.js` | `node --test`: shape, legend, key-then-exit reachability, revision, fastest clear above the API floor |
-| `test/online.test.js` | `node --test`: `online.js` against a fake `fetch`: request shapes, when results wait or go, a skip during a save, blocked cookies, 400, 401, 404, 409, 429, offline |
+| `test/online.test.js` | `node --test`: `online.js` against a fake `fetch`: request shapes, when results wait or go, a skip during a save, blocked cookies, login codes, verify answers and merges, the read-back after a login, a login ending a skip, logout, 400, 401, 404, 409, 429, offline |
 | `test/proxy.test.js` | `node --test`: the API proxy against a fake `fetch` |
 | `test/ticks.test.js` | `node --test`: the time formatter |
 | `MECHANICS.md` | the original rules as reconstructed from sources |
@@ -37,13 +37,32 @@ checks again) and plays as before.
 - The first result without a player opens the nick prompt (nick, human or
   agent, the privacy note). Results wait in memory until the player saves a
   nick (then they are sent) or skips (then they are dropped, and the game
-  does not ask again until the page is reloaded). A skip while the nick is
+  does not ask again until the page is reloaded, a nick is chosen in the
+  boards, or a login). A skip while the nick is
   still being saved deletes the new player again.
 - A run is sent only when it started at level 1 (`fromLevelOne`).
 - The boards open with `T` or the "Таблицы" button: records, fastest clear
   and most chests per level and shape, and chests over all levels, for
   humans or agents. The same dialog changes the nick and deletes the nick
   and all results (`DELETE /players/me`).
+- Accounts live in the same dialog. A guest, or a browser with no player,
+  asks for a code (`POST /login/code`, an email) and logs in with it
+  (`POST /login/verify`, the email and the code as a string of 6 digits;
+  spaces around a pasted code are trimmed). A new account is
+  the guest itself; logging in to an existing account moves the guest's
+  results into it only when both have the same kind (human or agent), and
+  the dialog says which happened. After a login the player is read back;
+  none means blocked cookies, as after a new nick. An account shows its
+  email (only to itself) and its kind, which it keeps from the guest; it
+  can log out (`POST /logout`) and delete itself with the same button,
+  email included. The boards mark every nick as `гость` or `аккаунт`.
+- For a code request the API stores not the address but its SHA-256 hash:
+  with the code's hash until the code is used, replaced or expires, and
+  with the request time, for the limits, for a day; outdated records go with
+  the next code request. It stores the
+  address itself only once a login creates or opens an account, and it
+  mails nothing but login codes. Both footers and the login part say so in
+  full, the nick prompt in short; the meta description names only the hash.
 - Any open `<dialog>` holds the game: play pauses, timers stop and game keys
   are ignored. Closing it puts the focus back on the field.
 - Nicks come from other players, so every text is set with `textContent`.

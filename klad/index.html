@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="dark">
 <title>КЛАД — rassimok</title>
-<meta name="description" content="КЛАД: a clean-room homage to the Korvet platformer. Five levels. No analytics, no tracking; stores the nick you pick and your results; one cookie, for its API only.">
+<meta name="description" content="КЛАД: a clean-room homage to the Korvet platformer. Five levels. No analytics, no tracking; stores the nick you pick, your results and, for an account, your email (a login code request keeps only a hash of the address); one cookie, for its API only.">
 <link rel="stylesheet" href="/klad/klad.css">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 </head>
@@ -44,15 +44,25 @@
     <p>A clean-room homage to <span lang="ru">«Клад»</span> (D. Ivanov, A. Shatalov, Korvet <span lang="ru">ПК-8020</span>),
     itself after <span lang="ja">ライズアウト</span> / <i>Rise Out</i> (ASCII, 1983). Own code, art and levels.
     No analytics, no tracking; the only script is this page's own. With a nick, the game's server
-    keeps it, your choice of human or agent and your results; one HttpOnly cookie, for the game's API only.
-    You can delete them on the boards screen, from this browser, as long as it keeps the game's cookie.
+    keeps it, your choice of human or agent and your results, and for an account also your email address;
+    one HttpOnly cookie, for the game's API only. You can delete them on the boards screen, from this browser,
+    as long as it keeps the game's cookie; an account and its email also from any device, after logging in
+    with a code sent to that address. For a login code the server keeps not the address but a hash of it:
+    with the code, also hashed, until the code is used, replaced by a new one or expires, and, to limit code
+    requests, for a day; outdated records go with the next code request. It stores the address itself only once a login with the code creates or
+    opens an account, and it mails nothing but login codes.
     <a href="/">← rassimok</a></p>
-    <p lang="ru">Приватность: пока вы не ввели ник, игра ничего не хранит. С ником сервер игры
+    <p lang="ru">Приватность: пока вы не ввели ник или email, игра ничего не хранит. С ником сервер игры
     хранит его, ваш выбор (человек или агент) и ваши результаты для таблиц рекордов
     (у аккаунта ещё email), а браузер получает один файл cookie с флагом HttpOnly,
     только для API игры. Без аналитики, без слежки, без localStorage. Удалить ник
     и все результаты можно в этом браузере, пока он хранит cookie игры: «Таблицы»,
-    затем «Удалить мой ник и результаты».</p>
+    затем «Удалить мой ник и результаты». Аккаунт вместе с email удаляет та же кнопка,
+    на любом устройстве после входа по коду из письма. Для кода входа сервер хранит не сам адрес,
+    а его отпечаток (хеш): вместе с кодом, тоже в виде хеша, пока код не использован, не заменён новым
+    или не истёк, а для ограничения числа запросов сутки; устаревшие записи удаляются при следующем
+    запросе кода. Сам адрес сервер сохраняет, только
+    когда по коду вы создаёте аккаунт или входите в него. Кроме кодов для входа, сервер писем не присылает.</p>
   </footer>
 </div>
 
@@ -73,7 +83,10 @@
     <p class="note">Приватность: сервер игры сохранит ник, ваш выбор (человек или агент) и ваши
     результаты, а браузер получит один файл cookie с флагом HttpOnly, только для API игры.
     Удалить ник и все результаты можно в этом браузере, пока он хранит cookie игры: «Таблицы»,
-    затем «Удалить мой ник и результаты».</p>
+    затем «Удалить мой ник и результаты». Аккаунт (по желанию, в «Таблицах») хранит ещё ваш
+    email; его удаляет та же кнопка, на любом устройстве после входа по коду из письма. Для кода входа
+    сервер хранит не сам адрес, а его хеш, а сам адрес сохраняет только при входе
+    в аккаунт. Кроме кодов для входа, сервер писем не присылает (подробнее в «Таблицах»).</p>
     <p id="nick-saving" class="note" role="status"></p>
     <p id="nick-error" class="error" role="alert"></p>
     <p class="actions">
@@ -112,6 +125,11 @@
     </div>
     <div id="me-some">
       <p id="me-line"></p>
+      <div id="me-account">
+        <p id="me-email"></p>
+        <p class="note">Выбор (человек или агент) аккаунт взял у ника гостя, и его не изменить.</p>
+        <p><button type="button" id="me-logout">Выйти из аккаунта</button></p>
+      </div>
       <form id="me-form">
         <p class="field"><label for="me-nick">Новый ник</label>
           <input id="me-nick" name="nick" type="text" required minlength="3" maxlength="16"
@@ -121,12 +139,43 @@
       </form>
       <p><button type="button" id="me-delete">Удалить мой ник и результаты</button></p>
       <div id="me-confirm" class="confirm" hidden>
-        <p>Удалить с сервера ник, выбор (человек или агент) и все результаты? Это не отменить.</p>
+        <p id="me-confirm-guest">Удалить с сервера ник, выбор (человек или агент) и все результаты? Это не отменить.</p>
+        <p id="me-confirm-account">Удалить с сервера аккаунт: email, ник, выбор (человек или агент) и все
+          результаты? Это не отменить.</p>
         <p><button type="button" id="me-yes">Да, удалить</button>
           <button type="button" id="me-no">Нет</button></p>
       </div>
     </div>
     <p id="me-note" role="status"></p>
+    <div id="login">
+      <h3>Аккаунт</h3>
+      <p class="note">Вход по коду из письма, без пароля. Новый аккаунт создаётся из вашего ника гостя
+      вместе с результатами; ник аккаунта никто другой не займёт, а играть под ним можно на любом устройстве.</p>
+      <p class="note">Приватность: для кода сервер хранит не сам адрес, а его отпечаток (хеш): вместе
+      с кодом, тоже в виде хеша, пока код не использован, не заменён новым или не истёк (он действует
+      10 минут), а для ограничения числа запросов сутки; устаревшие записи удаляются при следующем
+      запросе кода. Сам адрес сервер сохраняет, только когда
+      по коду вы создаёте аккаунт или входите в него: это email аккаунта. Кроме кодов для входа, сервер
+      писем не присылает; чтобы отправить письмо, адрес передаётся почтовому сервису. Удалить аккаунт вместе с email можно кнопкой «Удалить мой ник и результаты», войдя на
+      любом устройстве. При входе в уже созданный аккаунт результаты гостя этого браузера перейдут в него,
+      если выбор (человек или агент) у них один; иначе они останутся под ником гостя, и удалить их будет
+      уже нельзя. Чтобы этого не было, сначала удалите ник гостя кнопкой «Удалить мой ник и результаты»,
+      а потом войдите.</p>
+      <form id="login-email-form">
+        <p class="field"><label for="login-email">Email</label>
+          <input id="login-email" name="email" type="email" required maxlength="254"
+                 autocomplete="email" spellcheck="false">
+          <button type="submit">Получить код</button></p>
+      </form>
+      <form id="login-code-form" hidden>
+        <p class="field"><label for="login-code">Код из письма</label>
+          <input id="login-code" name="code" type="text" required minlength="6" pattern="\s*[0-9]{6}\s*"
+                 inputmode="numeric" autocomplete="one-time-code" aria-describedby="login-code-rules">
+          <button type="submit">Войти</button></p>
+        <p id="login-code-rules" class="note">6 цифр; код действует 10 минут.</p>
+      </form>
+      <p id="login-note" role="status" aria-live="polite"></p>
+    </div>
   </div>
   <p class="actions"><button type="button" id="board-close">Закрыть</button></p>
 </dialog>

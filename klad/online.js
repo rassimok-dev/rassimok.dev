@@ -1,6 +1,7 @@
-/* КЛАД online: the nick prompt, sending results and the boards, through the
-   site's own /klad/api. No storage: the API's HttpOnly cookie is the only
-   identity. The first half has no DOM, so the node tests can require it. */
+/* КЛАД online: the nick prompt, sending results, the boards and accounts,
+   through the site's own /klad/api. No storage: the API's HttpOnly cookie is
+   the only identity. The first half has no DOM, so the node tests can
+   require it. */
 'use strict';
 const KLAD_ONLINE = (() => {
   const BASE = '/klad/api';
@@ -15,6 +16,18 @@ const KLAD_ONLINE = (() => {
     noCookie: 'Сервер не узнал этот браузер: похоже, cookie заблокированы. Можно играть без ника.',
     nickKept: 'Ник мог остаться на сервере, и результаты могут записываться под ним, пока вы не удалите его в «Таблицах».',
     signedIn: 'Этот браузер уже играет под ником ',
+    codeSent: 'Код отправлен. Он действует 10 минут; если письма нет, загляните в папку «Спам».',
+    invalidEmail: 'Такой email не подойдёт: проверьте адрес.',
+    codeLimited: 'Слишком много запросов кода. Попробуйте позже.',
+    invalidCode: 'Код не подошёл или устарел. Проверьте его или запросите новый.',
+    tooManyAttempts: 'Слишком много неверных попыток: этот код больше не действует. Запросите новый.',
+    loginNickTaken: 'Ваш ник уже занят аккаунтом. Смените ник и запросите новый код.',
+    loginNoSession: 'Аккаунт создаётся из ника гостя: сначала выберите ник, потом снова откройте «Таблицы» и нажмите «Войти».',
+    loggedIn: 'Вы в аккаунте.',
+    merged: 'Вы в аккаунте. Результаты гостя перенесены в него.',
+    otherKind: 'Вы в аккаунте. Результаты гостя не перенесены: у аккаунта другой выбор (человек или агент). ' +
+      'Они остались под ником гостя, и удалить их больше нельзя.',
+    kept: (nick) => 'Вы в аккаунте. Результаты ника «' + nick + '» остались с ним.',
   };
   const isOk = (status) => status >= 200 && status < 300;
   const errorOf = (answer) => answer.data && answer.data.error;
@@ -48,6 +61,7 @@ const KLAD_ONLINE = (() => {
     let hasSkipped = false;
     let isAsking = false;
     let isCookieBlocked = false;
+    let codeEmail = null;
 
     /* Only 401 means "no player yet"; anything else but 200 means the API
        is not there, and the game does not ask for a nick until it answers
@@ -195,6 +209,88 @@ const KLAD_ONLINE = (() => {
         player = null;
         hasSkipped = true;
         pending = [];
+        codeEmail = null;
+      }
+      if (answer.status === 401) problem = TEXT.noPlayer;
+      else if (!isGone) problem = TEXT.unavailable;
+      return problem;
+    }
+
+    /* The code is checked against the address it went to, so editing the
+       email field afterwards does not break the login. */
+    async function requestCode(email) {
+      if (isCookieBlocked) return TEXT.noCookie;
+      const answer = await call('POST', '/login/code', { email });
+      let problem = null;
+      if (answer.status === 202) codeEmail = email;
+      else if (errorOf(answer) === 'invalid_email') problem = TEXT.invalidEmail;
+      else if (answer.status === 429) problem = TEXT.codeLimited;
+      else problem = TEXT.unavailable;
+      return problem;
+    }
+
+    /* Returns the text to show. After no_session the code stays: the guest
+       is made first, and a code the API has used up answers invalid_code.
+       A login is read back like a new nick, and it ends an earlier skip or
+       logout; no player then means blocked cookies, handled as in choose(). */
+    async function verify(code) {
+      const guest = player && !player.account ? player : null;
+      const answer = await call('POST', '/login/verify', { email: codeEmail, code });
+      const error = errorOf(answer);
+      let text;
+      if (answer.status === 200 && answer.data && answer.data.nick) {
+        const { merged: isMerged, ...account } = answer.data;
+        player = account;
+        codeEmail = null;
+        await readPlayer();
+        if (player) {
+          server = 'up';
+          hasSkipped = false;
+          text = welcome(guest, account, isMerged);
+        } else {
+          isCookieBlocked = true;
+          skip();
+          text = TEXT.noCookie;
+        }
+      } else if (answer.status === 401) {
+        player = null;
+        text = TEXT.loginNoSession;
+      } else if (error === 'invalid_code') {
+        text = TEXT.invalidCode;
+      } else if (error === 'too_many_attempts') {
+        codeEmail = null;
+        text = TEXT.tooManyAttempts;
+      } else if (error === 'nick_taken') {
+        codeEmail = null;
+        text = TEXT.loginNickTaken;
+      } else {
+        text = TEXT.unavailable;
+      }
+      return text;
+    }
+
+    /* merged false with a guest of the same kind is a sign-up (the guest is
+       now the account) or a login before guest merging existed; the kept
+       text is true for both. */
+    function welcome(guest, account, isMerged) {
+      let text = TEXT.loggedIn;
+      if (isMerged === true) text = TEXT.merged;
+      else if (guest && guest.kind !== account.kind) text = TEXT.otherKind;
+      else if (guest) text = TEXT.kept(guest.nick);
+      return text;
+    }
+
+    /* Like a delete, the page then has no player and does not ask for a
+       nick again; the boards offer one, or a new login. */
+    async function logout() {
+      const answer = await call('POST', '/logout');
+      const isGone = isOk(answer.status) || answer.status === 401;
+      let problem = null;
+      if (isGone) {
+        player = null;
+        hasSkipped = true;
+        pending = [];
+        codeEmail = null;
       }
       if (answer.status === 401) problem = TEXT.noPlayer;
       else if (!isGone) problem = TEXT.unavailable;
@@ -217,11 +313,13 @@ const KLAD_ONLINE = (() => {
     }
 
     return {
-      start, refresh: readPlayer, choose, skip, ask, rename, remove, loadBoard, onClear, onRun,
+      start, refresh: readPlayer, choose, skip, ask, rename, remove, requestCode, verify, logout,
+      loadBoard, onClear, onRun,
       player: () => player,
       isAvailable: () => server === 'up',
       isAsking: () => isAsking,
       isCookieBlocked: () => isCookieBlocked,
+      isCodeSent: () => codeEmail !== null,
     };
   }
 
@@ -239,6 +337,10 @@ if (typeof document !== 'undefined') (() => {
         boardShapeRow = $('board-shape-row'), boardStatus = $('board-status'), boardTables = $('board-tables');
   const me = $('me'), meNone = $('me-none'), meSome = $('me-some'), meLine = $('me-line'), meForm = $('me-form'),
         meNick = $('me-nick'), meNote = $('me-note'), meDelete = $('me-delete'), meConfirm = $('me-confirm');
+  const meAccount = $('me-account'), meEmail = $('me-email'), meLogout = $('me-logout'),
+        meConfirmGuest = $('me-confirm-guest'), meConfirmAccount = $('me-confirm-account');
+  const login = $('login'), loginEmailForm = $('login-email-form'), loginEmail = $('login-email'),
+        loginCodeForm = $('login-code-form'), loginCode = $('login-code'), loginNote = $('login-note');
   const KIND = { human: 'человек', agent: 'агент' };
   const SHAPE = { landscape: 'широкое поле', portrait: 'высокое поле' };
   let noticeTimer = 0, boardRequest = 0, isSaving = false, isChangingPlayer = false;
@@ -314,10 +416,10 @@ if (typeof document !== 'undefined') (() => {
       row.insertCell().textContent = entry.rank;
       const nick = row.insertCell();
       nick.textContent = entry.nick;
-      if (entry.guest) {
+      if (typeof entry.guest === 'boolean') {
         const mark = document.createElement('span');
-        mark.className = 'guest';
-        mark.textContent = 'гость';
+        mark.className = entry.guest ? 'guest' : 'account';
+        mark.textContent = entry.guest ? 'гость' : 'аккаунт';
         nick.append(' ', mark);
       }
       for (const value of cellsOf(entry)) row.insertCell().textContent = value;
@@ -361,15 +463,26 @@ if (typeof document !== 'undefined') (() => {
     if (data) boardTables.append(...tablesFor(view, data));
   }
 
+  /* The login part is for a guest or no player; an account logs out first. */
   function showMe() {
     const player = online.player();
+    const isAccount = Boolean(player && player.account);
     me.hidden = !online.isAvailable();
     meNone.hidden = Boolean(player);
     meSome.hidden = !player;
-    if (player) {
-      meLine.textContent = 'Вы: ' + player.nick + ' · ' + (KIND[player.kind] || player.kind) +
-        (player.account ? '' : ' · гость');
-    }
+    meAccount.hidden = !isAccount;
+    meConfirmGuest.hidden = isAccount;
+    meConfirmAccount.hidden = !isAccount;
+    login.hidden = isAccount;
+    loginCodeForm.hidden = !online.isCodeSent();
+    meEmail.textContent = isAccount ? 'Email: ' + player.email : '';
+    meLine.textContent = player ? 'Вы: ' + player.nick + ' · ' + (KIND[player.kind] || player.kind) +
+      (isAccount ? ' · аккаунт' : ' · гость') : '';
+  }
+
+  function forgetLogin() {
+    loginEmailForm.reset();
+    loginCodeForm.reset();
   }
 
   /* Only here and after a rename, so a rejected nick stays in the field. */
@@ -383,6 +496,7 @@ if (typeof document !== 'undefined') (() => {
     boardShape.value = matchMedia('(orientation: portrait)').matches ? 'portrait' : 'landscape';
     meConfirm.hidden = true;
     meNote.textContent = '';
+    loginNote.textContent = '';
     me.hidden = true;
     board.showModal();
     $('board-human').focus();
@@ -430,14 +544,66 @@ if (typeof document !== 'undefined') (() => {
   $('me-yes').addEventListener('click', async () => {
     if (isChangingPlayer) return;
     isChangingPlayer = true;
+    const wasAccount = Boolean(online.player() && online.player().account);
     meNote.textContent = 'удаление...';
     const problem = await online.remove();
     isChangingPlayer = false;
     meConfirm.hidden = true;
     showMe();
-    meNote.textContent = problem || 'Ник и результаты удалены.';
+    meNote.textContent = problem || (wasAccount ? 'Аккаунт, email, ник и результаты удалены.' : 'Ник и результаты удалены.');
     if (online.player()) meDelete.focus();
-    else { $('me-choose').focus(); showBoard(); }
+    else { forgetLogin(); $('me-choose').focus(); showBoard(); }
+  });
+
+  meLogout.addEventListener('click', async () => {
+    if (isChangingPlayer) return;
+    isChangingPlayer = true;
+    meNote.textContent = 'выход...';
+    const problem = await online.logout();
+    isChangingPlayer = false;
+    showMe();
+    meNote.textContent = problem || 'Вы вышли из аккаунта. Войти снова можно по коду из письма.';
+    if (online.player()) meLogout.focus();
+    else { forgetLogin(); loginEmail.focus(); }
+  });
+
+  /* A code request spends one of three an hour, so it shares the one
+     request at a time rule with rename and delete. */
+  loginEmailForm.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    if (isChangingPlayer) return;
+    isChangingPlayer = true;
+    loginNote.textContent = 'отправка...';
+    const problem = await online.requestCode(loginEmail.value.trim());
+    isChangingPlayer = false;
+    showMe();
+    loginNote.textContent = problem || KLAD_ONLINE.TEXT.codeSent;
+    if (!problem) { loginCode.value = ''; loginCode.focus(); }
+  });
+
+  /* After a login the login part hides, so its text goes to the note that
+     stays visible, and the focus moves on. */
+  loginCodeForm.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    if (isChangingPlayer) return;
+    isChangingPlayer = true;
+    loginNote.textContent = 'проверка...';
+    const text = await online.verify(loginCode.value.trim());
+    isChangingPlayer = false;
+    showMe();
+    if (login.hidden) {
+      loginNote.textContent = '';
+      forgetLogin();
+      meNote.textContent = text;
+      fillNick();
+      meNick.focus();
+      showBoard();
+    } else {
+      loginNote.textContent = text;
+      if (text === KLAD_ONLINE.TEXT.loginNoSession) $('me-choose').focus();
+      else if (text === KLAD_ONLINE.TEXT.loginNickTaken) meNick.focus();
+      else if (!online.isCodeSent()) loginEmail.focus();
+    }
   });
 
   document.addEventListener('klad:clear', (event) => online.onClear(event.detail));

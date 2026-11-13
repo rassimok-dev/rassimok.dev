@@ -180,3 +180,84 @@ footer {
 footer p { margin: 0; }
 footer a { color: var(--crt-hot); text-underline-offset: 3px; }
 footer a:focus-visible { outline: 2px solid var(--crt-hot); outline-offset: 3px; }
+
+/* Online: the stage notice, the nick prompt and the boards. Dialogs sit in
+   the top layer, outside the unselectable play area; they scroll on a short
+   landscape phone. */
+.notice {
+  position: absolute;
+  left: 50%;
+  bottom: .6rem;
+  z-index: 2;
+  transform: translateX(-50%);
+  max-width: calc(100% - 1rem);
+  margin: 0;
+  pointer-events: none;
+  font-size: .72rem;
+  text-align: center;
+}
+.notice:not(:empty) {
+  padding: .3rem .6rem;
+  background: var(--crt-bg);
+  border: 1px solid var(--crt-dim);
+  border-radius: .3rem;
+}
+dialog {
+  width: min(36rem, calc(100vw - 1rem));
+  max-height: calc(100dvh - 1rem);
+  overflow: auto;
+  padding: .8rem 1rem;
+  color: var(--crt-fg);
+  background: var(--crt-bg);
+  border: 1px solid var(--crt-dim);
+  border-radius: .4rem;
+  font: .8rem/1.5 var(--mono);
+}
+dialog::backdrop { background: rgba(11, 20, 16, .85); }
+dialog [hidden] { display: none; }
+dialog h2 {
+  margin: 0 0 .5rem;
+  font-size: 1rem;
+  letter-spacing: .15em;
+  text-transform: uppercase;
+}
+dialog h3 { margin: 1rem 0 .3rem; font-size: .85rem; color: var(--crt-hot); }
+dialog p { margin: .5rem 0; }
+dialog .note { color: var(--crt-dim); }
+dialog .error { color: var(--crt-alert); }
+dialog .error:empty, dialog .note:empty { margin: 0; }
+dialog fieldset {
+  margin: .5rem 0;
+  padding: .3rem .6rem .4rem;
+  border: 1px solid var(--crt-rule);
+}
+dialog fieldset label { display: inline-block; margin-right: 1rem; cursor: pointer; }
+dialog .field label { margin-right: .5rem; }
+dialog input, dialog select, dialog button { font: inherit; color: var(--crt-fg); }
+dialog input[type="radio"] { accent-color: var(--crt-fg); margin-left: 0; }
+dialog input[type="text"], dialog select {
+  padding: .2rem .4rem;
+  background: var(--crt-bg);
+  border: 1px solid var(--crt-dim);
+  border-radius: .2rem;
+}
+dialog button {
+  padding: .25rem .7rem;
+  background: transparent;
+  border: 1px solid var(--crt-dim);
+  border-radius: .3rem;
+  cursor: pointer;
+}
+dialog button[type="submit"] { color: var(--crt-hot); border-color: var(--crt-hot); }
+dialog button:disabled { color: var(--crt-dim); border-color: var(--crt-rule); cursor: default; }
+dialog button:active { background: var(--crt-rule); }
+dialog :focus-visible { outline: 2px solid var(--crt-hot); outline-offset: 2px; }
+dialog .actions { display: flex; flex-wrap: wrap; gap: .5rem; margin-bottom: 0; }
+dialog .switches { display: flex; flex-wrap: wrap; align-items: center; gap: 0 1rem; }
+dialog table { width: 100%; margin: .6rem 0; border-collapse: collapse; }
+dialog caption { text-align: left; color: var(--crt-hot); padding-bottom: .2rem; }
+dialog th, dialog td { padding: .15rem .4rem; text-align: left; border-bottom: 1px solid var(--crt-rule); }
+dialog th { color: var(--crt-dim); font-weight: 600; }
+dialog .guest { color: var(--crt-dim); font-size: .9em; }
+dialog .me { border-top: 1px solid var(--crt-rule); margin-top: .8rem; }
+dialog .confirm { padding: .1rem .6rem; border: 1px solid var(--crt-alert); border-radius: .3rem; }

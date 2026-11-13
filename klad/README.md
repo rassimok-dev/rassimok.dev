@@ -83,6 +83,17 @@ runs on the decoded path, so `/klad/api/%71/health` and
 `/klad/api//q/health` are refused too. All three error answers carry
 `Cache-Control: no-store`.
 
+A WebSocket upgrade (`Upgrade: websocket`, either case) goes through the same
+path rules and errors, and is forwarded with `fetch` to the same address,
+adding only the `Upgrade`, `Origin` and, if present, `Sec-WebSocket-Protocol`
+headers; the Workers runtime does the handshake itself. Its `Origin` must be
+exactly `https://rassimok.dev`, otherwise the proxy answers 403
+`{"error":"forbidden_origin"}` (also `no-store`) without calling the API:
+WebSockets have no CORS, so the check is what keeps other sites' pages from
+opening a socket with a player's cookie. The browser's `Origin` goes on
+unchanged so the API checks it too, and the API's 101 answer is returned as
+the same object, never rebuilt.
+
 ## To remove the game entirely
 1. `git rm -r klad/ functions/klad/api/ _routes.json`
 2. Delete the `/klad/*` block in `_headers`, with its `script-src 'self'`

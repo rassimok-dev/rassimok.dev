@@ -172,3 +172,139 @@ test('proxy answers 503 when API_ORIGIN is not set', async (t) => {
   assert.equal(response.headers.get('Cache-Control'), 'no-store');
   assert.equal(fetchMock.mock.callCount(), 0);
 });
+
+// Split for the CI grep, like the proxy's own constant, and written out here
+// rather than imported, so a typo in the proxy fails these tests.
+const SITE_ORIGIN = 'https:' + '//rassimok.dev';
+
+function upgradeRequest(path, headers) {
+  return new Request('test:' + path, { headers: { Upgrade: 'websocket', ...headers } });
+}
+
+test('proxy forwards a WebSocket upgrade from the site and returns the 101 as is', async (t) => {
+  // Node's Response refuses status 101, so the fake answer is a plain object.
+  const upstreamResponse = { status: 101, webSocket: {} };
+  const fetchMock = fakeFetch(t, upstreamResponse);
+  const request = upgradeRequest('/klad/api/race/echo', {
+    'Origin': SITE_ORIGIN,
+    'Cookie': 'klad_session=token',
+    'Connection': 'Upgrade',
+    'Sec-WebSocket-Key': 'dGhlIHNhbXBsZSBub25jZQ==',
+    'Sec-WebSocket-Version': '13',
+    'Sec-WebSocket-Extensions': 'permessage-deflate',
+    'User-Agent': 'browser',
+  });
+
+  const response = await onRequest({ request, env });
+
+  assert.equal(response, upstreamResponse);
+  const { url, init } = forwarded(fetchMock);
+  assert.equal(url, API_ORIGIN + '/race/echo');
+  assert.equal(init.method, 'GET');
+  assert.equal(init.body, undefined);
+  assert.deepEqual([...init.headers], [
+    ['cookie', 'klad_session=token'],
+    ['origin', SITE_ORIGIN],
+    ['upgrade', 'websocket'],
+  ]);
+});
+
+test('proxy passes on Sec-WebSocket-Protocol with an upgrade', async (t) => {
+  const fetchMock = fakeFetch(t);
+  const request = upgradeRequest('/klad/api/race/echo', {
+    'Origin': SITE_ORIGIN,
+    'Sec-WebSocket-Protocol': 'klad',
+  });
+
+  await onRequest({ request, env });
+
+  assert.equal(forwarded(fetchMock).init.headers.get('Sec-WebSocket-Protocol'), 'klad');
+});
+
+for (const origin of [
+  undefined,
+  'null',
+  SITE_ORIGIN.replace('https:', 'http:'),
+  SITE_ORIGIN + '/',
+  SITE_ORIGIN + ':443',
+  SITE_ORIGIN.replace('//', '//www.'),
+  SITE_ORIGIN + '.other.host',
+  SITE_ORIGIN.replace('rassimok.dev', 'other.host'),
+]) {
+  test(`proxy answers 403 without a fetch for an upgrade with Origin ${origin}`, async (t) => {
+    const fetchMock = fakeFetch(t);
+    const request = upgradeRequest('/klad/api/race/echo', origin === undefined ? {} : { Origin: origin });
+
+    const response = await onRequest({ request, env });
+
+    assert.equal(response.status, 403);
+    assert.deepEqual(await response.json(), { error: 'forbidden_origin' });
+    assert.equal(response.headers.get('Cache-Control'), 'no-store');
+    assert.equal(fetchMock.mock.callCount(), 0);
+  });
+}
+
+test('proxy reads the Upgrade value in either case', async (t) => {
+  const fetchMock = fakeFetch(t);
+  const request = new Request('test:/klad/api/race/echo', { headers: { Upgrade: 'WebSocket' } });
+
+  const response = await onRequest({ request, env });
+
+  assert.equal(response.status, 403);
+  assert.equal(fetchMock.mock.callCount(), 0);
+});
+
+for (const path of ['/klad/api/q', '/klad/api/%71/health/ready', '/klad/api@other.host/x']) {
+  for (const origin of [SITE_ORIGIN, SITE_ORIGIN.replace('rassimok.dev', 'other.host')]) {
+    test(`proxy answers 404 without a fetch for an upgrade to ${path} from ${origin}`, async (t) => {
+      const fetchMock = fakeFetch(t);
+      const request = upgradeRequest(path, { Origin: origin });
+
+      const response = await onRequest({ request, env });
+
+      assert.equal(response.status, 404);
+      assert.deepEqual(await response.json(), { error: 'not_found' });
+      assert.equal(fetchMock.mock.callCount(), 0);
+    });
+  }
+}
+
+test('proxy answers 503 for an upgrade when API_ORIGIN is not set', async (t) => {
+  const fetchMock = fakeFetch(t);
+  const request = upgradeRequest('/klad/api/race/echo', { Origin: SITE_ORIGIN });
+
+  const response = await onRequest({ request, env: {} });
+
+  assert.equal(response.status, 503);
+  assert.deepEqual(await response.json(), { error: 'not_configured' });
+  assert.equal(fetchMock.mock.callCount(), 0);
+});
+
+test('proxy answers 502 for an upgrade when the upstream fetch fails', async (t) => {
+  t.mock.method(globalThis, 'fetch', async () => {
+    throw new TypeError('fetch failed');
+  });
+  const request = upgradeRequest('/klad/api/race/echo', { Origin: SITE_ORIGIN });
+
+  const response = await onRequest({ request, env });
+
+  assert.equal(response.status, 502);
+  assert.deepEqual(await response.json(), { error: 'upstream' });
+});
+
+test('proxy neither checks nor forwards Origin without a WebSocket upgrade', async (t) => {
+  const fetchMock = fakeFetch(t);
+  const request = new Request('test:/klad/api/status', {
+    headers: {
+      'Origin': SITE_ORIGIN.replace('rassimok.dev', 'other.host'),
+      'Upgrade': 'h2c',
+      'Sec-WebSocket-Protocol': 'klad',
+      'Cookie': 'klad_session=token',
+    },
+  });
+
+  const response = await onRequest({ request, env });
+
+  assert.equal(response.status, 200);
+  assert.deepEqual([...forwarded(fetchMock).init.headers], [['cookie', 'klad_session=token']]);
+});

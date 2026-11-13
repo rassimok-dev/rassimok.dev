@@ -3,6 +3,65 @@
 Dated entries, newest first. Written for a reader picking this up cold —
 or a future session needing to know what already exists and why.
 
+## 2026-11-13 (sixth) - The API proxy passes WebSocket upgrades through
+
+The ghost race will run over a WebSocket at
+`wss://rassimok.dev/klad/api/race/<room>`. The proxy now forwards a request
+with `Upgrade: websocket` (either case) to the same upstream URL as any
+other, through the same path checks and the same 404, 503 and 502 answers.
+It adds the `Upgrade`, `Origin` and, if present, `Sec-WebSocket-Protocol`
+headers to the usual `Content-Type`, `Accept` and `Cookie`. An upgrade whose
+`Origin` differs from the origin of the request itself gets 403
+`{"error":"forbidden_origin"}` with `Cache-Control: no-store`, and the API
+is not called. Requests without the upgrade behave exactly as before.
+
+Status: a spike. The unit tests pass against a fake `fetch`. Whether Pages
+Functions really carry the socket is **not yet verified**: the production
+check (Chrome and Safari echo through `/klad/api/race/echo`) waits for the
+API's echo endpoint (RAS-29) to deploy. The result goes here when it is
+known.
+
+### Decisions worth not relitigating
+
+- **Same origin for the socket too.** `wss://rassimok.dev/...` should match
+  the game's `connect-src 'self'` in current browsers (Safari from 16, per
+  the W3C issue thread; the production check confirms it), so the CSP stays
+  as it is, and the session cookie stays first-party. A direct
+  `wss://api.rassimok.dev` would need a CSP change, and a ticket in the URL
+  because the cookie would be cross-site.
+- **The proxy checks `Origin`.** WebSockets have no CORS: any page can open
+  one to any host, with that host's cookies as far as `SameSite` allows (a
+  page on a same-site subdomain gets even `Strict` ones). The
+  exact string compare means a missing Origin, `null`, `http:`, a trailing
+  slash, a port or a subdomain is refused too. The browser's own `Origin`
+  then goes on unchanged, so the API checks it as well (RAS-29); the proxy
+  never sets one itself.
+- **The 101 is returned untouched.** `fetch` with `Upgrade: websocket`
+  gives a 101 Response whose `webSocket` is the upstream socket, and
+  returning that same object is what proxies the connection (Workers
+  `Response` docs: "a WebSocket connection proxied through a Worker").
+  Rewriting such a response into a new Response throws in workerd ("status
+  codes in the range 200 to 599", workerd issue 3047, still open), so
+  nothing may wrap or rebuild it. The known risk is workerd issue 7312:
+  intermittent "Network connection lost" after a 101 on Pages, reported for
+  a Worker that serves the socket itself, not one that proxies it.
+- **Few headers.** Cloudflare's WebSocket example sets only `Upgrade`; the
+  runtime adds `Sec-WebSocket-Key` and the rest of the handshake. So the
+  proxy does not copy `Connection`, `Sec-WebSocket-Key`,
+  `Sec-WebSocket-Version` or `Sec-WebSocket-Extensions`; each side of the
+  proxy negotiates its own. `Sec-WebSocket-Protocol` goes on so a later
+  subprotocol would reach the API.
+- **The upgrade's Origin must equal the request's own origin**
+  (`new URL(request.url).origin`). The page that opens the socket is served
+  by the same host as the Function, so no site origin is written in code:
+  no URL literal and no split string to get past the CI grep (an earlier
+  version of this ticket split `'https:' + '//rassimok.dev'`, which worked
+  around the guard and was removed). A preview host passes the proxy but the
+  API, which still checks the exact production origin, refuses it. The
+  tests send upgrades to a `ws:` URL (a `test:` URL has no origin, and the
+  CI grep only looks for `http:` and `https:`) and cover a foreign Origin
+  and a missing one, both 403 with no fetch.
+
 ## 2026-11-13 (fifth) - Klad accounts: sign-up and login by emailed code
 
 The boards dialog gains an "Аккаунт" part. A guest, or a browser with no

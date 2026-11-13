@@ -66,9 +66,11 @@ CSP at `connect-src 'self'`, makes the session cookie first-party, and needs
 no CORS.
 
 - The API's address lives only in the Pages environment variable
-  `API_ORIGIN`, so no URL appears in any script and check 3 below still holds.
+  `API_ORIGIN`, so it appears in no script and check 3 below still holds.
 - The proxy passes on only the request headers `Content-Type`, `Accept`
-  and `Cookie`, and drops every other one.
+  and `Cookie`, and drops every other one. A WebSocket upgrade also passes on
+  `Upgrade`, `Origin` and `Sec-WebSocket-Protocol`, and only when its
+  `Origin` is the site's own, because WebSockets have no CORS.
 - `_routes.json` limits the Function to `/klad/api/*`. Every other request is
   a static file and runs no code.
 

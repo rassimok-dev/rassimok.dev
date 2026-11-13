@@ -2,6 +2,9 @@
 // Pages variable API_ORIGIN: CI fails on any full URL in a .js file.
 const PREFIX = '/klad/api';
 const FORWARDED_HEADERS = ['Content-Type', 'Accept', 'Cookie'];
+// The runtime does the WebSocket handshake itself (Sec-WebSocket-Key and the
+// rest), so an upgrade adds only these. Origin goes on for the API's own check.
+const UPGRADE_HEADERS = ['Upgrade', 'Origin', 'Sec-WebSocket-Protocol'];
 
 export async function onRequest({ request, env }) {
   const url = new URL(request.url);
@@ -15,6 +18,14 @@ export async function onRequest({ request, env }) {
     return errorResponse(404, 'not_found');
   }
 
+  // WebSockets have no CORS, so any page could open one with the player's
+  // cookie; only pages served from this host may. The API checks the exact
+  // production origin again.
+  const isUpgrade = (request.headers.get('Upgrade') ?? '').toLowerCase() === 'websocket';
+  if (isUpgrade && request.headers.get('Origin') !== url.origin) {
+    return errorResponse(403, 'forbidden_origin');
+  }
+
   if (!env.API_ORIGIN) {
     return errorResponse(503, 'not_configured');
   }
@@ -23,8 +34,9 @@ export async function onRequest({ request, env }) {
   // //other.host/x must not be able to change the upstream host.
   const upstreamUrl = env.API_ORIGIN + path + url.search;
 
+  const forwardedNames = isUpgrade ? FORWARDED_HEADERS.concat(UPGRADE_HEADERS) : FORWARDED_HEADERS;
   const headers = new Headers();
-  for (const name of FORWARDED_HEADERS) {
+  for (const name of forwardedNames) {
     const value = request.headers.get(name);
     if (value !== null) {
       headers.set(name, value);
@@ -32,6 +44,8 @@ export async function onRequest({ request, env }) {
   }
 
   const hasBody = request.method !== 'GET' && request.method !== 'HEAD';
+  // Returned as is, also for a 101: the upstream socket travels with this
+  // object, and workerd throws on rewriting a 101 into a new Response.
   try {
     return await fetch(upstreamUrl, {
       method: request.method,

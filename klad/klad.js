@@ -333,7 +333,7 @@
     loadLevel(S.level);
     show('КЛАД', touch
       ? 'ОГОНЬ — старт · крестовина — ход · этап ' + (S.level + 1)
-      : '← → ↑ ↓ ход · Z/пробел выстрел · P пауза · R заново (−1 жизнь) · M звук · 1–5 этап · Enter старт');
+      : '← → ↑ ↓ ход · Z/пробел выстрел · P пауза · R заново (−1 жизнь) · M звук · T таблицы · 1–5 этап · Enter старт');
     setPhase('title');
   }
   function timers(dt) {
@@ -355,7 +355,12 @@
     }
   }
 
+  /* An open dialog (the nick prompt, the boards) holds the game: play
+     pauses, timers stop and keys are ignored until it closes. */
+  const isHeld = () => document.querySelector('dialog[open]') !== null;
+
   function tick(dt) {
+    if (isHeld()) { if (S.phase === 'play') press('pause'); return; }
     S.t += dt;
     if (S.phase !== 'play') { if (S.timer > 0) timers(dt); return; }
     S.ticks++; run.ticks++;
@@ -440,8 +445,10 @@
     } else if (action === 'restart' && S.phase === 'play') die();
   }
   const isTyping = (e) => /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName);
+  /* Space and Enter on a focused button press the button, not fire. */
+  const isPressingButton = (e) => e.target.tagName === 'BUTTON' && (e.code === 'Space' || e.code === 'Enter');
   addEventListener('keydown', (e) => {
-    if (isTyping(e)) return;
+    if (isHeld() || isTyping(e) || isPressingButton(e)) return;
     if (e.repeat) { if (KEYMAP[e.code]) e.preventDefault(); return; }
     audio();
     if (e.code === 'KeyM') { setMuted(!muted); return; }

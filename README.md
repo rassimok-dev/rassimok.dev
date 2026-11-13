@@ -15,8 +15,9 @@ or an agent, and their results for the leaderboards (and, once accounts
 exist, an email address), and sets one HttpOnly cookie that only the game's
 API receives (`Path=/klad/api`). The
 cookie keeps a player's own results together and follows nobody, so there is
-still no cookie banner. The footers say this, and CI enforces what a grep can
-check (see below), so the claims cannot quietly become false.
+still no cookie banner. A player can delete the nick and every result from
+the game's boards screen at any time. The footers say this, and CI enforces
+what a grep can check (see below), so the claims cannot quietly become false.
 
 **Zero third-party requests.** Fonts are the usual leak here: loading Google
 Fonts sends every visitor's IP address to Google. This site uses the system
@@ -71,7 +72,7 @@ Every push runs five checks:
 2. **Link checking** — a dead link on a personal site is a cheap bad impression.
 3. **No third-party references** — fails the build if any external URL appears in HTML, CSS or a script, the proxy included. This is what keeps the privacy claim honest over time.
 4. **No JavaScript** in pages outside `/klad/` — asserts the design decision rather than trusting discipline. Inside `/klad/`, only the game's own scripts may load.
-5. **Level sanity** — every game level, in both orientations, must have a route from start to key to exit. The same step runs the API proxy's tests.
+5. **Level sanity** — every game level, in both orientations, must have a route from start to key to exit. The same step runs the tests of the API proxy and of the game's online code.
 
 Checks 3 and 4 exist because *intentions decay*. A future me, or an AI
 assistant helping a future me, will eventually paste in a font link or an

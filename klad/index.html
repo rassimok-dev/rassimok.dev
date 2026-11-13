@@ -18,6 +18,7 @@
     <span id="h-key" class="key" hidden>Ключ</span>
     <span>Счёт <b id="h-score">0</b></span>
     <button type="button" id="h-sound" aria-pressed="true">Звук вкл</button>
+    <button type="button" id="h-board" aria-keyshortcuts="T">Таблицы</button>
   </header>
 
   <main id="stage" class="stage">
@@ -26,6 +27,7 @@
       <p id="msg-title" class="msg-title">КЛАД</p>
       <p id="msg-body">загрузка</p>
     </div>
+    <p id="online-notice" class="notice" role="status"></p>
   </main>
 
   <div class="pad" role="group" aria-label="Управление">
@@ -43,15 +45,91 @@
     itself after <span lang="ja">ライズアウト</span> / <i>Rise Out</i> (ASCII, 1983). Own code, art and levels.
     No analytics, no tracking; the only script is this page's own. With a nick, the game's server
     keeps it, your choice of human or agent and your results; one HttpOnly cookie, for the game's API only.
+    You can delete them on the boards screen.
     <a href="/">← rassimok</a></p>
     <p lang="ru">Приватность: пока вы не ввели ник, игра ничего не хранит. С ником сервер игры
     хранит его, ваш выбор (человек или агент) и ваши результаты для таблиц рекордов
     (у аккаунта ещё email), а браузер получает один файл cookie с флагом HttpOnly,
-    только для API игры. Без аналитики, без слежки, без localStorage.</p>
+    только для API игры. Без аналитики, без слежки, без localStorage. Удалить ник
+    и все результаты можно в любой момент: «Таблицы», затем «Удалить мой ник и результаты».</p>
   </footer>
 </div>
+
+<dialog id="nick" aria-labelledby="nick-title">
+  <form id="nick-form">
+    <h2 id="nick-title">Ник для таблиц рекордов</h2>
+    <p>С ником ваши результаты попадут в таблицы рекордов. Можно играть и без него.</p>
+    <p class="field"><label for="nick-name">Ник</label>
+      <input id="nick-name" name="nick" type="text" required minlength="3" maxlength="16"
+             autocomplete="off" autocapitalize="off" spellcheck="false" aria-describedby="nick-rules"></p>
+    <p id="nick-rules" class="note">От 3 до 16 знаков: латинские или русские буквы (не вперемешку), цифры, _ и -.</p>
+    <fieldset aria-describedby="kind-note">
+      <legend>Кто играет</legend>
+      <label><input type="radio" name="kind" value="human" required> человек</label>
+      <label><input type="radio" name="kind" value="agent"> агент (ИИ или скрипт)</label>
+      <p id="kind-note" class="note">Этот выбор потом не изменить.</p>
+    </fieldset>
+    <p class="note">Приватность: сервер игры сохранит ник, ваш выбор (человек или агент) и ваши
+    результаты, а браузер получит один файл cookie с флагом HttpOnly, только для API игры.
+    Удалить ник и все результаты можно в любой момент: «Таблицы», затем «Удалить мой ник и результаты».</p>
+    <p id="nick-error" class="error" role="alert"></p>
+    <p class="actions">
+      <button type="submit">Сохранить ник</button>
+      <button type="button" id="nick-skip">Играть без ника</button>
+    </p>
+  </form>
+</dialog>
+
+<dialog id="board" aria-labelledby="board-title">
+  <h2 id="board-title">Таблицы рекордов</h2>
+  <div class="switches">
+    <fieldset>
+      <legend>Игроки</legend>
+      <label><input type="radio" name="board-kind" id="board-human" value="human" checked> люди</label>
+      <label><input type="radio" name="board-kind" value="agent"> агенты</label>
+    </fieldset>
+    <p class="field"><label for="board-view">Таблица</label>
+      <select id="board-view">
+        <option value="records">рекорды: игры с первого этапа</option>
+        <option value="chests" id="board-chests">клады: все этапы вместе</option>
+      </select></p>
+    <p class="field" id="board-shape-row"><label for="board-shape">Поле</label>
+      <select id="board-shape">
+        <option value="landscape">широкое</option>
+        <option value="portrait">высокое</option>
+      </select></p>
+  </div>
+  <p id="board-status" role="status"></p>
+  <div id="board-tables" class="tables"></div>
+  <div id="me" class="me" hidden>
+    <h3>Ваш ник</h3>
+    <div id="me-none">
+      <p>Ника нет: результаты не сохраняются.</p>
+      <p><button type="button" id="me-choose">Выбрать ник</button></p>
+    </div>
+    <div id="me-some">
+      <p id="me-line"></p>
+      <form id="me-form">
+        <p class="field"><label for="me-nick">Новый ник</label>
+          <input id="me-nick" name="nick" type="text" required minlength="3" maxlength="16"
+                 autocomplete="off" autocapitalize="off" spellcheck="false" aria-describedby="me-rules">
+          <button type="submit">Сменить ник</button></p>
+        <p id="me-rules" class="note">От 3 до 16 знаков: латинские или русские буквы (не вперемешку), цифры, _ и -.</p>
+      </form>
+      <p><button type="button" id="me-delete">Удалить мой ник и результаты</button></p>
+      <div id="me-confirm" class="confirm" hidden>
+        <p>Удалить с сервера ник, выбор (человек или агент) и все результаты? Это не отменить.</p>
+        <p><button type="button" id="me-yes">Да, удалить</button>
+          <button type="button" id="me-no">Нет</button></p>
+      </div>
+    </div>
+    <p id="me-note" role="status"></p>
+  </div>
+  <p class="actions"><button type="button" id="board-close">Закрыть</button></p>
+</dialog>
 <script src="/klad/levels.js"></script>
 <script src="/klad/ticks.js"></script>
 <script src="/klad/klad.js"></script>
+<script src="/klad/online.js"></script>
 </body>
 </html>

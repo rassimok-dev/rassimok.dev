@@ -3,6 +3,69 @@
 Dated entries, newest first. Written for a reader picking this up cold —
 or a future session needing to know what already exists and why.
 
+## 2026-11-13 (fourth) - Klad goes online: nick prompt, results and boards
+
+New `klad/online.js`, loaded after `klad.js`, connects the game to its API
+through `/klad/api`. It listens for `klad:clear` and `klad:run`, asks for a
+nick at the first result, sends clears and runs (a run only when it started
+at level 1), and shows the boards: records, fastest clear and most chests
+per level and shape, and chests over all levels, each for humans or agents.
+The boards dialog also changes the nick and deletes the nick and every
+result (`DELETE /players/me`); the footer's privacy notes and the README say
+so. The page gains two `<dialog>` elements, a "Таблицы" button in the HUD
+and a short notice line on the stage. `klad.js` holds while a dialog is
+open, and Space or Enter on a focused button now presses the button.
+
+### Decisions worth not relitigating
+
+- **The nick prompt opens at the first result, not on load.** Nobody wants
+  a form before the first move, and the privacy note can honestly say that
+  nothing is stored until a nick is picked. The result that triggered the
+  prompt, and any that follow while it is open, wait in memory and are sent
+  once the nick is saved. Skipping drops them and the game does not ask
+  again on that page; the boards dialog has "Выбрать ник" for a change of
+  mind. A reload loses waiting results, which is the price of no storage.
+- **No storage in the browser.** The API's HttpOnly cookie is the only
+  identity, so `online.js` cannot see it; it calls `GET /players/me` on load
+  instead. Only 401 means "no player yet". Any other answer (404, as
+  production gives until the API is deployed, 502, 503, a page that is not
+  JSON) or a network failure means the API is unavailable: no prompt,
+  results dropped, the game plays as before, and the boards say so. Opening
+  the boards asks again, so the game recovers without a reload.
+- **Answers.** 401 on a send: the player is gone (expired or deleted
+  elsewhere), so the result goes back to waiting and the prompt opens again.
+  A 401 right after creating the player means the browser blocks cookies;
+  the prompt says so instead of looping. 409 `already_signed_in`: this
+  browser already has a player, so it reads that player and sends the
+  waiting results. 429 and 400 drop the result with a short notice, no
+  retry. Sends never block or stop the game.
+- **Any open dialog holds the game.** `klad.js` checks for `dialog[open]`
+  instead of listening for a new event, so there is no extra contract
+  between the two scripts and nothing to get out of step. While held, play
+  switches to the pause screen, the intro, clear and death timers stop, and
+  game keys are ignored, so Escape, Space and Enter belong to the dialog.
+  After closing, the game stays paused until P or fire.
+- **`T` opens the boards** ("таблицы"); it was the free key nearest the
+  meaning, and the title screen lists it. Like the other keys it is read by
+  `e.code`, so it is the same physical key on a Russian layout. Touch
+  players use the HUD button.
+- **Space and Enter on a button press the button.** The game took them as
+  fire even on a focused HUD button, which made the new button unusable from
+  the keyboard; the sound button gains the same fix.
+- **Focus goes back to the field after a dialog closes**, as after the sound
+  button, so the next Space fires instead of reopening the boards.
+- **Native `<dialog>` with `showModal()`** gives the focus trap, Escape and
+  an inert page for free. Forms are handled in script with
+  `preventDefault`, because the CSP has `form-action 'none'`.
+- **Delete asks first, in the dialog**, with "Нет" focused, rather than
+  `confirm()`, which a browser may suppress.
+- **Nicks are other people's text.** Every board cell is built with
+  `textContent`; nothing from the API goes through `innerHTML`.
+- **One file, two halves.** The logic half has no DOM and assigns
+  `module.exports`, like `levels.js` and `ticks.js`, so `node --test` covers
+  request shapes and every answer above with a fake `fetch`. The page half
+  runs only in a browser. A single script tag keeps the CI rule simple.
+
 ## 2026-11-13 (later still) - Klad counts engine ticks and reports clears and runs
 
 `klad.js` counts fixed 1/120 s update steps per level attempt and dispatches

@@ -19,6 +19,7 @@
     <span>Счёт <b id="h-score">0</b></span>
     <button type="button" id="h-sound" aria-pressed="true">Звук вкл</button>
     <button type="button" id="h-board" aria-keyshortcuts="T">Таблицы</button>
+    <button type="button" id="h-lobby">Лобби</button>
   </header>
 
   <main id="stage" class="stage">
@@ -28,6 +29,7 @@
       <p id="msg-body">загрузка</p>
     </div>
     <p id="online-notice" class="notice" role="status"></p>
+    <p id="race-notice" class="notice race-notice" role="status"></p>
   </main>
 
   <div class="pad" role="group" aria-label="Управление">
@@ -179,9 +181,69 @@
   </div>
   <p class="actions"><button type="button" id="board-close">Закрыть</button></p>
 </dialog>
+
+<dialog id="lobby" aria-labelledby="lobby-title">
+  <h2 id="lobby-title">Лобби</h2>
+  <p id="lobby-status" role="status"></p>
+  <div id="lobby-no-nick" hidden>
+    <p>В лобби играют под ником: выберите его, и вас увидят другие игроки.</p>
+    <p><button type="button" id="lobby-choose">Выбрать ник</button></p>
+  </div>
+  <div id="lobby-main" hidden>
+    <h3>Сейчас в лобби</h3>
+    <p class="note">Пока лобби открыто и ещё около минуты после, другие игроки видят в этом списке ваш ник, ваш выбор (человек или агент) и то, гость вы или аккаунт.</p>
+    <p id="lobby-online-status" class="note"></p>
+    <ul id="lobby-online" class="people"></ul>
+    <div id="lobby-out">
+      <h3>Комната</h3>
+      <p class="note">Создайте комнату и отправьте ссылку друзьям: в комнате до 4 игроков.</p>
+      <p><button type="button" id="lobby-create">Создать комнату</button></p>
+    </div>
+    <div id="lobby-room" hidden>
+      <h3>Комната</h3>
+      <p class="field"><label for="lobby-link">Ссылка для друзей</label>
+        <input id="lobby-link" type="text" readonly spellcheck="false">
+        <button type="button" id="lobby-copy">Копировать</button></p>
+      <p id="lobby-copy-note" class="note" role="status"></p>
+      <p id="lobby-room-status" class="note"></p>
+      <ul id="lobby-players" class="people"></ul>
+      <p id="lobby-level-line"></p>
+      <p class="field" id="lobby-level-row"><label for="lobby-level">Этап гонки</label>
+        <select id="lobby-level"></select></p>
+      <p id="lobby-start-note" class="note"></p>
+      <p class="actions">
+        <button type="button" id="lobby-ready" aria-pressed="false">Готов</button>
+        <button type="button" id="lobby-start">Старт</button>
+        <button type="button" id="lobby-leave">Выйти из комнаты</button>
+      </p>
+      <p id="lobby-race" role="status"></p>
+      <p class="note">Если закрыть лобби, вы выйдете из комнаты.</p>
+    </div>
+  </div>
+  <p class="actions"><button type="button" id="lobby-close">Закрыть</button></p>
+</dialog>
+
+<dialog id="race" aria-labelledby="race-title">
+  <h2 id="race-title">Гонка</h2>
+  <p id="race-level"></p>
+  <p class="note">Участники комнаты видят вашего бегуна, ник и время во время гонки; в таблицы ничего не попадает.</p>
+  <p id="race-count" class="count" role="status" hidden></p>
+  <p id="race-status" class="note" role="status"></p>
+  <div id="race-results" hidden>
+    <div id="race-places"></div>
+    <p class="note">Побеждает тот, чей финиш сервер получил первым; время показано для сведения.</p>
+    <p class="note">Если закрыть это окно, вы выйдете из комнаты.</p>
+    <p class="actions">
+      <button type="button" id="race-room">Назад в комнату</button>
+      <button type="button" id="race-leave">Выйти из комнаты</button>
+    </p>
+  </div>
+</dialog>
 <script src="/klad/levels.js"></script>
 <script src="/klad/ticks.js"></script>
 <script src="/klad/klad.js"></script>
 <script src="/klad/online.js"></script>
+<script src="/klad/lobby.js"></script>
+<script src="/klad/race.js"></script>
 </body>
 </html>

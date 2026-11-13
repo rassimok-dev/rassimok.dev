@@ -1,7 +1,7 @@
 /* КЛАД — a clean-room homage. Vanilla JS, no dependencies, no build step,
    no storage. Rules reconstructed in MECHANICS.md. Levels in levels.js. */
 'use strict';
-(() => {
+const KLAD_GAME = (() => {
   const LEVELS = KLAD_LEVELS;
   const SPEED = { walk: 5, climb: 4.5, fall: 9, guard: 3.8, shot: 15 };
   const HOLE_TIME = 4.2, HOLE_WARN = 1, GUARD_HOLE = 3.6, GUARD_RESPAWN = 3;
@@ -23,6 +23,9 @@
     alert: col('--crt-alert', '#ff8a7a'), dark: col('--crt-dark', '#163a2a'),
     rule: col('--crt-rule', '#23503c'), water: col('--crt-water', '#2f5d8a'),
     waterHi: col('--crt-water-hi', '#8fb4d9') };
+  const GHOST = [col('--crt-ghost-0', '#f59cff'), col('--crt-ghost-1', '#7fdcff'),
+    col('--crt-ghost-2', '#f2f2f2'), col('--crt-ghost-3', '#b8a4ff')];
+  const FONT = col('--mono', 'monospace');
   const PX = { 1: C.fg, 2: C.dim, 3: C.hot, 4: C.alert, 5: C.dark, 6: C.water, 7: C.waterHi, 8: C.rule };
 
   /* 8x8 sprites. '.' is transparent; digits index PX. Our own art. */
@@ -44,8 +47,8 @@
     g1: ['.4....4.', '..4444..', '...4.4..', '..4444..', '...44...', '..4444..', '..4444..', '.4....4.'],
   };
   let T = 24, cache = {};
-  function sprite(name, flip) {
-    const key = name + (flip ? 'f' : '');
+  function sprite(name, flip, tint) {
+    const key = name + (flip ? 'f' : '') + (tint || '');
     if (cache[key]) return cache[key];
     const c = document.createElement('canvas');
     c.width = c.height = T;
@@ -53,7 +56,7 @@
     SPR[name].forEach((row, y) => {
       for (let x = 0; x < 8; x++) {
         if (row[x] === '.') continue;
-        g.fillStyle = PX[row[x]];
+        g.fillStyle = tint || PX[row[x]];
         const px = flip ? 7 - x : x;
         g.fillRect(Math.floor(px * s), Math.floor(y * s), Math.ceil(s), Math.ceil(s));
       }
@@ -105,6 +108,7 @@
   const S = { phase: 'title', level: 0, lives: START_LIVES, score: 0, hasKey: false,
               chestsLeft: 0, total: 0, t: 0, timer: 0, shape: 'landscape', ticks: 0 };
   let run = { fromLevelOne: true, levelsCleared: 0, ticks: 0 };
+  let race = null;
   let grid = [], W = 0, H = 0, player = null, guards = [], shot = null;
   const holes = new Map(), chests = new Map();
   const keys = { up: false, down: false, left: false, right: false };
@@ -136,7 +140,7 @@
   const pickShape = () => matchMedia('(orientation: portrait)').matches ? 'portrait' : 'landscape';
 
   function loadLevel(i) {
-    S.shape = pickShape();
+    S.shape = race ? race.shape : pickShape();
     const rows = LEVELS[i][S.shape];
     H = rows.length; W = rows[0].length;
     grid = rows.map((r) => r.split(''));
@@ -308,19 +312,21 @@
   function intro() {
     loadLevel(S.level);
     S.ticks = 0;
-    history.replaceState(null, '', '#' + (S.level + 1));
+    if (!race) history.replaceState(null, '', '#' + (S.level + 1));
     show('ЭТАП ' + (S.level + 1), LEVELS[S.level].name);
     setPhase('intro', 1.4);
     SFX.start();
   }
   function die() {
     if (S.phase !== 'play') return;
-    show('ПОГИБ', S.lives > 0 ? 'осталось жизней: ' + S.lives : 'это была последняя');
+    const left = S.lives > 0 ? 'осталось жизней: ' + S.lives : 'это была последняя';
+    show('ПОГИБ', race ? 'в гонке попыток сколько угодно' : left);
     setPhase('dead', 1.4);
     SFX.die();
   }
   function report(name, detail) { document.dispatchEvent(new CustomEvent(name, { detail })); }
   function levelClear() {
+    if (race) { setPhase('finish'); SFX.clear(); race.onFinish(S.ticks); return; }
     S.score += SCORE.clear;
     run.levelsCleared++;
     report('klad:clear', { level: S.level + 1, shape: S.shape, revision: LEVELS[S.level].revision,
@@ -341,7 +347,7 @@
     if (S.timer > 0) return;
     if (S.phase === 'intro') { hide(); setPhase('play'); }
     else if (S.phase === 'dead') {
-      S.lives--;
+      if (!race) S.lives--;
       if (S.lives < 0) { report('klad:run', { ...run, score: S.score }); show('ИГРА ОКОНЧЕНА', 'счёт ' + S.score + ' · ОГОНЬ или Enter — заново'); setPhase('over'); }
       else intro();
     } else if (S.phase === 'clear') {
@@ -420,6 +426,7 @@
       const f = g.moving && Math.floor(g.anim * 2) % 2 ? 'g1' : 'g0';
       ctx.drawImage(sprite(f, g.dir < 0), g.x * T, g.y * T);
     }
+    if (race) for (const ghost of race.ghosts()) drawGhost(ghost);
     const p = player, climbing = p.moving && p.ty !== p.cy && !p.falling;
     const pf = climbing ? 'pc' : (p.moving && Math.floor(p.anim * 2) % 2 ? 'p1' : 'p0');
     ctx.drawImage(sprite(pf, p.dir < 0), p.x * T, p.y * T);
@@ -430,6 +437,38 @@
     hud.key.hidden = !S.hasKey;
     hud.score.textContent = S.score;
   }
+
+  /* Another racer: see-through, coloured by slot (guests may share a nick),
+     the nick drawn on the canvas, so it is never read as HTML. */
+  function drawGhost(ghost) {
+    const colour = GHOST[ghost.slot % GHOST.length], size = Math.max(8, Math.round(T / 2));
+    ctx.globalAlpha = ghost.alpha;
+    ctx.drawImage(sprite('p0', ghost.direction < 0, colour), ghost.x * T, ghost.y * T);
+    ctx.fillStyle = colour;
+    ctx.font = size + 'px ' + FONT;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'bottom';
+    ctx.fillText(ghost.nick, ghost.x * T + T / 2, Math.max(size, ghost.y * T));
+    ctx.globalAlpha = 1;
+  }
+
+  /* ---- Race (race.js): the room's level in the host's shape, whatever this
+     device's orientation. No game over, and no klad:clear or klad:run. ---- */
+  function startRace(level, shape, hooks) {
+    if (!LEVELS[level - 1] || (shape !== 'landscape' && shape !== 'portrait')) return false;
+    race = { shape, onFinish: hooks.onFinish, ghosts: hooks.ghosts };
+    S.level = level - 1; S.lives = START_LIVES; S.score = 0;
+    loadLevel(S.level);
+    S.ticks = 0;
+    hide(); setPhase('play'); SFX.start();
+    return true;
+  }
+  function stopRace() {
+    if (!race) return;
+    race = null;
+    title();
+  }
+  const racePosition = () => (race && S.phase === 'play' ? { x: player.x, y: player.y, tick: S.ticks } : null);
 
   /* ---- Input ---- */
   const KEYMAP = { ArrowUp: 'up', KeyW: 'up', ArrowDown: 'down', KeyS: 'down',
@@ -489,4 +528,5 @@
     requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);
+  return { startRace, stopRace, racePosition };
 })();

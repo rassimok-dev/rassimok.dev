@@ -31,7 +31,8 @@ last level done). On load it asks `GET /klad/api/players/me` whether this
 browser already has a player; the API's HttpOnly cookie is the only
 identity, and nothing is kept in the browser. Only a 401 means "no player
 yet"; any other failure means the API is unavailable, and then the game
-never asks for a nick and plays as before.
+does not ask for a nick until the API answers again (opening the boards
+checks again) and plays as before.
 
 - The first result without a player opens the nick prompt (nick, human or
   agent, the privacy note). Results wait in memory until the player saves a

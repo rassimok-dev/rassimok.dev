@@ -13,7 +13,7 @@ const KLAD_ONLINE = (() => {
     nickTaken: 'Этот ник занят аккаунтом. Выберите другой.',
     noPlayer: 'У этого браузера больше нет ника на сервере.',
     noCookie: 'Сервер не узнал этот браузер: похоже, cookie заблокированы. Можно играть без ника.',
-    nickKept: 'Ник мог остаться на сервере: проверьте «Таблицы», там его можно удалить.',
+    nickKept: 'Ник мог остаться на сервере, и результаты могут записываться под ним, пока вы не удалите его в «Таблицах».',
     signedIn: 'Этот браузер уже играет под ником ',
   };
   const isOk = (status) => status >= 200 && status < 300;
@@ -50,7 +50,8 @@ const KLAD_ONLINE = (() => {
     let isCookieBlocked = false;
 
     /* Only 401 means "no player yet"; anything else but 200 means the API
-       is not there, and then the game never asks for a nick. */
+       is not there, and the game does not ask for a nick until it answers
+       again (opening the boards checks again). */
     async function readPlayer() {
       const answer = await call('GET', '/players/me');
       if (answer.status === 200 && answer.data && answer.data.nick) {
@@ -103,19 +104,22 @@ const KLAD_ONLINE = (() => {
       else settle();
     }
 
-    /* A skip while this waits wins: the new player is deleted again. Blocked
-       cookies also count as a skip, and after them nothing more is posted,
-       because each new player would be one this browser cannot delete. */
+    async function undoSave() {
+      const answer = await call('DELETE', '/players/me');
+      if (!isOk(answer.status) && answer.status !== 401) page.notice(TEXT.nickKept);
+    }
+
+    /* Until this returns, closing the prompt counts as a skip (isAsking stays
+       set), and a skip wins: a player this call created is deleted again.
+       Blocked cookies also count as a skip, and after them nothing more is
+       posted, because each new player would be one this browser cannot delete. */
     async function choose(nick, kind) {
       if (isCookieBlocked) return TEXT.noCookie;
       const answer = await call('POST', '/players', { nick, kind });
       const code = errorOf(answer);
       let problem = null;
       if (hasSkipped) {
-        if (answer.status === 201) {
-          const undo = await call('DELETE', '/players/me');
-          if (!isOk(undo.status) && undo.status !== 401) page.notice(TEXT.nickKept);
-        }
+        if (answer.status === 201) await undoSave();
       } else if (answer.status === 201) {
         player = answer.data;
       } else if (code === 'already_signed_in') {
@@ -133,14 +137,18 @@ const KLAD_ONLINE = (() => {
         problem = TEXT.unavailable;
       }
       if (!problem && !hasSkipped) {
-        isAsking = false;
         if (pending.length) await flush();
         else if (answer.status === 201) await readPlayer();
-        if (!player) {
+        if (hasSkipped) {
+          player = null;
+          pending = [];
+          if (answer.status === 201) await undoSave();
+        } else if (!player) {
           isCookieBlocked = true;
           skip();
           problem = TEXT.noCookie;
         }
+        isAsking = false;
       }
       return problem;
     }
@@ -232,7 +240,7 @@ if (typeof document !== 'undefined') (() => {
         meNick = $('me-nick'), meNote = $('me-note'), meDelete = $('me-delete'), meConfirm = $('me-confirm');
   const KIND = { human: 'человек', agent: 'агент' };
   const SHAPE = { landscape: 'широкое поле', portrait: 'высокое поле' };
-  let noticeTimer = 0, boardRequest = 0, isSaving = false;
+  let noticeTimer = 0, boardRequest = 0, isSaving = false, isChangingPlayer = false;
 
   const online = KLAD_ONLINE.create((url, options) => fetch(url, options), {
     askNick() {
@@ -242,10 +250,13 @@ if (typeof document !== 'undefined') (() => {
       nickDialog.showModal();
       nickName.focus();
     },
+    /* The kept-nick warning asks the player to act, so it stays longer. It
+       is not permanent because the line covers the bottom of the field. */
     notice(text) {
       notice.textContent = text;
       clearTimeout(noticeTimer);
-      noticeTimer = setTimeout(() => { notice.textContent = ''; }, 6000);
+      const seconds = text === KLAD_ONLINE.TEXT.nickKept ? 20 : 6;
+      noticeTimer = setTimeout(() => { notice.textContent = ''; }, seconds * 1000);
     },
   });
 
@@ -394,10 +405,15 @@ if (typeof document !== 'undefined') (() => {
     board.close();
     online.ask();
   });
+  /* One rename or delete at a time: a second request's answer could arrive
+     last and replace the first one's message. */
   meForm.addEventListener('submit', async (event) => {
     event.preventDefault();
-    meNote.textContent = '';
+    if (isChangingPlayer) return;
+    isChangingPlayer = true;
+    meNote.textContent = 'сохранение...';
     const problem = await online.rename(meNick.value.trim());
+    isChangingPlayer = false;
     showMe();
     meNote.textContent = problem || 'Ник изменён.';
     if (!problem) { fillNick(); showBoard(); }
@@ -411,7 +427,11 @@ if (typeof document !== 'undefined') (() => {
     meDelete.focus();
   });
   $('me-yes').addEventListener('click', async () => {
+    if (isChangingPlayer) return;
+    isChangingPlayer = true;
+    meNote.textContent = 'удаление...';
     const problem = await online.remove();
+    isChangingPlayer = false;
     meConfirm.hidden = true;
     showMe();
     meNote.textContent = problem || 'Ник и результаты удалены.';

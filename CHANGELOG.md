@@ -28,10 +28,24 @@ open, and Space or Enter on a focused HUD button now presses the button.
 - **A skip always means no nick.** A slow save is likely (the database
   wakes up in 2 to 3 s), so while the nick is being saved the prompt says
   "сохранение...", both buttons are off and Escape is held back. A repeated
-  Escape cannot always be held back, so `choose()` also checks for a skip
-  when the answer arrives and then deletes the new player again
-  (`DELETE /players/me`). If that delete fails, a notice says the nick may
-  have been kept and points to the boards, where it can be deleted.
+  Escape cannot always be held back, so closing the prompt counts as a skip
+  until `choose()` returns: it checks for one when the answer arrives and
+  again after the waiting results are sent (or the new player is read
+  back), and then deletes the player it created (`DELETE /players/me`,
+  which also removes results already sent). After `already_signed_in` the
+  player belongs to another tab, so this page only forgets it. If the
+  delete fails, a notice says for 20 s, not 6, that the nick may have been
+  kept and that results may be recorded under it until it is deleted in the
+  boards. A boards visit reads the player again and shows it with the
+  delete button, and from then on results go out under it; after a reload
+  the skip is forgotten too, because nothing is stored. Retrying the delete
+  when the boards find the player was left out: if it failed again, the
+  boards would show no nick and no delete button.
+- **One rename or delete at a time.** A second click on "Да, удалить"
+  during a slow request sent a second `DELETE`, whose 401 could arrive last
+  and replace "Ник и результаты удалены." with a vaguer line. While one
+  request runs, the dialog ignores further clicks and says "удаление..." or
+  "сохранение...".
 - **No storage in the browser.** The API's HttpOnly cookie is the only
   identity, so `online.js` cannot see it; it calls `GET /players/me` on load
   instead. Only 401 means "no player yet". Any other answer (404, as

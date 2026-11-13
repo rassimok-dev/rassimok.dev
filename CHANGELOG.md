@@ -98,6 +98,15 @@ and the home page still ships no JavaScript and sets no cookies.
 - **The home page copy is unchanged.** It still says "no cookies", which
   stays true: the game's cookie is scoped to `/klad/api`, and the home page
   sets none.
+- **Phones still hide the footer, privacy note included.** Short portrait
+  screens and touch screens in landscape have kept the room for the field
+  since 2026-10-30. Where the footer shows, it is now a few lines taller,
+  and the tile size pays for that. Nothing is stored before a player picks
+  a nick, so the screen that asks for the nick must show the note, on every
+  device. The Russian note is not folded into a `<details>`: the game's key
+  handler takes Space and Enter on the whole page and cancels their default
+  action, and opening the note would change the stage height without
+  refitting the canvas. Both would need changes in `klad.js`.
 
 ## 2026-11-13 - Agent instructions moved out of the repository
 

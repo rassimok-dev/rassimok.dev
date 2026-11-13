@@ -152,8 +152,9 @@ canvas:focus-visible { box-shadow: 0 0 0 2px var(--crt-hot); }
     padding: .5rem 1.2rem .8rem;
   }
 }
-/* A phone in portrait has about 660px to work with. The field matters more
-   than the footer there; the same credit is one tap away on the home page. */
+/* A phone in portrait has about 660px to work with, and the field matters
+   more than the footer (landscape hides it too). The credit is also on the
+   home page; the privacy note is not, so a nick prompt must show it. */
 @media (hover: none) and (pointer: coarse) and (orientation: portrait) and (max-height: 760px) {
   footer { display: none; }
 }

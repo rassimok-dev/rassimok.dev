@@ -44,6 +44,17 @@ for (const path of [
   '/klad/api.other.host/x',
   '/klad/apix',
   '/klad/api/%2e%2e/%2e%2e/aaaaaaaa@other.host/x',
+  '/klad/api/q',
+  '/klad/api/q?x=1',
+  '/klad/api/q/',
+  '/klad/api/q/health/ready',
+  '/klad/api/status/../q/health/ready',
+  '/klad/api//q/health',
+  '/klad/api/%71/health/ready',
+  '/klad/api/Q/health',
+  '/klad/api/q;x/health',
+  '/klad/api/%zz',
+  '/klad/api/%ff',
 ]) {
   test(`proxy answers 404 without a fetch for ${path}`, async (t) => {
     const fetchMock = fakeFetch(t);
@@ -53,9 +64,19 @@ for (const path of [
 
     assert.equal(response.status, 404);
     assert.deepEqual(await response.json(), { error: 'not_found' });
+    assert.equal(response.headers.get('Cache-Control'), 'no-store');
     assert.equal(fetchMock.mock.callCount(), 0);
   });
 }
+
+test('proxy forwards a path that only starts with the letter q', async (t) => {
+  const fetchMock = fakeFetch(t);
+  const request = new Request('test:/klad/api/quests');
+
+  await onRequest({ request, env });
+
+  assert.equal(forwarded(fetchMock).url, API_ORIGIN + '/quests');
+});
 
 test('proxy passes on the method and the body', async (t) => {
   const fetchMock = fakeFetch(t);
@@ -137,6 +158,7 @@ test('proxy answers 502 when the upstream fetch fails', async (t) => {
 
   assert.equal(response.status, 502);
   assert.deepEqual(await response.json(), { error: 'upstream' });
+  assert.equal(response.headers.get('Cache-Control'), 'no-store');
 });
 
 test('proxy answers 503 when API_ORIGIN is not set', async (t) => {
@@ -147,5 +169,6 @@ test('proxy answers 503 when API_ORIGIN is not set', async (t) => {
 
   assert.equal(response.status, 503);
   assert.deepEqual(await response.json(), { error: 'not_configured' });
+  assert.equal(response.headers.get('Cache-Control'), 'no-store');
   assert.equal(fetchMock.mock.callCount(), 0);
 });

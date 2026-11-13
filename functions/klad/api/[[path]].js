@@ -10,6 +10,10 @@ export async function onRequest({ request, env }) {
   if (url.pathname !== PREFIX && !url.pathname.startsWith(PREFIX + '/')) {
     return errorResponse(404, 'not_found');
   }
+  const path = url.pathname.slice(PREFIX.length);
+  if (isQuarkusPath(path)) {
+    return errorResponse(404, 'not_found');
+  }
 
   if (!env.API_ORIGIN) {
     return errorResponse(503, 'not_configured');
@@ -17,7 +21,7 @@ export async function onRequest({ request, env }) {
 
   // Plain concatenation, not new URL(path, origin): a path such as
   // //other.host/x must not be able to change the upstream host.
-  const upstreamUrl = env.API_ORIGIN + url.pathname.slice(PREFIX.length) + url.search;
+  const upstreamUrl = env.API_ORIGIN + path + url.search;
 
   const headers = new Headers();
   for (const name of FORWARDED_HEADERS) {
@@ -37,6 +41,17 @@ export async function onRequest({ request, env }) {
     });
   } catch {
     return errorResponse(502, 'upstream');
+  }
+}
+
+// Quarkus serves its health and dev endpoints under /q. Its server decodes
+// %71 to q and reads // as /, so the check runs on the decoded path, and a
+// path that does not decode counts as one too.
+function isQuarkusPath(path) {
+  try {
+    return /^\/+q(\/|;|$)/i.test(decodeURIComponent(path));
+  } catch {
+    return true;
   }
 }
 

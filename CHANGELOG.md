@@ -8,8 +8,9 @@ or a future session needing to know what already exists and why.
 `/klad/api/*` now reaches the game's API. A Cloudflare Pages Function,
 `functions/klad/api/[[path]].js`, forwards each request to the origin in the
 Pages variable `API_ORIGIN`, with the `/klad/api` prefix removed and the
-query string kept, and returns the API's answer unchanged. `_routes.json`
-limits Functions to `/klad/api/*`, and the `/klad/*` CSP gains
+query string kept, and returns the API's answer unchanged; the API's own
+Quarkus endpoints under `/q` are not forwarded. `_routes.json` limits
+Functions to `/klad/api/*`, and the `/klad/*` CSP gains
 `connect-src 'self'`. Nothing calls the proxy yet; the game's online code
 comes in a later change.
 
@@ -59,14 +60,31 @@ and the home page still ships no JavaScript and sets no cookies.
   `API_ORIGIN`, so the Function cannot become an open proxy; the tests assert
   the forwarded host for each path case, and that off-prefix paths make no
   fetch.
+- **Quarkus's `/q` endpoints stay off the site origin.** The API serves its
+  health checks (and, in dev mode, the dev UI) under `/q`, and the readiness
+  answer can carry a database error message. The game needs none of them,
+  and the deploy check calls them on the API's own address, so the Function
+  answers 404 for `/klad/api/q` and everything under it, before any fetch.
+  The check runs on the parsed path, where dot segments are already
+  resolved, and on the percent-decoded rest of it, with any number of
+  leading slashes and either case: the API's server (Vert.x) decodes `%71`
+  to `q` and reads `//` as `/`, so a plain `startsWith('/q/')` would let
+  `/klad/api/%71/health/ready` and `/klad/api//q/health` through. `q;x`
+  counts as `q` as well, since a server may read `;` as the start of path
+  parameters. A path that
+  does not decode (`%zz`, or `%ff`, which is not UTF-8) is refused the same
+  way; the API has no path parameters, so no real request looks like that.
+  The raw path, not the decoded one, is what gets forwarded.
 - **`redirect: 'manual'`.** A redirect from the API comes back as it is,
   instead of being followed inside the Function.
 - **Proxy errors use the API's error shape.** A path that is not `/klad/api`
-  or under `/klad/api/` gives 404 `{"error":"not_found"}`, `API_ORIGIN`
-  unset 503 `{"error":"not_configured"}`, an unreachable API 502
-  `{"error":"upstream"}`, all `Cache-Control: no-store`. There is no fallback address: a deploy
-  without the variable, such as a branch preview before it is set there,
-  answers 503 rather than guessing.
+  or under `/klad/api/`, or that is under `/klad/api/q`, gives 404
+  `{"error":"not_found"}`, `API_ORIGIN` unset 503
+  `{"error":"not_configured"}`, an unreachable API 502
+  `{"error":"upstream"}`. All three carry `Cache-Control: no-store`, and the
+  tests check it. There is no fallback address: a deploy without the
+  variable, such as a branch preview before it is set there, answers 503
+  rather than guessing.
 - **`_headers` does not cover `/klad/api/*`.** Pages never applies `_headers`
   to responses from Functions, so those responses carry only the API's own
   headers, and the API owns them. The game page's CSP is unaffected.

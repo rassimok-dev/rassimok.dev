@@ -30,7 +30,11 @@ answers 503 `{"error":"not_configured"}`. If the API cannot be reached, the
 proxy answers 502 `{"error":"upstream"}`. `_routes.json` keeps every other
 path off the Function; should one reach it anyway, a path that is not
 `/klad/api` or under `/klad/api/` gets 404 `{"error":"not_found"}` and never
-reaches the API.
+reaches the API. The same 404 answers `/klad/api/q` and everything under it,
+so the API's Quarkus health and dev endpoints stay off the site; the check
+runs on the decoded path, so `/klad/api/%71/health` and
+`/klad/api//q/health` are refused too. All three error answers carry
+`Cache-Control: no-store`.
 
 ## To remove the game entirely
 1. `git rm -r klad/ functions/klad/api/ _routes.json`

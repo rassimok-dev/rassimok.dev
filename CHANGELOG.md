@@ -3,6 +3,100 @@
 Dated entries, newest first. Written for a reader picking this up cold —
 or a future session needing to know what already exists and why.
 
+## 2026-11-15 (fourth) - Privacy page at /privacy/ (RAS-57)
+
+Google's OAuth consent screen "In production" needs a privacy policy on the
+app's own domain, linked from the home page, that says how the app uses,
+stores and shares data (decided by the user on 2026-11-15). Until now the
+only privacy texts were the klad footers and the notes in its dialogs, at
+no stable URL of their own. `privacy/index.html` is a new page: plain HTML
+on `/style.css`, no JavaScript, Russian first and English after. The home
+page footer and both klad footers (English and Russian) link to it; the
+existing notes are unchanged. Google sign-in (RAS-44) and the room chat
+(RAS-54) add their sections in the same change as their features.
+
+### Decisions worth not relitigating
+
+- **Only what the code does.** Every claim was checked against the API at
+  `main` (migrations V1 to V3, `Sessions`, `PlayersResource`,
+  `LoginResource`, `LoginCodes`, `PresenceStore`, the room views,
+  `RaceMessage` with contract section 8, `BoardsResource`,
+  `application.properties`, `deploy.yml`) and against the site (`_headers`,
+  the proxy, `online.js`, the klad notes). The regions of Neon
+  (AWS eu-central-1) and Resend (eu-west-1) and the 30 days of Cloud
+  Logging come from the run's brief and the workspace state, not from code.
+- **The stored list is complete.** Besides the nick, the kind, the results
+  and an account's email, the tables hold when the player was created and
+  roughly when it was last seen (refreshed at most once a day), the time of
+  each result, and per browser the hash of the cookie's key with its expiry.
+  A shorter list would be wrong, so the page names them all. "Nothing deletes
+  it on its own": there is no guest purge (an open proposal), and expired
+  session rows stay too, so the page says the cookie expires, not that the
+  session is deleted.
+- **Deletion with its limits.** The button deletes a guest only in the
+  browser that holds its cookie; a login into an account of the other kind
+  leaves the guest with its results and no cookie, so it can no longer be
+  deleted (as the klad login note says); a browser that refuses the cookie
+  leaves the nick it just saved on the server, without results (the
+  read-back in `online.js` finds no player, and no further `POST /players`
+  goes out until a reload); the send-log hashes stay a day and go with the
+  first code request after that. Logout deletes the browser's key and the
+  cookie and keeps the account. The page promises no deletion
+  by mail, because nothing in the code does it; the contact line asks for
+  questions only.
+- **Boards are "open to everyone"**: `GET /boards/*` needs no session. The
+  online list, the open rooms and the room members are seen by players with
+  a nick, as the lobby note says. In a race the others get, from the race
+  socket, each member's position, nick, kind, place and ticks, so the race
+  line names all of them (the race dialog's note names runner, nick and
+  time).
+- **Accounts and merges:** the account part also says that a new account
+  is made from the browser's guest with its results, and that a login into
+  an existing account of the same kind moves the guest's results into it
+  and deletes the guest (contract section 5), because data moves between
+  records there.
+- **Logs:** Cloud Run's request records and the API's own lines go to Cloud
+  Logging for 30 days, with no region named (the default bucket is
+  `global`). "The API writes no email address into its log": its two log
+  calls hold none (the failed-mail line names only the exception class and
+  the SMTP reply code). The unexpected-error mapper logs any other exception
+  with its text; of the database constraints only the unique `email` one
+  could repeat an address, and verify cannot reach it (the code row's lock
+  serialises it, and an existing account is looked up first). The page makes
+  no claim about IP addresses: it says only which request headers the proxy
+  passes on, which is in the code.
+- **No links to the providers.** A `https://` link fails the CI grep on
+  `//` and would be the only outbound link besides GitHub; Cloudflare,
+  Google, Neon and Resend are named in text. The `mailto:` link has no `//`.
+- **Layout from the home page:** `main.crt` and `div.screen`, no new CSS.
+  `style.css` colours links and headings for the dark screen only; outside
+  it the yellow links would fail contrast on the light background. Only the
+  screen's power-on animation runs (none under reduced motion); `.copy`,
+  `.reel` and the other attract-mode classes are not used, so no text waits
+  for an animation. One `h1` ("Приватность / privacy"), the Russian
+  sections as `h2`, then a
+  `div lang="en" id="en"` with its own `h2`s; a link at the top jumps to the
+  English part. A line "Updated 15 November 2026" in both languages tells a
+  reader which version they read; the tickets that add sections update it.
+  The meta description is English, like the klad page's.
+- **Link texts:** "Privacy policy." closes the home page's privacy line and
+  the English klad footer (before "← rassimok"); the Russian footer ends with
+  "Подробнее на странице о приватности."
+- **Size:** about 19.1 KB, 6.6 KB gzipped (Cyrillic takes two bytes a
+  letter). The home page budget (2026-10-30) is for the apex; this page is
+  text that only loads when asked for, and nothing on it is decorative.
+- `_headers` is unchanged: the `/*` block covers `/privacy/` (CSP
+  `default-src 'none'` with same-origin styles and images, HSTS, nosniff,
+  no referrer, the permissions, COOP, CORP, no frames), and `/klad/*` does
+  not match it.
+- CI: `privacy/index.html` joins the html-validate step. No node test: the
+  page has no logic, and html-validate, linkinator (it crawls `/privacy/`
+  and skips the `mailto:` link) and the two grep guards check it.
+  `klad/README.md` names the page as a reference outside the game's folder
+  and in its removal steps.
+- Not verified here: `/privacy/` on production (status, headers, a read of
+  the page) waits for the deploy.
+
 ## 2026-11-15 (later still) - Klad lobby: open rooms with a join button (RAS-46)
 
 The lobby had no list: a room was entered only by its link. The API now

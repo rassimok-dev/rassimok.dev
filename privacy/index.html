@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Приватность &mdash; rassimok</title>
+<meta name="description" content="Privacy policy of rassimok.dev and the game КЛАД: what is stored, who sees it, where it runs and how to delete it. In Russian, then English.">
+<link rel="stylesheet" href="/style.css">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+</head>
+<body>
+<main class="crt">
+  <div class="screen">
+
+    <h1>Приватность <span lang="en">/ privacy</span></h1>
+    <p class="lede">Что хранят сайт rassimok.dev и игра «Клад», кто это видит, где это
+    работает и как это удалить. Обновлено 15 ноября 2026 года.</p>
+    <p><a href="#en" lang="en">English version below</a></p>
+
+    <h2>Сайт</h2>
+    <p>Главная страница и эта страница &mdash; обычный HTML без JavaScript. Они ничего не собирают,
+    не ставят cookie и ничего не хранят в браузере. Шрифты берутся из вашей системы, стили и
+    картинки приходят с rassimok.dev, а политика безопасности страниц (Content-Security-Policy) не
+    даёт загрузить что-либо с другого адреса. Без аналитики и без слежки.</p>
+
+    <h2>Игра</h2>
+    <p>Игра на <a href="/klad/">/klad/</a> работает на собственных скриптах сайта и по тому же
+    правилу: ни одного запроса на другой сайт. Кроме cookie (о нём ниже), она ничего не хранит в
+    браузере; этап, на котором вы остановились, живёт только в адресе страницы (/klad/#3). Пока вы не выбрали ник и не
+    ввели email, в базе данных игры о вас ничего нет.</p>
+
+    <h2>Cookie</h2>
+    <p>С ником браузер получает один файл cookie, <code>klad_session</code>, с флагами HttpOnly,
+    Secure, SameSite=Strict и путём /klad/api: браузер отправляет его только API игры на
+    rassimok.dev, а скрипты страницы его не видят. В нём случайный ключ, по которому сервер узнаёт
+    ваш ник; сам сервер хранит только хеш этого ключа (SHA-256). Cookie действует 90 дней и
+    продлевается, когда вы заходите в игру (не чаще раза в сутки). Других cookie нет: их не ставят
+    ни страницы, ни скрипты, ни прокси сайта.</p>
+
+    <h2>Что хранит сервер игры</h2>
+    <ul>
+      <li>ник и ваш выбор: человек или агент (ИИ или скрипт); выбор потом не изменить;</li>
+      <li>результаты для таблиц рекордов: каждый пройденный этап (этап, форма поля, время, клады) и
+      каждую игру с первого этапа (сколько этапов пройдено, счёт, время), со временем отправки;</li>
+      <li>когда ник создан и примерно когда вы играли последний раз (обновляется не чаще раза в
+      сутки);</li>
+      <li>у аккаунта ещё ваш email;</li>
+      <li>хеш ключа из cookie (по одному на браузер) и срок его действия.</li>
+    </ul>
+    <p>Всё это хранится, пока вы это не удалите; само оно не удаляется.</p>
+
+    <h2>Аккаунт и коды для входа</h2>
+    <p>Аккаунт по желанию: вход без пароля, по коду из 6 цифр, который приходит на ваш email. Для
+    запроса кода сервер хранит не сам адрес, а его хеш (SHA-256): вместе с кодом, тоже в виде хеша, и
+    числом неверных попыток, пока код не использован, не заменён новым или не истёк (он действует
+    10 минут), а вместе со временем запроса, для ограничения числа запросов, сутки; устаревшие
+    записи удаляются при следующем запросе кода. Сам адрес сервер сохраняет, только когда по коду вы
+    создаёте аккаунт или входите в него: это email аккаунта, и показывается он только самому
+    аккаунту. Новый аккаунт создаётся из ника гостя этого браузера вместе с его результатами. При
+    входе в уже созданный аккаунт результаты гостя переходят в аккаунт, а гость удаляется, если выбор
+    (человек или агент) у них один.</p>
+    <p>Письма с кодом отправляет почтовый сервис Resend с адреса klad@mail.rassimok.dev; для этого
+    Resend получает ваш адрес и письмо с кодом. Письмо &mdash; простой текст с кодом, без ссылок и
+    без отслеживания. Кроме кодов для входа, сервер писем не присылает.</p>
+
+    <h2>Что видят другие игроки</h2>
+    <ul>
+      <li>Таблицы рекордов открыты всем: любой видит в них ники, гость это или аккаунт, и
+      результаты; у людей и у агентов таблицы разные.</li>
+      <li>Пока у вас открыто лобби и ещё около минуты после, игроки с ником видят в списке
+      «Сейчас в лобби» ваш ник, ваш выбор (человек или агент) и то, гость вы или аккаунт.</li>
+      <li>Ник хозяина и число игроков открытой комнаты видит каждый игрок с ником, и во время её
+      гонки тоже. Любой игрок с ником может войти в комнату из списка открытых или по ссылке и тогда
+      видит её участников: ники, выбор (человек или агент), кто готов и кто хозяин. «Только по
+      ссылке» убирает комнату из следующих списков, но не отзывает ссылку, которую уже видели.</li>
+      <li>В гонке участники комнаты видят вашего бегуна на поле, ваш ник, выбор (человек или агент),
+      место и время; в таблицы рекордов гонка не попадает.</li>
+      <li>Ваш email и внутренние номера игроков не видит никто из других игроков.</li>
+    </ul>
+
+    <h2>Лобби и гонки только в памяти</h2>
+    <p>Кто сейчас в лобби, комнаты и гонки сервер держит только в памяти и в базу данных не
+    записывает; перезапуск сервера их стирает. Из списка «Сейчас в лобби» вы пропадаете примерно
+    через минуту после того, как закрыли лобби.</p>
+
+    <h2>Как удалить свои данные</h2>
+    <p>В игре: «Таблицы», затем «Удалить мой ник и результаты». Сервер удалит ник, ваш выбор
+    (человек или агент), все результаты и все ключи cookie этого ника, а у аккаунта ещё email и
+    неиспользованный код для входа. Это не отменить.</p>
+    <p>Гостя (ник без аккаунта) так можно удалить только в браузере, который хранит его cookie.
+    Аккаунт можно удалить на любом устройстве, войдя по коду из письма. Хеши адреса в журнале
+    отправленных писем остаются на сутки и удаляются при первом запросе кода после этого.</p>
+    <p>Если войти в уже созданный аккаунт с другим выбором (человек или агент), гость этого браузера
+    останется на сервере со своими результатами, но без cookie, и удалить его будет уже нельзя.
+    Поэтому сначала удалите гостя, а потом входите.</p>
+    <p>Если браузер не принимает cookie, только что сохранённый ник остаётся на сервере без
+    результатов, и удалить его из браузера уже нельзя; до перезагрузки страницы игра больше не
+    сохраняет ников.</p>
+    <p>«Выйти из аккаунта» удаляет ключ этого браузера и cookie; аккаунт остаётся.</p>
+
+    <h2>Где это работает</h2>
+    <ul>
+      <li>Cloudflare Pages: страницы сайта и прокси /klad/api, через который игра обращается к своему
+      API. Из заголовков вашего запроса прокси передаёт API только Content-Type, Accept и Cookie (для
+      соединения гонки ещё Upgrade, Origin и Sec-WebSocket-Protocol) и своего журнала не ведёт.</li>
+      <li>Google Cloud Run, регион europe-west4 (Нидерланды): API игры.</li>
+      <li>Neon, база данных Postgres на AWS в регионе eu-central-1 (Франкфурт): ники, результаты,
+      email аккаунтов и хеши, о которых сказано выше.</li>
+      <li>Resend, регион eu-west-1 (Ирландия): письма с кодом для входа.</li>
+    </ul>
+
+    <h2>Журналы</h2>
+    <p>Cloud Run записывает каждый запрос к API и строки журнала самого API в Google Cloud Logging;
+    там они хранятся 30 дней. Email-адресов API в свой журнал не пишет.</p>
+
+    <h2>Контакт</h2>
+    <p>Вопросы о ваших данных и об этой странице:
+    <a href="mailto:hello.rassimok@gmail.com">hello.rassimok@gmail.com</a>.</p>
+
+    <hr>
+
+    <div id="en" lang="en">
+    <h2>Privacy, in English</h2>
+    <p class="lede">What rassimok.dev and the game <span lang="ru">«Клад»</span> keep about you, who
+    sees it, where it runs and how to delete it. Updated 15 November 2026.</p>
+
+    <h2>The site</h2>
+    <p>The home page and this page are plain HTML with no JavaScript. They collect nothing, set no
+    cookie and store nothing in your browser. Fonts come from your own system, styles and images
+    from rassimok.dev, and the pages' Content-Security-Policy blocks loading anything from any other
+    address. No analytics, no tracking.</p>
+
+    <h2>The game</h2>
+    <p>The game at <a href="/klad/">/klad/</a> runs on the site's own scripts under the same rule:
+    no request goes to another site. Apart from the cookie below, it keeps nothing in your browser;
+    the level you are on lives only in the page address (/klad/#3). Until you pick a nick or enter an email address, the
+    game's database holds nothing about you.</p>
+
+    <h2>The cookie</h2>
+    <p>With a nick, your browser gets one cookie, <code>klad_session</code>, with the flags HttpOnly,
+    Secure, SameSite=Strict and the path /klad/api: the browser sends it only to the game's API on
+    rassimok.dev, and the page's scripts cannot read it. It holds a random key by which the server
+    knows your nick; the server itself stores only the key's hash (SHA-256). The cookie lasts 90 days
+    and is renewed when you come back to the game (at most once a day). There is no other cookie: no
+    page, script or the site's proxy sets one.</p>
+
+    <h2>What the game's server keeps</h2>
+    <ul>
+      <li>your nick and your choice of human or agent (AI or script), which cannot be changed
+      later;</li>
+      <li>your results for the leaderboards: each level cleared (level, field shape, time, chests)
+      and each game from level 1 (levels cleared, score, time), with the time it was sent;</li>
+      <li>when the nick was created and roughly when you last played (updated at most once a
+      day);</li>
+      <li>for an account, also your email address;</li>
+      <li>the hash of the cookie's key (one per browser) and when it expires.</li>
+    </ul>
+    <p>All of this stays until you delete it; nothing deletes it on its own.</p>
+
+    <h2>Account and login codes</h2>
+    <p>An account is optional: you log in without a password, with a 6-digit code sent to your email
+    address. For a code request the server keeps not the address but its hash (SHA-256): with the
+    code, also hashed, and the count of wrong tries, until the code is used, replaced by a new one or
+    expires (it is valid for 10 minutes), and with the time of the request, to limit code requests,
+    for a day; outdated records go with the next code request. The server stores the address itself
+    only once a login with the code creates or opens an account: that is the account's email, and it
+    is shown only to the account itself. A new account is made from this browser's guest nick,
+    together with its results. Logging in to an existing account moves the guest's results into it
+    and deletes the guest, if both have the same choice of human or agent.</p>
+    <p>The mail service Resend sends the code mails, from klad@mail.rassimok.dev; for that, Resend
+    gets your address and the mail with the code. The mail is plain text with the code, with no links
+    and no tracking. The server mails nothing but login codes.</p>
+
+    <h2>What other players see</h2>
+    <ul>
+      <li>The leaderboards are open to everyone: anyone sees the nicks on them, whether each is a
+      guest or an account, and the results; humans and agents have separate boards.</li>
+      <li>While your lobby is open and for about a minute after, players with a nick see your nick,
+      your choice of human or agent and whether you are a guest or an account in the lobby's list of
+      who is online.</li>
+      <li>Every player with a nick sees the host's nick and the number of players of each open room,
+      also during its race. Any player with a nick can join a room from the list of open rooms or by
+      its link, and then sees its members: their nicks, human or agent, who is ready and who is the
+      host. "Link only" hides a room from later lists but does not take back a link already
+      seen.</li>
+      <li>In a race, the room's members see your runner on the field, your nick, your choice of human
+      or agent, your place and your time; nothing of a race goes to the leaderboards.</li>
+      <li>No other player sees your email address or any player's internal id.</li>
+    </ul>
+
+    <h2>The lobby and races live in memory only</h2>
+    <p>Who is in the lobby, the rooms and the races are kept only in the memory of the API and never
+    written to the database; a restart of the server wipes them. You drop off the list of who is
+    online about a minute after you close the lobby.</p>
+
+    <h2>How to delete your data</h2>
+    <p>In the game: "<span lang="ru">Таблицы</span>" (the boards), then "<span lang="ru">Удалить мой ник и
+    результаты</span>" (delete my nick and results). The server deletes your nick, your choice of human or agent, all your results and all
+    the cookie keys of that nick, and for an account also its email address and any unused login
+    code. This cannot be undone.</p>
+    <p>A guest (a nick without an account) can be deleted this way only in the browser that holds its
+    cookie. An account can be deleted on any device after logging in with a code sent to its address.
+    The hashes of the address in the record of sent mails stay for a day and go with the first code
+    request after that.</p>
+    <p>Logging in to an existing account of the other kind (human or agent) leaves this browser's
+    guest on the server with its results but without a cookie, and then it can no longer be deleted.
+    So delete the guest first, then log in.</p>
+    <p>If the browser refuses the cookie, the nick it just saved stays on the server without results,
+    and it can no longer be deleted from the browser; until the page is reloaded, the game saves
+    no further nick.</p>
+    <p>"<span lang="ru">Выйти из аккаунта</span>" (log out) deletes this browser's key and the cookie; the account
+    stays.</p>
+
+    <h2>Where it runs</h2>
+    <ul>
+      <li>Cloudflare Pages: the site's pages and the proxy at /klad/api through which the game
+      reaches its API. Of your request's headers the proxy passes on only Content-Type, Accept and
+      Cookie (for the race connection also Upgrade, Origin and Sec-WebSocket-Protocol), and it keeps
+      no log of its own.</li>
+      <li>Google Cloud Run, region europe-west4 (Netherlands): the game's API.</li>
+      <li>Neon, a Postgres database on AWS in region eu-central-1 (Frankfurt): nicks, results,
+      accounts' email addresses and the hashes named above.</li>
+      <li>Resend, region eu-west-1 (Ireland): the login code mails.</li>
+    </ul>
+
+    <h2>Logs</h2>
+    <p>Cloud Run writes a record of each request to the API, and the API's own log lines, to Google
+    Cloud Logging, which keeps them for 30 days. The API writes no email address into its log.</p>
+
+    <h2>Contact</h2>
+    <p>Questions about your data or this page:
+    <a href="mailto:hello.rassimok@gmail.com">hello.rassimok@gmail.com</a>.</p>
+    </div>
+
+    <footer>
+      <p><a href="/">&larr; rassimok</a> &middot; <a href="/klad/">КЛАД</a></p>
+    </footer>
+
+  </div>
+</main>
+</body>
+</html>

@@ -25,7 +25,7 @@ jobs:
       # Catches malformed markup and, importantly, missing accessibility
       # attributes that are easy to regress by hand.
       - name: Validate HTML
-        run: npx --yes html-validate@11.17.0 index.html klad/index.html
+        run: npx --yes html-validate@11.17.0 index.html klad/index.html privacy/index.html
 
       # A broken link on a CV site is the cheapest possible bad impression.
       - name: Check links

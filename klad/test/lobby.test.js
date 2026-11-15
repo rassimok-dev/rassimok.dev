@@ -164,17 +164,9 @@ test('inviteMailto has no receiver and decodes to the subject and the exact room
   assert.equal(query.get('body'), TEXT.inviteBody + roomLink);
   assert.equal(href.includes('#'), false);
   assert.equal(href.includes(' '), false);
-});
-
-test('inviteMailto sends no request', (t) => {
-  // given
-  const fetchCalls = t.mock.method(globalThis, 'fetch', async () => ({}));
-
-  // when
-  KLAD_LOBBY.inviteMailto('test://rassimok.test/klad/#room=' + ID);
-
-  // then
-  assert.equal(fetchCalls.mock.callCount(), 0);
+  assert.equal(href.includes('+'), false);
+  assert.equal(decodeURIComponent(href.split('subject=')[1].split('&body=')[0]), TEXT.inviteSubject);
+  assert.equal(decodeURIComponent(href.split('&body=')[1]), TEXT.inviteBody + roomLink);
 });
 
 test('roomIdOf reads the id after #room= and leaves every other hash alone', () => {
@@ -1957,7 +1949,7 @@ test('lobby page: an empty list says so and points to Создать комна�
   assert.equal(down.elements['lobby-online'].children.length, 2);
 });
 
-test('lobby page: the room view links the mail app to the room link and sends nothing for it', async () => {
+test('lobby page: the room view links the mail app to the room link and the link adds no call and no listener', async () => {
   // given
   const page = loadLobbyPage({ ...LIST_OF(LISTED), [JOIN]: [[200, room()]], [POLL]: [[200, room()]] });
   page.elements['h-lobby'].listeners.click();
@@ -1971,7 +1963,10 @@ test('lobby page: the room view links the mail app to the room link and sends no
   const roomLink = 'test://rassimok.dev/klad/#room=' + ID;
   assert.equal(page.elements['lobby-link'].value, roomLink);
   assert.equal(page.elements['lobby-mail'].href, KLAD_LOBBY.inviteMailto(roomLink));
-  assert.equal(page.server.calls.some((call) => call.includes('mail')), false);
+  assert.equal(page.elements['lobby-mail'].target, '_blank');
+  assert.equal(page.elements['lobby-mail'].rel, 'noopener');
+  assert.deepEqual(page.elements['lobby-mail'].listeners, {});
+  assert.deepEqual(page.server.calls, [HEARTBEAT, ONLINE_LIST, ROOM_LIST, JOIN, POLL]);
 });
 
 test('lobby page: the Войти button joins the room and the list part is hidden', async () => {

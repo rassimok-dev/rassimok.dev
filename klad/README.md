@@ -147,8 +147,11 @@ closed or the tab is hidden:
   mail app does the sending from the player's own address; nothing goes to
   the API and nothing is stored, so the privacy notes are unchanged. It is a
   link because a form would be blocked by `form-action 'none'`; a `mailto:`
-  link is not covered by the CSP. With only webmail on a desktop it may open
-  nothing.
+  link is not covered by the CSP. The anchor has no `href` in the HTML
+  (Cloudflare's email obfuscation would rewrite it); `renderRoom` sets it
+  with `target="_blank"` and `rel="noopener"`, which makes a web mail
+  handler open in a new tab, so the game tab and the room stay. A device with no mail handler may do nothing;
+  "Копировать" is the fallback.
 - Joining another room leaves the current one. Leaving (the button or
   closing the dialog) while a join is out takes the room off the screen at
   once and sends `POST /rooms/<id>/leave` only after the join answers. Any

@@ -751,6 +751,8 @@ if (typeof document !== 'undefined') (() => {
     const isLobby = Boolean(view && view.state === 'lobby');
     link.value = location.origin + '/klad/#room=' + state.roomId;
     mailLink.href = KLAD_LOBBY.inviteMailto(link.value);
+    mailLink.target = '_blank';
+    mailLink.rel = 'noopener';
     listedLine.textContent = view ? (view.isListed ? 'Комната в списке открытых комнат.' : 'Комната только по ссылке: в списке её нет.') : '';
     listedRow.hidden = !(view && view.isHost);
     if (view && (document.activeElement !== linkOnlyBox || !state.isBusy)) linkOnlyBox.checked = !view.isListed;

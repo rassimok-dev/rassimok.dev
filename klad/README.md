@@ -156,7 +156,10 @@ player's game: no shared world, no collision.
   sender's `tick` and is drawn 250 ms in the past, on the straight line
   between the two positions around that moment, spaced by the ticks (the
   tick rate is `KLAD_TICKS.PER_SECOND`, passed in the environment as
-  `ticksPerSecond`). It never runs ahead of the last position. A position
+  `ticksPerSecond`). When a position arrives after the drawn moment has
+  passed the last one (a pause, a lost frame, rising latency), the move
+  starts from where the ghost stands and is anchored at the arrival, so
+  there is no hop. It never runs ahead of the last position. A position
   with a lower `tick` (a new attempt) or a step over 3 cells shows at once;
   a fall step of 1.8 cells slides. With no update for 2 s a ghost fades out
   over 1 s. A `state` after a reconnect replaces the ghosts with its

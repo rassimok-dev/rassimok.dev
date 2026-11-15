@@ -20,12 +20,14 @@ position".
   moment.** Positions are spaced by the sender's ticks (the rate is
   `KLAD_TICKS.PER_SECOND`, passed to `race.js` as `ticksPerSecond` like
   `format`, not repeated), so a message that comes late does not change the
-  spacing. A position is shown no earlier than it arrived: its time is the
-  previous one plus the tick gap, but never before arrival minus 250 ms
-  and never after arrival (so a sender running faster than the clock
-  cannot make the lag grow). A move starts at its time minus the tick gap,
-  so after a pause (no `pos` for a second, ticks that go on) the ghost
-  stands where it was and then goes on, with no jump back.
+  spacing. A position is shown at the previous one's time plus the tick
+  gap, never after its arrival (so a sender running faster than the clock
+  cannot make the lag grow). When the previous position's time is already
+  behind the drawn moment (a pause, a lost frame, latency that rose for
+  good), the new one is anchored at its arrival instead and its move starts
+  no earlier than the drawn moment, so the ghost waits where it stands and
+  slides, with no hop and no hop on the messages after it. A move
+  otherwise starts at its time minus the tick gap.
 - **Never extrapolate.** After the last position the ghost stays; a guess
   that is wrong would be a hop back. The 2 s fade is unchanged.
 - **At once, no slide:** a lower `tick` than before (a new attempt after a
@@ -36,11 +38,14 @@ position".
 - **The cap is 10 positions per ghost**, so a member that sends 10 a
   second for 4 minutes does not grow memory; the oldest is dropped.
 - **The delay costs jitter room only 250 ms minus the 200 ms spacing.** A
-  message up to about 50 ms late is absorbed fully; one 150 ms late makes
-  the ghost wait at its last position and then catch up in one frame (it
-  never goes back). A longer delay (350 ms absorbs 150 ms) would hide it
-  but is over the "about a third of a second behind" the ticket asks for.
-  `GHOST_DELAY` is one constant if this is changed.
+  message up to about 50 ms late is absorbed fully; a later one makes the
+  ghost wait at its last position and then slide to it, re-anchored at
+  its arrival, so the margin comes back. No steady scenario moves a ghost
+  more than 0.2 cell per 10 ms frame; the one residual is a late message
+  followed by an early one, which crosses a cell in 50 ms. Do not keep a
+  one-frame catch-up on purpose. A longer delay is not needed and would go
+  over the "about a third of a second behind" the ticket asks for;
+  `GHOST_DELAY` is one constant.
 - **Facing follows the received x** against the previous position, as
   before, and slots still separate the ghosts.
 

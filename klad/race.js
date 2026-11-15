@@ -107,8 +107,9 @@ const KLAD_RACE = (() => {
       const samples = isContinuing ? previous.samples : [];
       if (isContinuing) {
         const gap = (entry.tick - last.tick) * SECOND / ticksPerSecond;
-        sample.at = Math.min(Math.max(last.at + gap, now - GHOST_DELAY), now);
-        sample.start = Math.max(last.at, sample.at - gap);
+        const shown = now - GHOST_DELAY;
+        sample.at = last.at < shown ? now : Math.min(last.at + gap, now);
+        sample.start = Math.max(last.at, sample.at - gap, shown);
       }
       samples.push(sample);
       if (samples.length > MAX_SAMPLES) samples.shift();

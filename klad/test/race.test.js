@@ -322,29 +322,62 @@ test('a ghost takes the position it reaches and faces the way it moved', () => {
   assert.deepEqual(race.ghosts(), [{ slot: 1, nick: 'Anna', x: 3.5, y: 5, direction: -1, alpha: KLAD_RACE.GHOST_ALPHA }]);
 });
 
-test('a ghost walking one way never moves back, also when one message is 150 ms late and the next comes 50 ms after it', () => {
-  // given
-  const { race, clock, say } = racing();
-  const arrivals = [[0, 4], [200, 5], [550, 6], [600, 7], [800, 8]];
+const MAX_FRAME_MOVE = 0.25;
+
+/* Sends the positions at the given times (ms, tick) one cell apart and
+   returns the ghost's x for every 10 ms frame until 1 s after the last one. */
+function walkFrames(race, clock, say, arrivals) {
   const seen = [];
-  let tick = 0;
   let time = 0;
-  // when
-  for (const [at, x] of arrivals) {
-    for (; time < at; time += 10) {
+  const advanceTo = (target) => {
+    for (; time < target; time += 10) {
       clock.advance(10);
       if (ghostOf(race)) seen.push(ghostOf(race).x);
     }
-    say(pos(x, 5, tick));
-    tick += STEP_TICKS;
-  }
-  for (let step = 0; step < 100; step++) {
-    clock.advance(10);
-    seen.push(ghostOf(race).x);
-  }
+  };
+  arrivals.forEach(([at, tick], index) => {
+    advanceTo(at);
+    say(pos(4 + index, 5, tick));
+  });
+  advanceTo(time + 1000);
+  return seen;
+}
+
+const biggestFrameMove = (seen) => Math.max(...seen.slice(1).map((x, index) => Math.abs(x - seen[index])));
+
+test('a ghost walking one way never moves back or hops, also when one message is 150 ms late and the next comes 50 ms after it', () => {
+  // given
+  const { race, clock, say } = racing();
+  // when
+  const seen = walkFrames(race, clock, say, [[0, 0], [200, STEP_TICKS], [550, 2 * STEP_TICKS], [600, 3 * STEP_TICKS], [800, 4 * STEP_TICKS]]);
   // then
   assert.deepEqual(seen, [...seen].sort((first, second) => first - second));
   assert.equal(seen[seen.length - 1], 8);
+  assert.ok(biggestFrameMove(seen) <= MAX_FRAME_MOVE);
+});
+
+test('a ghost does not hop on every message when the latency rises by 150 ms for good', () => {
+  // given
+  const { race, clock, say } = racing();
+  const arrivals = [[0, 0], [200, STEP_TICKS], [400, 2 * STEP_TICKS]];
+  for (let index = 3; index < 12; index++) arrivals.push([150 + index * 200, index * STEP_TICKS]);
+  // when
+  const seen = walkFrames(race, clock, say, arrivals);
+  // then
+  assert.equal(seen[seen.length - 1], 15);
+  assert.ok(biggestFrameMove(seen) <= MAX_FRAME_MOVE);
+});
+
+test('a ghost does not hop on every message after the sender loses ticks in one 300 ms frame', () => {
+  // given
+  const { race, clock, say } = racing();
+  const arrivals = [[0, 0], [200, STEP_TICKS], [400, 2 * STEP_TICKS], [700, 3.5 * STEP_TICKS]];
+  for (let index = 1; index < 9; index++) arrivals.push([700 + index * 200, (3.5 + index) * STEP_TICKS]);
+  // when
+  const seen = walkFrames(race, clock, say, arrivals);
+  // then
+  assert.equal(seen[seen.length - 1], 15);
+  assert.ok(biggestFrameMove(seen) <= MAX_FRAME_MOVE);
 });
 
 test('a position with a lower tick than the one before is shown at once at its place', () => {
@@ -394,7 +427,7 @@ test('with no newer position a ghost stays at the last one and never runs ahead,
   assert.equal(halfWay.alpha, KLAD_RACE.GHOST_ALPHA / 2);
 });
 
-test('after the sender pauses for a second the ghost goes on from where it stood, with no jump back', () => {
+test('after the sender pauses for a second the ghost goes on from where it stood, with no jump and no hops on the next positions', () => {
   // given
   const { race, clock, say } = racing();
   say(pos(4, 5, 0));
@@ -404,14 +437,20 @@ test('after the sender pauses for a second the ghost goes on from where it stood
   say(pos(6, 5, 2 * STEP_TICKS));
   const seen = [];
   // when
-  for (let step = 0; step < 60; step++) {
-    clock.advance(10);
-    seen.push(ghostOf(race).x);
+  for (let index = 0; index < 3; index++) {
+    for (let step = 0; step < 20; step++) {
+      clock.advance(10);
+      seen.push(ghostOf(race).x);
+    }
+    say(pos(7 + index, 5, (3 + index) * STEP_TICKS));
   }
+  clock.advance(1000);
+  seen.push(ghostOf(race).x);
   // then
   assert.deepEqual(seen, [...seen].sort((first, second) => first - second));
   assert.ok(seen[0] >= 5);
-  assert.equal(seen[seen.length - 1], 6);
+  assert.equal(seen[seen.length - 1], 9);
+  assert.ok(biggestFrameMove(seen.slice(0, -1)) <= MAX_FRAME_MOVE);
 });
 
 test('the positions kept per ghost are capped, also at 10 a second for 4 minutes', () => {
@@ -443,7 +482,11 @@ test('a ghost with no update for 2 s fades out, and comes back with the next pos
   assert.equal(atTwoSeconds, KLAD_RACE.GHOST_ALPHA);
   assert.equal(halfWay, KLAD_RACE.GHOST_ALPHA / 2);
   assert.deepEqual(faded, []);
-  assert.equal(race.ghosts()[0].alpha, KLAD_RACE.GHOST_ALPHA);
+  const comeback = race.ghosts()[0];
+  clock.advance(KLAD_RACE.GHOST_DELAY);
+  assert.equal(comeback.alpha, KLAD_RACE.GHOST_ALPHA);
+  assert.equal(comeback.x, 4);
+  assert.equal(race.ghosts()[0].x, 6);
 });
 
 test('pos messages with a bad slot or position make no ghost', () => {
@@ -454,6 +497,8 @@ test('pos messages with a bad slot or position make no ghost', () => {
   say({ type: 'pos', slot: '1', nick: 'Anna', x: 4, y: 5, tick: 10 });
   say({ type: 'pos', slot: 1, nick: 'Anna', x: '4', y: 5, tick: 10 });
   say({ type: 'pos', slot: 1, nick: 'Anna', y: 5, tick: 10 });
+  say({ type: 'pos', slot: 1, nick: 'Anna', x: 4, y: 5 });
+  say({ type: 'pos', slot: 1, nick: 'Anna', x: 4, y: 5, tick: '10' });
   // then
   assert.deepEqual(race.ghosts(), []);
 });

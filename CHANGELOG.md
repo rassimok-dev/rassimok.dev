@@ -21,6 +21,20 @@ no room (in a room it would invite a join that silently leaves it).
   costs about 360 requests (240 presence, 120 list), as in contract
   section 7; inside it is still about 600 (a room opened after the first
   beat adds that one list). The lobby test counts both.
+- Review round 1: the list is cleared (`rooms = null`, "загрузка") when a
+  room is entered and when the player is lost, and `listRooms` now also
+  drops an answer that arrives while in a room (the comment promised it, the
+  check did not do it). The page rebuilds the list only when a line changed
+  (id, state, host, counts, level, shape), because a rebuild every beat
+  dropped keyboard focus from a "Войти" button; when a line did change, focus
+  follows to the button of the same room. After a join from the list that
+  does not open the room, focus goes to that room's button if it is still
+  there, otherwise to "Создать комнату". "Войти" in the note meant account
+  login on this page, so the note now names the audience. The page test
+  stub uses a `test://` origin instead of a split `https:` literal, so the
+  CI grep guard is not worked around. New tests: late list answer dropped, a
+  real race-socket leave with the lobby closed, one list after a drop,
+  `joinFromList` while busy, focus kept and moved.
 - The join button calls the existing `join(id)` through `joinFromList`,
   which does nothing in a room, while a request is out, or for a malformed
   id, so the messages for a full room, a running race and a room that is
@@ -51,8 +65,8 @@ no room (in a room it would invite a join that silently leaves it).
   After a join from the list focus goes to "Копировать", as after creating
   a room.
 - Texts: headings "Сейчас в лобби: N" and "Открытые комнаты: N" (without
-  the count until the first answer). The note says every signed-in player
-  sees a listed room's host nick and player count, also during its race,
+  the count until the first answer). The note says every player with a nick
+  (guest or account; `GET /rooms` needs only a session) sees a listed room's host nick and player count, also during its race,
   and that link only hides a room from later lists but does not take back a
   link already seen. A failed list says "Сервер не отвечает: список комнат
   не загрузился. Остальное в лобби работает." The count counts the 20

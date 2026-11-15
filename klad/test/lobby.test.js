@@ -1599,6 +1599,41 @@ test('the list is not asked while in a room, and once more after leaving it', as
   assert.equal(lobby.state().rooms.length, 4);
 });
 
+test('a list answer that arrives after joining a room is dropped', async () => {
+  // given
+  const { lobby, server } = setup({ ...LIST_OF(LISTED), [JOIN]: [[200, room()]], [POLL]: [[200, room()]] });
+  const release = server.hold(ROOM_LIST);
+  await lobby.open();
+  await settle();
+
+  // when
+  await lobby.joinFromList(ID);
+  release();
+  await settle();
+
+  // then
+  assert.equal(lobby.state().roomId, ID);
+  assert.equal(lobby.state().rooms, null);
+});
+
+test('joinFromList does nothing while a request is out', async () => {
+  // given
+  const { lobby, server } = setup({ ...LIST_OF(LISTED), [JOIN]: [[200, room()]], [POLL]: [[200, room()]] });
+  await lobby.open();
+  await settle();
+  const release = server.hold(JOIN);
+  const joining = lobby.joinFromList(ID);
+  await settle();
+
+  // when
+  await lobby.joinFromList(ID);
+
+  // then
+  assert.equal(count(server.calls, JOIN), 1);
+  release();
+  await joining;
+});
+
 test('a room list is never fetched while the tab is hidden or the lobby closed', async () => {
   // given
   const { lobby, server, world } = setup(LIST_OF(LISTED));
@@ -1615,9 +1650,11 @@ test('a room list is never fetched while the tab is hidden or the lobby closed',
 
 test('leaving a room with the lobby closed fetches no list', async () => {
   // given
-  const { lobby, server } = await hosting(LIST_OF(LISTED));
+  const racing = room({ state: 'racing' });
+  const { lobby, server } = await joined({ ...LIST_OF(LISTED), [JOIN]: [[200, racing]], [POLL]: [[200, racing]] });
   const before = count(server.calls, ROOM_LIST);
   lobby.close();
+  assert.equal(lobby.state().roomId, ID);
 
   // when
   await lobby.leave();
@@ -1701,12 +1738,14 @@ test('a #room= entry joins by POST, so the member answer shows the room', async 
 
 test('a poll that answers as a non-member (host null, no players) ends the room view with the removed text', async () => {
   // given
-  const { lobby, clock } = await joined({ [POLL]: [[200, room()], [200, STRANGER_VIEW]] });
+  const { lobby, clock, server } = await joined({ ...LIST_OF(LISTED), [POLL]: [[200, room()], [200, STRANGER_VIEW]] });
+  const before = count(server.calls, ROOM_LIST);
   await clock.advance(KLAD_LOBBY.ROOM_EVERY);
 
   // then
   assert.equal(lobby.state().roomId, null);
   assert.equal(lobby.state().message, TEXT.removed);
+  assert.equal(count(server.calls, ROOM_LIST), before + 1);
 });
 
 test('a long unseen member polled as a non-member (host null, no players) is joined again', async () => {
@@ -1751,12 +1790,16 @@ const vm = require('node:vm');
 function stubNode(tag, registry) {
   const node = {
     tag, textContent: '', className: '', hidden: false, disabled: false, checked: false, value: '', open: false,
-    children: [], listeners: {}, attributes: {},
+    children: [], listeners: {}, attributes: {}, dataset: {},
     addEventListener(type, listener) { this.listeners[type] = listener; },
     setAttribute(name, value) { this.attributes[name] = value; },
     focus() { registry.focused = this; }, select() {},
     append(...items) { this.children.push(...items); },
     replaceChildren(...items) { this.children = items; },
+    querySelectorAll(selector) {
+      return this.children.flatMap((child) => (typeof child === 'string' ? [] : [...(child.tag === selector ? [child] : []), ...child.querySelectorAll(selector)]));
+    },
+    contains(other) { return other === this || this.children.some((child) => typeof child !== 'string' && child.contains(other)); },
     add() {},
     showModal() { this.open = true; },
     close() { this.open = false; },
@@ -1770,7 +1813,7 @@ function loadLobbyPage(answers) {
   const server = fakeServer(answers);
   const document = {
     visibilityState: 'visible',
-    activeElement: null,
+    get activeElement() { return registry.focused; },
     getElementById: (id) => elements[id] || (elements[id] = stubNode('#' + id, registry)),
     createElement: (tag) => { registry.created.push(tag); return stubNode(tag, registry); },
     querySelector: () => null,
@@ -1787,7 +1830,7 @@ function loadLobbyPage(answers) {
     matchMedia: () => ({ matches: false }),
     Option: function Option(text, value) { this.text = text; this.value = value; },
     CustomEvent: function CustomEvent() {},
-    location: { protocol: 'https:', host: 'rassimok.dev', origin: 'https:' + '//rassimok.dev', hash: '' },
+    location: { protocol: 'https:', host: 'rassimok.dev', origin: 'test://rassimok.dev', hash: '' },
     addEventListener() {},
     Date, setTimeout: () => 0, clearTimeout: () => {},
   };
@@ -1822,6 +1865,38 @@ test('lobby page: each open room is one list item with host, counts, level and a
   assert.equal(page.elements['lobby-rooms-title'].textContent, 'Открытые комнаты: 4');
   assert.equal(page.elements['lobby-online-title'].textContent, 'Сейчас в лобби: 2');
   assert.equal(page.elements['lobby-out'].hidden, false);
+});
+
+test('lobby page: rendering the same list again keeps the focused Войти button in the list', async () => {
+  // given
+  const page = loadLobbyPage(LIST_OF(LISTED));
+  page.elements['h-lobby'].listeners.click();
+  await settle();
+  const button = buttonsOf(page.elements['lobby-rooms'])[0];
+  button.focus();
+
+  // when
+  page.elements['h-lobby'].listeners.click();
+  await settle();
+
+  // then
+  assert.equal(buttonsOf(page.elements['lobby-rooms'])[0], button);
+  assert.equal(page.registry.focused, button);
+});
+
+test('lobby page: a join that does not open the room keeps the focus on the page, on Создать комнату', async () => {
+  // given
+  const page = loadLobbyPage({ ...LIST_OF(LISTED), [JOIN]: [[409, { error: 'room_full' }]] });
+  page.elements['h-lobby'].listeners.click();
+  await settle();
+  const button = buttonsOf(page.elements['lobby-rooms'])[0];
+
+  // when
+  await button.listeners.click();
+  await settle();
+
+  // then
+  assert.equal(page.registry.focused, page.elements['lobby-create']);
 });
 
 test('lobby page: a host nick like <img src=x> is shown as text, not as an element', async () => {

@@ -265,10 +265,16 @@ const KLAD_LOBBY = (() => {
       roomPoll.stop();
     }
 
+    function forgetRooms() {
+      rooms = null;
+      isRoomsDown = false;
+    }
+
     function lostPlayer() {
       forgetRoom(TEXT.noPlayer);
       phase = 'no-nick';
       online = null;
+      forgetRooms();
       resume();
     }
 
@@ -343,7 +349,7 @@ const KLAD_LOBBY = (() => {
       if (!isActive() || roomId !== null) return;
       const request = ++roomsRequest;
       const answer = await call('GET', '/rooms');
-      if (request !== roomsRequest || phase !== 'ready') return;
+      if (request !== roomsRequest || phase !== 'ready' || roomId !== null) return;
       if (answer.status === 401) {
         lostPlayer();
       } else if (answer.status === 200 && answer.data && Array.isArray(answer.data.rooms)) {
@@ -400,6 +406,7 @@ const KLAD_LOBBY = (() => {
       }
       leave();
       forgetRoom('');
+      forgetRooms();
       roomId = id;
       await enter();
     }
@@ -464,6 +471,7 @@ const KLAD_LOBBY = (() => {
       isBusy = false;
       if (answer.status === 201 && answer.data && isRoomId(answer.data.id)) {
         forgetRoom('');
+        forgetRooms();
         roomId = answer.data.id;
         lastSeen = clock.now();
         const shape = environment.shape();
@@ -687,9 +695,11 @@ if (typeof document !== 'undefined') (() => {
       const button = document.createElement('button');
       button.type = 'button';
       button.textContent = 'Войти';
+      button.dataset.roomId = line.id;
       button.addEventListener('click', async () => {
         await lobby.joinFromList(line.id);
         if (!roomPart.hidden) copyButton.focus();
+        else focusRoomButton(line.id);
       });
       item.append(button);
     } else {
@@ -701,12 +711,30 @@ if (typeof document !== 'undefined') (() => {
     return item;
   }
 
+  const roomKey = (line) => [line.id, line.state, line.hostNick, line.players, line.size, line.level, line.shape].join('|');
+  let shownRooms = null;
+
+  function roomButtonOf(id) {
+    return Array.from(roomsList.querySelectorAll('button')).find((button) => button.dataset.roomId === id) || null;
+  }
+
+  function focusRoomButton(id) {
+    const button = roomButtonOf(id);
+    (button || createButton).focus();
+  }
+
   function renderRooms(state) {
     const lines = state.rooms || [];
     roomsTitle.textContent = 'Открытые комнаты' + (state.rooms ? ': ' + lines.length : '');
     roomsStatus.textContent = state.isRoomsDown ? TEXT.roomsDown
       : (state.rooms === null ? 'загрузка' : (lines.length === 0 ? 'Открытых комнат нет. Нажмите «Создать комнату».' : ''));
+    const keys = lines.map(roomKey).join('\n');
+    if (keys === shownRooms) return;
+    const focused = document.activeElement;
+    const focusedId = focused && focused.dataset && roomsList.contains(focused) ? focused.dataset.roomId : null;
     roomsList.replaceChildren(...lines.map(roomItem));
+    shownRooms = keys;
+    if (focusedId) focusRoomButton(focusedId);
   }
 
   function renderRoom(state) {

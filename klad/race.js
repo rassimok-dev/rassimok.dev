@@ -14,7 +14,7 @@ const KLAD_RACE = (() => {
   const MAX_STEP = 3;
   const MAX_SAMPLES = 10;
   const NOTICE_FOR = 8 * 1000;
-  const SLOTS = 4;
+  const SLOTS = 10;
   const LAST_CELL = 24;
   const MAX_TICKS = (4 * 60 + 10) * 120;
   const SHAPES = ['landscape', 'portrait'];

@@ -515,7 +515,7 @@ test('pos messages with a bad slot or position make no ghost', () => {
   // given
   const { race, say } = racing();
   // when
-  say({ type: 'pos', slot: 4, nick: 'Anna', x: 4, y: 5, tick: 10 });
+  say({ type: 'pos', slot: 10, nick: 'Anna', x: 4, y: 5, tick: 10 });
   say({ type: 'pos', slot: '1', nick: 'Anna', x: 4, y: 5, tick: 10 });
   say({ type: 'pos', slot: 1, nick: 'Anna', x: '4', y: 5, tick: 10 });
   say({ type: 'pos', slot: 1, nick: 'Anna', y: 5, tick: 10 });
@@ -523,6 +523,16 @@ test('pos messages with a bad slot or position make no ghost', () => {
   say({ type: 'pos', slot: 1, nick: 'Anna', x: 4, y: 5, tick: '10' });
   // then
   assert.deepEqual(race.ghosts(), []);
+});
+
+test('a pos from slot 9 makes a ghost and from slot 10 none', () => {
+  // given
+  const { race, say } = racing();
+  // when
+  say({ type: 'pos', slot: 9, nick: 'Anna', x: 4, y: 5, tick: 10 });
+  say({ type: 'pos', slot: 10, nick: 'Boris', x: 4, y: 5, tick: 10 });
+  // then
+  assert.deepEqual(race.ghosts().map((ghost) => ghost.slot), [9]);
 });
 
 /* ---- results ---- */
@@ -545,6 +555,21 @@ test('results show the places in order with times, the winner, this player and w
     { place: null, nick: 'Anna', time: null, isWinner: false, isMine: false, hasLeft: true },
   ]);
   assert.equal(engine.stops, 1);
+});
+
+test('results of 10 places show finishers by place, then those with no finish', () => {
+  // given
+  const { race, say } = racing();
+  const finishers = [9, 8, 7, 6, 5, 4, 3, 2, 1].map((slot) => (
+    { slot, nick: 'P' + slot, kind: 'human', place: 10 - slot, ticks: 1000 + slot, left: false }));
+  // when
+  say({ type: 'results', places: [
+    { slot: 0, nick: 'P0', kind: 'human', place: null, ticks: null, left: true },
+    ...finishers,
+  ] });
+  // then
+  assert.deepEqual(race.state().places.map((entry) => entry.nick),
+    ['P9', 'P8', 'P7', 'P6', 'P5', 'P4', 'P3', 'P2', 'P1', 'P0']);
 });
 
 test('results that come while this player still plays end the race too, and nothing more goes out', () => {
@@ -874,6 +899,20 @@ test('klad.js: ghosts are drawn with the nick as canvas text, coloured by slot, 
   const drawn = texts.slice(-2);
   assert.deepEqual(drawn.map((entry) => entry.text), ['<img src=x>', '<img src=x>']);
   assert.notEqual(drawn[0].colour, drawn[1].colour);
+});
+
+test('klad.js: ghosts of slots 0 to 9 are drawn in 10 different colours', () => {
+  // given
+  const { game, texts, run } = loadGame();
+  const hooks = raceHooks();
+  hooks.ghostList = Array.from({ length: 10 }, (unused, slot) => (
+    { slot, nick: 'P' + slot, x: slot + 1, y: 0, direction: 1, alpha: 0.5 }));
+  game.startRace(1, 'landscape', hooks);
+  // when
+  run(0.02);
+  // then
+  const colours = texts.slice(-10).map((entry) => entry.colour);
+  assert.equal(new Set(colours).size, 10);
 });
 
 test('klad.js: no ghosts are drawn outside a race', () => {

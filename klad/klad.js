@@ -24,7 +24,9 @@ const KLAD_GAME = (() => {
     rule: col('--crt-rule', '#23503c'), water: col('--crt-water', '#2f5d8a'),
     waterHi: col('--crt-water-hi', '#8fb4d9') };
   const GHOST = [col('--crt-ghost-0', '#f59cff'), col('--crt-ghost-1', '#7fdcff'),
-    col('--crt-ghost-2', '#f2f2f2'), col('--crt-ghost-3', '#b8a4ff')];
+    col('--crt-ghost-2', '#f2f2f2'), col('--crt-ghost-3', '#b8a4ff'), col('--crt-ghost-4', '#d6f26b'),
+    col('--crt-ghost-5', '#ffa45c'), col('--crt-ghost-6', '#ff8fb8'), col('--crt-ghost-7', '#86b6ff'),
+    col('--crt-ghost-8', '#e6d3a3'), col('--crt-ghost-9', '#8ff0e0')];
   const FONT = col('--mono', 'monospace');
   const PX = { 1: C.fg, 2: C.dim, 3: C.hot, 4: C.alert, 5: C.dark, 6: C.water, 7: C.waterHi, 8: C.rule };
 
@@ -441,7 +443,7 @@ const KLAD_GAME = (() => {
   /* Another racer: see-through, coloured by slot (guests may share a nick),
      the nick drawn on the canvas, so it is never read as HTML. */
   function drawGhost(ghost) {
-    const colour = GHOST[ghost.slot % GHOST.length], size = Math.max(8, Math.round(T / 2));
+    const colour = GHOST[ghost.slot], size = Math.max(8, Math.round(T / 2));
     ctx.globalAlpha = ghost.alpha;
     ctx.drawImage(sprite('p0', ghost.direction < 0, colour), ghost.x * T, ghost.y * T);
     ctx.fillStyle = colour;

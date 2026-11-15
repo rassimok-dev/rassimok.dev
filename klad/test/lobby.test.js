@@ -214,6 +214,21 @@ test('roomView turns the polled room into what the room view shows', () => {
   });
 });
 
+test('roomView keeps size 10 and 10 players', () => {
+  // given
+  const players = Array.from({ length: 10 }, (unused, index) => (
+    { nick: 'P' + index, kind: 'human', ready: false, host: index === 0, slot: index }));
+  // when
+  const view = KLAD_LOBBY.roomView(room({ size: 10, host: { nick: 'P0' }, players }));
+  // then
+  assert.equal(view.size, 10);
+  assert.equal(view.players.length, 10);
+});
+
+test('the room-full text names no number', () => {
+  assert.doesNotMatch(TEXT.roomFull, /\d/);
+});
+
 test('roomView finds this player by you, not by nick and kind, and a missing one is no member', () => {
   // given
   const twin = { ...MINE, you: false, host: true, ready: true };

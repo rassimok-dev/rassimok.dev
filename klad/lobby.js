@@ -30,6 +30,8 @@ const KLAD_LOBBY = (() => {
     notReady: 'Старт возможен, когда готовы все, а игроков хотя бы двое.',
     refused: 'Сервер не принял это действие.',
     raceWaiting: 'Гонка начинается: ждём остальных...',
+    inviteSubject: 'Приглашение в КЛАД',
+    inviteBody: 'Заходи играть вместе в КЛАД. Комната здесь: ',
     raceUnavailable: 'Онлайн-игра недоступна в этом браузере. Обычная игра работает как прежде.',
   };
   const ACTION_ERRORS = { not_host: TEXT.notHost, not_in_lobby: TEXT.notInLobby, not_ready: TEXT.notReady };
@@ -41,6 +43,13 @@ const KLAD_LOBBY = (() => {
      so a malformed one still says "room not found". */
   function roomIdOf(hash) {
     return hash.startsWith(ROOM_LINK) ? hash.slice(ROOM_LINK.length) : null;
+  }
+
+  /* The mail app opens with the subject and text filled in and no receiver.
+     The link sits inside the text, so it is encoded whole. */
+  function inviteMailto(roomLink) {
+    return 'mailto:?subject=' + encodeURIComponent(TEXT.inviteSubject)
+      + '&body=' + encodeURIComponent(TEXT.inviteBody + roomLink);
   }
 
   function raceUrl(protocol, host, id) {
@@ -598,7 +607,7 @@ const KLAD_LOBBY = (() => {
   }
 
   return {
-    create, connect, roomIdOf, isRoomId, raceUrl, roomView, TEXT,
+    create, connect, roomIdOf, inviteMailto, isRoomId, raceUrl, roomView, TEXT,
     PRESENCE_EVERY, ROOM_EVERY, SWEEP_AFTER, REJOIN_AFTER, SOCKET_TRIES, SOCKET_RECONNECTS, SOCKET_FIRST_WAIT,
   };
 })();
@@ -613,7 +622,7 @@ if (typeof document !== 'undefined') (() => {
         listedLine = $('lobby-listed-line'), listedRow = $('lobby-listed-row'), linkOnlyBox = $('lobby-link-only'),
         onlineStatus = $('lobby-online-status'), onlineList = $('lobby-online'),
         out = $('lobby-out'), createButton = $('lobby-create');
-  const roomPart = $('lobby-room'), link = $('lobby-link'), copyButton = $('lobby-copy'), copyNote = $('lobby-copy-note'),
+  const roomPart = $('lobby-room'), link = $('lobby-link'), mailLink = $('lobby-mail'), copyButton = $('lobby-copy'), copyNote = $('lobby-copy-note'),
         roomStatus = $('lobby-room-status'), playerList = $('lobby-players'), levelLine = $('lobby-level-line'),
         levelRow = $('lobby-level-row'), levelSelect = $('lobby-level'), startNote = $('lobby-start-note'),
         readyButton = $('lobby-ready'), startButton = $('lobby-start'), leaveButton = $('lobby-leave'),
@@ -741,6 +750,7 @@ if (typeof document !== 'undefined') (() => {
     const view = state.room;
     const isLobby = Boolean(view && view.state === 'lobby');
     link.value = location.origin + '/klad/#room=' + state.roomId;
+    mailLink.href = KLAD_LOBBY.inviteMailto(link.value);
     listedLine.textContent = view ? (view.isListed ? 'Комната в списке открытых комнат.' : 'Комната только по ссылке: в списке её нет.') : '';
     listedRow.hidden = !(view && view.isHost);
     if (view && (document.activeElement !== linkOnlyBox || !state.isBusy)) linkOnlyBox.checked = !view.isListed;

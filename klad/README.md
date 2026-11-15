@@ -140,6 +140,15 @@ closed or the tab is hidden:
   most one join per poll. A poll answered after the tab hid again does
   nothing. Inside the 55 s, or in a starting or running race, the room view
   ends with a message.
+- Invite by mail (RAS-48): next to "Копировать" the room view has a link
+  "Отправить по почте", an `<a>` whose `href` is `KLAD_LOBBY.inviteMailto`
+  of the link field: `mailto:` with no receiver, a subject and a short text
+  holding the room link, both through `encodeURIComponent`. The device's
+  mail app does the sending from the player's own address; nothing goes to
+  the API and nothing is stored, so the privacy notes are unchanged. It is a
+  link because a form would be blocked by `form-action 'none'`; a `mailto:`
+  link is not covered by the CSP. With only webmail on a desktop it may open
+  nothing.
 - Joining another room leaves the current one. Leaving (the button or
   closing the dialog) while a join is out takes the room off the screen at
   once and sends `POST /rooms/<id>/leave` only after the join answers. Any

@@ -150,6 +150,33 @@ async function hosting(answers, options) {
 
 /* ---- the room link ---- */
 
+test('inviteMailto has no receiver and decodes to the subject and the exact room link', () => {
+  // given
+  const roomLink = 'test://rassimok.test/klad/#room=' + ID;
+
+  // when
+  const href = KLAD_LOBBY.inviteMailto(roomLink);
+
+  // then
+  assert.ok(href.startsWith('mailto:?subject='));
+  const query = new URLSearchParams(href.slice('mailto:?'.length));
+  assert.equal(query.get('subject'), TEXT.inviteSubject);
+  assert.equal(query.get('body'), TEXT.inviteBody + roomLink);
+  assert.equal(href.includes('#'), false);
+  assert.equal(href.includes(' '), false);
+});
+
+test('inviteMailto sends no request', (t) => {
+  // given
+  const fetchCalls = t.mock.method(globalThis, 'fetch', async () => ({}));
+
+  // when
+  KLAD_LOBBY.inviteMailto('test://rassimok.test/klad/#room=' + ID);
+
+  // then
+  assert.equal(fetchCalls.mock.callCount(), 0);
+});
+
 test('roomIdOf reads the id after #room= and leaves every other hash alone', () => {
   // given
   const { roomIdOf } = KLAD_LOBBY;
@@ -1928,6 +1955,23 @@ test('lobby page: an empty list says so and points to Создать комна�
   assert.equal(empty.elements['lobby-rooms-title'].textContent, 'Открытые комнаты: 0');
   assert.equal(down.elements['lobby-rooms-status'].textContent, TEXT.roomsDown);
   assert.equal(down.elements['lobby-online'].children.length, 2);
+});
+
+test('lobby page: the room view links the mail app to the room link and sends nothing for it', async () => {
+  // given
+  const page = loadLobbyPage({ ...LIST_OF(LISTED), [JOIN]: [[200, room()]], [POLL]: [[200, room()]] });
+  page.elements['h-lobby'].listeners.click();
+  await settle();
+
+  // when
+  await buttonsOf(page.elements['lobby-rooms'].children[0])[0].listeners.click();
+  await settle();
+
+  // then
+  const roomLink = 'test://rassimok.dev/klad/#room=' + ID;
+  assert.equal(page.elements['lobby-link'].value, roomLink);
+  assert.equal(page.elements['lobby-mail'].href, KLAD_LOBBY.inviteMailto(roomLink));
+  assert.equal(page.server.calls.some((call) => call.includes('mail')), false);
 });
 
 test('lobby page: the Войти button joins the room and the list part is hidden', async () => {

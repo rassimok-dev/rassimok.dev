@@ -19,7 +19,7 @@ proxy (below), it is self-contained on purpose so it can be removed in one go.
 | `race.js` | the ghost race on the lobby's socket: countdown, positions, ghosts, finish, the finish screen; its logic half is also loaded by the node tests |
 | `test/levels.test.js` | `node --test`: shape, legend, key-then-exit reachability, revision, fastest clear above the API floor |
 | `test/online.test.js` | `node --test`: `online.js` against a fake `fetch`: request shapes, when results wait or go, a skip during a save, blocked cookies, login codes, verify answers and merges, the read-back after a login, a login ending a skip, logout, 400, 401, 404, 409, 429, offline |
-| `test/lobby.test.js` | `node --test`: `lobby.js` against a fake `fetch`, a fake clock and a fake `WebSocket`: the room id form and the `#room=` link, the room view and the Start condition, presence and room polls only while open and visible, the poll after an own action, 404, 409 `room_full`, the socket at `starting` and at `racing` after a reload, once (backoff, 1008, the cap in all, its stop), the not-available text when the API drops a player whose socket never opened, the re-join after the sweep (heartbeat 204 not counted, a tap on Ready, 57 s, network failures, a poll answered after a hide), another link and the leave button during a join, the answers after the close, the request budget for an hour |
+| `test/lobby.test.js` | `node --test`: `lobby.js` against a fake `fetch`, a fake clock and a fake `WebSocket`: the room id form and the `#room=` link, the room view and the Start condition, the open rooms list (marks, join from it, empty, failed, the poll rate and the poll after leaving), link only, a non-member's room answer, presence and room polls only while open and visible, the poll after an own action, 404, 409 `room_full`, the socket at `starting` and at `racing` after a reload, once (backoff, 1008, the cap in all, its stop), the not-available text when the API drops a player whose socket never opened, the re-join after the sweep (heartbeat 204 not counted, a tap on Ready, 57 s, network failures, a poll answered after a hide), another link and the leave button during a join, the answers after the close, the request budget for an hour, and the page half in a `vm` context with a stub page (list items, a nick shown as text, the link-only box and switch) |
 | `test/race.test.js` | `node --test`: `race.js` on the lobby's real socket module with a fake `WebSocket`, a fake clock and a fake engine: the countdown and go, a missed go, the position rate only while racing, visible and in play, one ping timer across reconnects, finish once and its resend after a reconnect, ghosts by slot (slot 9 makes one, slot 10 none), their interpolation (midpoint, no step back, new attempt and long step at once, a pause, the cap, seen through `ghostSampleCount`, which exists for that test only), fade and resync, the results view (also with 10 places), close 1000, offline, a second race, a reload in the race and after the own finish; `race.js`'s page half in a `vm` context with stub dialogs: Escape on the finish screen leaves the room, "Назад в комнату" and go do not; and `klad.js` in a `vm` context with a stub page: the host's shape whatever the orientation, the exit and deaths in a race with no `klad:clear`, `klad:run` or game over, `stopRace`, ghosts drawn as canvas text, 10 slots in 10 colours |
 | `test/proxy.test.js` | `node --test`: the API proxy against a fake `fetch` |
 | `test/ticks.test.js` | `node --test`: the time formatter |
@@ -81,6 +81,23 @@ closed or the tab is hidden:
 
 - While it is open: `POST /presence` and then `GET /presence` (who is in
   the lobby), at most once per 30 s each, about 240 requests an hour.
+- While it is open and the player is in no room: `GET /rooms` (the open
+  rooms, at most 20) together with the online list, at most once per 30 s,
+  and once more after the player leaves a room, fails a join or is dropped
+  from one: about 360 requests an hour in all. Nothing asks for it inside a
+  room, while the tab is hidden or with the dialog closed.
+- The list shows one line per room (host nick, `players` of `size`, level,
+  shape) with a "Войти" button that calls the lobby's join; a full, starting
+  or racing room is marked and has no button. The headings count both lists
+  ("Сейчас в лобби: N", "Открытые комнаты: N"). An empty list points to
+  "Создать комнату"; a failed list request says the server is not answering
+  while the rest of the lobby works. Link only: a checkbox before
+  "Создать комнату" sends `POST /rooms?listed=false` (no query means listed);
+  the host's switch in the room view sends `POST /rooms/<id>/listed` with
+  `{"listed":true|false}`, and everyone reads the setting from `listed`.
+  A non-member's `GET /rooms/<id>` has `host` null and `players` empty, which
+  reads as "no member" like any room this player was dropped from. Nicks
+  from the list go in with `textContent` only.
 - In a room: `GET /rooms/<id>` every 10 s, plus once right after each own
   action (join, ready, level, start), about 360 an hour more. Leaving is
   `POST /rooms/<id>/leave`; closing the dialog leaves too unless a race socket is live.

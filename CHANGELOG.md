@@ -3,6 +3,79 @@
 Dated entries, newest first. Written for a reader picking this up cold —
 or a future session needing to know what already exists and why.
 
+## 2026-11-15 (later still) - Klad lobby: open rooms with a join button (RAS-46)
+
+The lobby had no list: a room was entered only by its link. The API now
+lists open rooms (RAS-45, `GET /rooms`), so the lobby shows them. The user
+decided on 2026-11-15: only the list and the counts in the headings (no
+player status, no panel layout), and the list only while the player is in
+no room (in a room it would invite a join that silently leaves it).
+
+- `lobby.js`: `listRooms()` runs at the end of each presence beat, so it
+  shares the 30 s rate and the conditions (lobby open, tab visible), and
+  only while the player is in no room. It also runs once after the player
+  leaves, after a failed join and after being dropped from a room, so the
+  list is not the stale one from before the join. An answer older than a
+  newer request, or one that arrives after joining, is dropped. Entries
+  with an id that is not a room id are left out. Outside a room the hour
+  costs about 360 requests (240 presence, 120 list), as in contract
+  section 7; inside it is still about 600 (a room opened after the first
+  beat adds that one list). The lobby test counts both.
+- Review round 1: the list is cleared (`rooms = null`, "загрузка") when a
+  room is entered and when the player is lost, and `listRooms` now also
+  drops an answer that arrives while in a room (the comment promised it, the
+  check did not do it). The page rebuilds the list only when a line changed
+  (id, state, host, counts, level, shape), because a rebuild every beat
+  dropped keyboard focus from a "Войти" button; when a line did change, focus
+  follows to the button of the same room. After a join from the list that
+  does not open the room, focus goes to that room's button if it is still
+  there, otherwise to "Создать комнату". "Войти" in the note meant account
+  login on this page, so the note now names the audience. The page test
+  stub uses a `test://` origin instead of a split `https:` literal, so the
+  CI grep guard is not worked around. New tests: late list answer dropped, a
+  real race-socket leave with the lobby closed, one list after a drop,
+  `joinFromList` while busy, focus kept and moved.
+- The join button calls the existing `join(id)` through `joinFromList`,
+  which does nothing in a room, while a request is out, or for a malformed
+  id, so the messages for a full room, a running race and a room that is
+  gone are the old ones. Only a `lobby` room with a free place gets the
+  button; full, `starting` and `racing` rooms say "заполнена", "гонка
+  начинается", "идёт гонка".
+- Link only: a checkbox "Только по ссылке" before "Создать комнату" sends
+  exactly `POST /rooms?listed=false`; unchecked sends plain `POST /rooms`
+  (no query means listed). The host's room view has the same checkbox
+  (`POST /rooms/<id>/listed`, `{"listed":true|false}`); everyone reads the
+  setting from `listed` ("Комната в списке открытых комнат." or "Комната
+  только по ссылке: в списке её нет."). A missing `listed` counts as
+  listed. The checkbox is not rewritten from the poll while its own request
+  is out, as with the level select.
+- A non-member's `GET /rooms/<id>` has `host` null and `players` empty
+  since RAS-45. Checked with tests: `roomView` reads it as no member, a poll
+  that gets it ends the room view with the "removed" text, and after a long
+  unseen time it counts as dropped and joins once more (`wasDropped`). The
+  `#room=<id>` entry joins by POST, which answers the member's own view,
+  so it never depends on that answer.
+- Page: each room is one `<li>` (host nick, "игроков N из M, Этап ...",
+  button or mark), so a screen reader reads the room and its button
+  together; the button is a plain `<button>` reached by Tab with the
+  dialog's existing focus outline. The item wraps on a phone and the
+  dialog already scrolls. Host nicks go in with `textContent`; the page
+  test runs `lobby.js` in a `vm` context with a stub page and checks that a
+  nick `<img src=x onerror=alert(1)>` is text and no `img` is created.
+  After a join from the list focus goes to "Копировать", as after creating
+  a room.
+- Texts: headings "Сейчас в лобби: N" and "Открытые комнаты: N" (without
+  the count until the first answer). The note says every player with a nick
+  (guest or account; `GET /rooms` needs only a session) sees a listed
+  room's host nick and player count, also during its race; that any such
+  player can join an open room and then sees its members; and that link
+  only hides a room from later lists but does not take back a link already
+  seen. A failed list says "Сервер не отвечает: список комнат
+  не загрузился. Остальное в лобби работает." The count counts the 20
+  rooms the API returns, so it caps at 20.
+- Not verified here: the two-browser run on production and the 360 px
+  layout in a real browser.
+
 ## 2026-11-15 (later) - Klad: the game is ready for rooms of up to 10 (RAS-42)
 
 The room size comes from the API, but the game had 4 built in. This ships

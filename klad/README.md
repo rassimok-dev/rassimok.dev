@@ -159,10 +159,13 @@ player's game: no shared world, no collision.
   `ticksPerSecond`). When a position arrives after the drawn moment has
   passed the last one (a pause, a lost frame, rising latency), the move
   starts from where the ghost stands and is anchored at the arrival. A
-  position never gets a slide shorter than 100 ms, so messages that arrive
-  bunched after a stall do not hop; the ghost may lag a little more for a
-  moment (up to about 450 ms after a stall) and catches up within a second.
-  It never runs ahead of the last position. A position
+  position never gets a slide shorter than its tick gap or 100 ms,
+  whichever is less, so messages that arrive bunched after a stall do not
+  hop: after N positions together the ghost runs at twice its speed, up to
+  250 + 100 x (N - 1) ms behind, and is back at 250 ms about N x 200 ms
+  later. From about 9 together (a stall of about 1.8 s) the cap of 10
+  drops samples still needed and the ghost hops until it has caught up (a
+  known limit). It never runs ahead of the last position. A position
   with a lower `tick` (a new attempt) or a step over 3 cells shows at once;
   a fall step of 1.8 cells slides. With no update for 2 s a ghost fades out
   over 1 s. A `state` after a reconnect replaces the ghosts with its

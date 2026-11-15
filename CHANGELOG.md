@@ -24,11 +24,15 @@ position".
   gap, but never sooner than half a send interval (`POSITION_EVERY / 2`,
   100 ms) after the previous one, even when it arrives at once behind it:
   messages that come bunched after a stall (TCP delivers them together)
-  would otherwise get a slide of zero length and hop. The time may so run
-  a little past the arrival, by a bounded amount (a bunched pair about
-  350 ms behind in all, three after a stall 450 ms, a hostile burst of 10
-  about 1150 ms, draining within a second); a sender running faster than
-  the clock still cannot make the lag grow without bound. When the previous position's time is already
+  would otherwise get a slide of zero length and hop. (A tick gap under
+  100 ms, as after a resume, keeps its own shorter slide.) The time may so
+  run past the arrival: after N positions arrive together the ghost runs
+  at twice its speed, up to 250 + 100 x (N - 1) ms behind their arrival,
+  and is back at its usual 250 ms about N x 200 ms later, about the length
+  of the stall. Known limit: from about 9 positions together (a stall of
+  about 1.8 s) the cap of 10 drops samples the drawn moment still needs,
+  and the ghost hops a cell at a time until it has caught up; no worse
+  than before this change. When the previous position's time is already
   behind the drawn moment (a pause, a lost frame, latency that rose for
   good), the new one is anchored at its arrival instead and its move starts
   no earlier than the drawn moment, so the ghost waits where it stands and
@@ -46,13 +50,13 @@ position".
 - **The delay costs jitter room only 250 ms minus the 200 ms spacing.** A
   message up to about 50 ms late is absorbed fully; a later one makes the
   ghost wait at its last position and then slide to it, re-anchored at
-  its arrival, so the margin comes back. No scenario tested (late message, bunched
-  pair, three after a stall, rising latency, lost ticks) moves a ghost more
-  than 0.25 cell per 10 ms frame. Right after a stall the lag may briefly
-  pass 350 ms, which is the price of the floor. Do not keep a one-frame
-  catch-up on purpose. A longer delay is not needed and would go
-  over the "about a third of a second behind" the ticket asks for;
-  `GHOST_DELAY` is one constant.
+  its arrival, so the margin comes back. No tested scenario (late
+  message, bunched pair, three after a stall, rising latency, lost ticks)
+  moves a ghost more than 0.25 cell per 10 ms frame. Right after a stall
+  the lag passes the usual 250 ms by the rule above, which is the price of
+  the floor. Do not keep a one-frame catch-up on purpose. A longer delay
+  is not needed and would go over the "about a third of a second behind"
+  the ticket asks for; `GHOST_DELAY` is one constant.
 - **Facing follows the received x** against the previous position, as
   before, and slots still separate the ghosts.
 

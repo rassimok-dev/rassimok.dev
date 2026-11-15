@@ -235,6 +235,7 @@ dialog h2 {
 dialog h3 { margin: 1rem 0 .3rem; font-size: .85rem; color: var(--crt-hot); }
 dialog p { margin: .5rem 0; }
 dialog .note { color: var(--crt-dim); }
+dialog a { color: var(--crt-hot); text-underline-offset: 3px; }
 dialog .error { color: var(--crt-alert); }
 dialog .error:empty, dialog .note:empty { margin: 0; }
 dialog fieldset {

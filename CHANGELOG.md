@@ -11,9 +11,12 @@ stores and shares data (decided by the user on 2026-11-15). Until now the
 only privacy texts were the klad footers and the notes in its dialogs, at
 no stable URL of their own. `privacy/index.html` is a new page: plain HTML
 on `/style.css`, no JavaScript, Russian first and English after. The home
-page footer and both klad footers (English and Russian) link to it; the
-existing notes are unchanged. Google sign-in (RAS-44) and the room chat
-(RAS-54) add their sections in the same change as their features.
+page footer, both klad footers (English and Russian) and the privacy note
+of the boards dialog's login part link to it; that note also says "игра уже
+не сможет их удалить" instead of "удалить их будет уже нельзя" (see the
+deletion requests below), and the other notes are unchanged. Google
+sign-in (RAS-44) and the room chat (RAS-54) add their sections in the same
+change as their features.
 
 ### Decisions worth not relitigating
 
@@ -22,28 +25,38 @@ existing notes are unchanged. Google sign-in (RAS-44) and the room chat
   `LoginResource`, `LoginCodes`, `PresenceStore`, the room views,
   `RaceMessage` with contract section 8, `BoardsResource`,
   `application.properties`, `deploy.yml`) and against the site (`_headers`,
-  the proxy, `online.js`, the klad notes). The regions of Neon
+  the proxy, `online.js`, the klad notes). The one promise that is not in
+  the code is deletion by hand on request (below). The regions of Neon
   (AWS eu-central-1) and Resend (eu-west-1) and the 30 days of Cloud
   Logging come from the run's brief and the workspace state, not from code.
 - **The stored list is complete.** Besides the nick, the kind, the results
   and an account's email, the tables hold when the player was created and
-  roughly when it was last seen (refreshed at most once a day), the time of
-  each result, and per browser the hash of the cookie's key with its expiry.
-  A shorter list would be wrong, so the page names them all. "Nothing deletes
+  roughly when it was last seen (refreshed at most once a day per browser,
+  and at each login), the time of each result, and the hash of each cookie
+  key issued to the nick, with when it was issued and when it expires. A key
+  that expired or was cleared from the browser stays until the nick is
+  deleted; logout and a login delete only the browser's current key, so the
+  page no longer says "one per browser". A shorter list would be wrong, so
+  the page names them all. "Nothing deletes
   it on its own": there is no guest purge (an open proposal), and expired
   session rows stay too, so the page says the cookie expires, not that the
   session is deleted.
 - **Deletion with its limits.** The button deletes a guest only in the
-  browser that holds its cookie; a login into an account of the other kind
-  leaves the guest with its results and no cookie, so it can no longer be
-  deleted (as the klad login note says); a browser that refuses the cookie
-  leaves the nick it just saved on the server, without results (the
-  read-back in `online.js` finds no player, and no further `POST /players`
-  goes out until a reload); the send-log hashes stay a day and go with the
-  first code request after that. Logout deletes the browser's key and the
-  cookie and keeps the account. The page promises no deletion
-  by mail, because nothing in the code does it; the contact line asks for
-  questions only.
+  browser that holds its cookie. The most common way to lose that is a
+  cookie that runs out after 90 days without a visit or is cleared with the
+  browser's data: the guest and its results stay. A login into an account
+  of the other kind leaves the guest with its results and no cookie (as the
+  klad login note says); a browser that refuses the cookie leaves the nick
+  it just saved on the server, without results (the read-back in
+  `online.js` finds no player, and no further `POST /players` goes out
+  until a reload); the send-log hashes stay a day and go with the first
+  code request after that. Logout deletes the browser's key and the cookie
+  and keeps the account. The page and the login note say the game can no
+  longer delete such a guest, not that nobody can: the contact address also
+  takes deletion requests (decided by the user on 2026-11-15, for GDPR), and
+  the page, next to the limits and again under "Contact", asks for the nick
+  and roughly when it played, so the nick and its results can be deleted by
+  hand.
 - **Boards are "open to everyone"**: `GET /boards/*` needs no session. The
   online list, the open rooms and the room members are seen by players with
   a nick, as the lobby note says. In a race the others get, from the race
@@ -81,8 +94,15 @@ existing notes are unchanged. Google sign-in (RAS-44) and the room chat
   The meta description is English, like the klad page's.
 - **Link texts:** "Privacy policy." closes the home page's privacy line and
   the English klad footer (before "← rassimok"); the Russian footer ends with
-  "Подробнее на странице о приватности."
-- **Size:** about 19.1 KB, 6.6 KB gzipped (Cyrillic takes two bytes a
+  "Подробнее на странице о приватности." `klad.css` hides the game's footer
+  on touch devices, so on a phone the game's only link to the page ends the
+  login part's privacy note (shown for a guest or no player), and it opens
+  in a new tab (`target="_blank" rel="noopener"`, said in the link text) so
+  the game in progress and any results waiting in memory are not lost; the
+  nick prompt gets no link. A new `dialog a` rule gives it the footer links'
+  `--crt-hot`, because the browser's default blue fails contrast on the
+  dark dialog.
+- **Size:** about 21.4 KB, 7.0 KB gzipped (Cyrillic takes two bytes a
   letter). The home page budget (2026-10-30) is for the apex; this page is
   text that only loads when asked for, and nothing on it is decorative.
 - `_headers` is unchanged: the `/*` block covers `/privacy/` (CSP

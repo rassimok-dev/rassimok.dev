@@ -68,7 +68,8 @@ checks again) and plays as before.
   mails nothing but login codes. Both footers and the login part say so in
   full, the nick prompt in short; the meta description names only the hash.
   The site's privacy page (`/privacy/`, outside this folder), linked from
-  both footers, says all of it in one place.
+  both footers and, in a new tab, from the login part's privacy note, says
+  all of it in one place.
 - Any open `<dialog>` holds the game: play pauses, timers stop and game keys
   are ignored. Closing it puts the focus back on the field.
 - Nicks come from other players, so every text is set with `textContent`.

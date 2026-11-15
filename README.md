@@ -31,12 +31,14 @@ what a grep can check (see below), so the claims cannot quietly become false.
 one place, Russian first and English after: what the site and the game keep,
 what other players see, how to delete it, where each part runs (Cloudflare
 Pages, Google Cloud Run in europe-west4, Neon on AWS in eu-central-1, Resend
-in eu-west-1), the logs, and a contact address. The home page and both
-footers of the game link to it. Plain HTML on `style.css`, no JavaScript,
-under the site-wide headers. Google's OAuth consent screen wants such a page
-on the app's own domain, linked from the home page. It says only what the
-code does, so a change that stores, shows or mails more changes the page in
-the same go.
+in eu-west-1), the logs, and a contact address that also takes deletion
+requests. The home page, both footers of the game and the privacy note of
+its login part (in a new tab) link to it. Plain HTML on `style.css`, no
+JavaScript, under the site-wide headers. Google's OAuth consent screen wants
+such a page on the app's own domain, linked from the home page. It says only
+what the code does, with one exception: deletion by hand on request, which
+is the operator's promise, not the code's. So a change that stores, shows or
+mails more changes the page in the same go.
 
 **Zero third-party requests.** Fonts are the usual leak here: loading Google
 Fonts sends every visitor's IP address to Google. This site uses the system

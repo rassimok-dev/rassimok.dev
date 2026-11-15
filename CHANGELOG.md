@@ -3,6 +3,24 @@
 Dated entries, newest first. Written for a reader picking this up cold —
 or a future session needing to know what already exists and why.
 
+## 2026-11-15 (fifth) - Email addresses on the privacy page kept out of Cloudflare's rewrite
+
+Cloudflare's Email Address Obfuscation (a zone feature, on by default)
+rewrote every address on `/privacy/` into a placeholder and injected its own
+decoder script from `/cdn-cgi/`. The page's CSP has no `script-src`, so the
+script was blocked: visitors saw "[email protected]" instead of the contact
+address, and the browser logged a CSP violation. Each address is now wrapped
+in `<!--email_off-->` and `<!--/email_off-->`, which tells Cloudflare to leave
+it alone, so no script is injected and the `mailto:` links work.
+
+### Decisions worth not relitigating
+
+- **Markers per address, not a zone setting.** Turning the feature off in
+  the Cloudflare dashboard (Scrape Shield) would cover every page, but it is
+  a zone setting outside the repo and outside this change; it is listed for
+  the user. Any page that shows an address (the chat note of RAS-54, the
+  Google sign-in notes of RAS-44) needs the same markers until then.
+
 ## 2026-11-15 (fourth) - Privacy page at /privacy/ (RAS-57)
 
 Google's OAuth consent screen "In production" needs a privacy policy on the

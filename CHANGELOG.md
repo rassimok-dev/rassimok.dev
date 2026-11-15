@@ -3,6 +3,39 @@
 Dated entries, newest first. Written for a reader picking this up cold —
 or a future session needing to know what already exists and why.
 
+## 2026-11-15 (later) - Klad: the game is ready for rooms of up to 10 (RAS-42)
+
+The room size comes from the API, but the game had 4 built in. This ships
+before the API change (RAS-43) on purpose: with the API still at 4 nothing
+changes for players, while in the other order a fifth player's runner
+would be invisible to the others. Contract sections 7 and 8 still say 4
+until RAS-43 changes them.
+
+- `race.js`: `SLOTS` is 10. A `pos` from slot 0 to 9 makes a ghost (the own
+  slot excepted), slot 10 and above makes none; the finish table sorts
+  players with no place after 10 places (`SLOTS + 1`). The per-slot ghosts
+  of RAS-40 needed no other change.
+- Ten ghost colours, `--crt-ghost-0` to `--crt-ghost-9` in `klad.css`,
+  with the same fallbacks in `klad.js`, picked by slot (no `% 4`, which
+  repeated colours from slot 4). The first four are unchanged. New:
+  `#d6f26b` lime, `#ffa45c` orange, `#ff8fb8` rose, `#86b6ff` sky blue,
+  `#e6d3a3` sand, `#8ff0e0` aqua. Checked with a throwaway script: contrast
+  against `--crt-bg` is 8.7 or more for all ten (the first four are 8.7 to
+  16.7; the new ones 8.8 to 15.0), the CIELAB distance of every new colour
+  to every other ghost, `--crt-fg` and `--crt-alert` is 22 or more (the
+  closest pair is sky blue and the lavender of slot 3), and none is
+  green or red. Sand and orange sit near the `--crt-hot` yellow, which no
+  ghost uses.
+- Texts name no number: the room-full message is now "Комната заполнена:
+  свободных мест нет." and the lobby hint is "Создайте комнату и отправьте
+  ссылку друзьям." (the "up to N" clause is gone, because any number there
+  goes stale with the API). The room view keeps "Игроков: N из <size>" from
+  the API.
+- Tests: slot 9 makes a ghost and slot 10 none (the bad-slot test moved
+  from 4 to 10), results with 10 places in order, ten different colours in
+  the `klad.js` test, `roomView` with size 10 and 10 players, and the
+  room-full text has no digit.
+
 ## 2026-11-15 - Klad ghost race: ghosts move smoothly (RAS-40)
 
 Other players' runners hopped about five times a second, because a ghost

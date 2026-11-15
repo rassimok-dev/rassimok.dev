@@ -14,6 +14,12 @@
   --crt-ghost-1: #7fdcff;
   --crt-ghost-2: #f2f2f2;
   --crt-ghost-3: #b8a4ff;
+  --crt-ghost-4: #d6f26b;
+  --crt-ghost-5: #ffa45c;
+  --crt-ghost-6: #ff8fb8;
+  --crt-ghost-7: #86b6ff;
+  --crt-ghost-8: #e6d3a3;
+  --crt-ghost-9: #8ff0e0;
   --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "DejaVu Sans Mono",
           "Liberation Mono", monospace;
 }

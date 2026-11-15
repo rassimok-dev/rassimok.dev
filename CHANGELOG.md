@@ -3,6 +3,63 @@
 Dated entries, newest first. Written for a reader picking this up cold —
 or a future session needing to know what already exists and why.
 
+## 2026-11-15 - Klad ghost race: ghosts move smoothly (RAS-40)
+
+Other players' runners hopped about five times a second, because a ghost
+was drawn at the last received position until the next `pos` arrived (a
+step of 1 cell walking, 1.8 falling), and unevenly when the network delayed
+a message. The receiver now interpolates; the sender and the API are
+unchanged (`pos` every 200 ms, contract section 8 as it was). This replaces
+the 2026-11-13 (eighth) decision "a ghost is drawn from the latest
+position".
+
+### Decisions worth not relitigating
+
+- **Each ghost keeps its last 10 positions with the sender's `tick`, and is
+  drawn 250 ms in the past on the line between the two around that
+  moment.** Positions are spaced by the sender's ticks (the rate is
+  `KLAD_TICKS.PER_SECOND`, passed to `race.js` as `ticksPerSecond` like
+  `format`, not repeated), so a message that comes late does not change the
+  spacing. A position is shown at the previous one's time plus the tick
+  gap, but never sooner than half a send interval (`POSITION_EVERY / 2`,
+  100 ms) after the previous one, even when it arrives at once behind it:
+  messages that come bunched after a stall (TCP delivers them together)
+  would otherwise get a slide of zero length and hop. (A tick gap under
+  100 ms, as after a resume, keeps its own shorter slide.) The time may so
+  run past the arrival: after N positions arrive together the ghost runs
+  at twice its speed, up to 250 + 100 x (N - 1) ms behind their arrival,
+  and is back at its usual 250 ms about N x 200 ms later, about the length
+  of the stall. Known limit: from about 9 positions together (a stall of
+  about 1.8 s) the cap of 10 drops samples the drawn moment still needs,
+  and the ghost hops a cell at a time until it has caught up; no worse
+  than before this change. When the previous position's time is already
+  behind the drawn moment (a pause, a lost frame, latency that rose for
+  good), the new one is anchored at its arrival instead and its move starts
+  no earlier than the drawn moment, so the ghost waits where it stands and
+  slides, and the messages after it keep the floor above. A move
+  otherwise starts at its time minus the tick gap.
+- **Never extrapolate.** After the last position the ghost stays; a guess
+  that is wrong would be a hop back. The 2 s fade is unchanged.
+- **At once, no slide:** a lower `tick` than before (a new attempt after a
+  death; `intro()` resets the count) or a step over 3 cells (Euclidean, in
+  cells) starts the list again at that position. A fall step of 1.8 cells
+  is below 3 and slides. A `state` after a reconnect clears the ghosts and
+  takes its `positions` the same way, so they show at once.
+- **The cap is 10 positions per ghost**, so a member that sends 10 a
+  second for 4 minutes does not grow memory; the oldest is dropped.
+- **The delay costs jitter room only 250 ms minus the 200 ms spacing.** A
+  message up to about 50 ms late is absorbed fully; a later one makes the
+  ghost wait at its last position and then slide to it, re-anchored at
+  its arrival, so the margin comes back. No tested scenario (late
+  message, bunched pair, three after a stall, rising latency, lost ticks)
+  moves a ghost more than 0.25 cell per 10 ms frame. Right after a stall
+  the lag passes the usual 250 ms by the rule above, which is the price of
+  the floor. Do not keep a one-frame catch-up on purpose. A longer delay
+  is not needed and would go over the "about a third of a second behind"
+  the ticket asks for; `GHOST_DELAY` is one constant.
+- **Facing follows the received x** against the previous position, as
+  before, and slots still separate the ghosts.
+
 ## 2026-11-13 (eighth) - Klad ghost race: countdown, ghosts, finish screen
 
 When the host starts, every player in the room plays the same level on

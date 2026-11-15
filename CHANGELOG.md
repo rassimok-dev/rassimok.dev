@@ -3,6 +3,50 @@
 Dated entries, newest first. Written for a reader picking this up cold —
 or a future session needing to know what already exists and why.
 
+## 2026-11-15 (sixth) - Lobby: invite a friend by mail through the player's own mail app (RAS-48)
+
+The room view has a link "Отправить по почте" next to "Копировать". It opens
+the device's mail app through `mailto:` with a subject, a short text holding
+the room link, and no receiver. The player types the address and sends from
+their own account.
+
+### Decisions worth not relitigating
+
+- **`mailto:`, not a mail sent by the API.** No API change, no mail quota, no
+  stored address, so the privacy notes and the promise that the server mails
+  only login codes stay as they are (user, 2026-11-15; the API variant,
+  RAS-47, is cancelled). Limit: a device with no mail handler may do nothing;
+  "Копировать" stays as the fallback.
+- **No `href` in the served HTML, and `target="_blank"`.** Cloudflare's Email
+  Address Obfuscation (on for the zone) rewrote a `mailto:` link on
+  `/privacy/` and injects a `/cdn-cgi/` decoder script, which the klad CSP
+  `script-src 'self'` would let run. The anchor has no `href` in the HTML;
+  `renderRoom` sets it before the room part is shown. `target="_blank"` and
+  `rel="noopener"` are set there too, because html-validate rejects both on
+  an `<a>` without `href`. They make a web mail handler, for example Gmail
+  registered in desktop Chrome, open in a new tab; without it the game tab
+  would be replaced, the player would drop out of the room until the 60 s
+  sweep and a host would have no `#room=` to come back to (main session,
+  2026-11-15).
+- **An `<a>`, not a form or a script.** A form would be blocked by
+  `form-action 'none'`; navigating a link to `mailto:` is not covered by the
+  klad CSP (research item 18), so `_headers` is unchanged. To be confirmed on
+  a Pages response in Chrome and Safari.
+- **Built in `KLAD_LOBBY.inviteMailto` from the link field's value**, so the
+  mail carries exactly the link the player sees and copies (page origin plus
+  `/klad/#room=<id>`); no URL literal in any `.js` file. Subject and text
+  are `TEXT.inviteSubject` and `TEXT.inviteBody` and both are encoded with
+  `encodeURIComponent`, so `#`, `&`, spaces and Cyrillic cannot break the
+  link. The href is set in `renderRoom`, so it follows the room the player
+  is in.
+- **Focus.** A link is reachable with Tab and takes the dialog's
+  `:focus-visible` outline; the focus handling RAS-46 added is untouched.
+- **Tests** in `klad/test/lobby.test.js`: the href decodes back to the
+  subject and the exact room link and holds no `+` (spaces are `%20`); in the
+  page test `#lobby-mail` has no event listeners and the full list of server
+  calls equals the join flow's own (heartbeat, online list, room list, join,
+  poll), so the link adds no call.
+
 ## 2026-11-15 (fifth) - Email addresses on the privacy page kept out of Cloudflare's rewrite
 
 Cloudflare's Email Address Obfuscation (a zone feature, on by default)

@@ -190,13 +190,17 @@
     <p><button type="button" id="lobby-choose">Выбрать ник</button></p>
   </div>
   <div id="lobby-main" hidden>
-    <h3>Сейчас в лобби</h3>
-    <p class="note">Пока лобби открыто и ещё около минуты после, другие игроки видят в этом списке ваш ник, ваш выбор (человек или агент) и то, гость вы или аккаунт.</p>
+    <h3 id="lobby-online-title">Сейчас в лобби</h3>
+    <p class="note">Пока лобби открыто и ещё около минуты после, другие игроки видят в этом списке ваш ник, ваш выбор (человек или агент) и то, гость вы или аккаунт. Ник хозяина и число игроков открытой комнаты видит каждый вошедший игрок, и во время её гонки тоже. «Только по ссылке» прячет комнату из следующих списков, но не отзывает ссылку, которую уже видели.</p>
     <p id="lobby-online-status" class="note"></p>
     <ul id="lobby-online" class="people"></ul>
     <div id="lobby-out">
+      <h3 id="lobby-rooms-title">Открытые комнаты</h3>
+      <p id="lobby-rooms-status" class="note"></p>
+      <ul id="lobby-rooms" class="people rooms"></ul>
       <h3>Комната</h3>
       <p class="note">Создайте комнату и отправьте ссылку друзьям.</p>
+      <p><label><input type="checkbox" id="lobby-private"> Только по ссылке</label></p>
       <p><button type="button" id="lobby-create">Создать комнату</button></p>
     </div>
     <div id="lobby-room" hidden>
@@ -206,6 +210,8 @@
         <button type="button" id="lobby-copy">Копировать</button></p>
       <p id="lobby-copy-note" class="note" role="status"></p>
       <p id="lobby-room-status" class="note"></p>
+      <p id="lobby-listed-line" class="note"></p>
+      <p id="lobby-listed-row"><label><input type="checkbox" id="lobby-link-only"> Только по ссылке</label></p>
       <ul id="lobby-players" class="people"></ul>
       <p id="lobby-level-line"></p>
       <p class="field" id="lobby-level-row"><label for="lobby-level">Этап гонки</label>

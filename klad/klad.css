@@ -280,6 +280,8 @@ dialog .confirm { padding: .1rem .6rem; border: 1px solid var(--crt-alert); bord
 /* The lobby: who is in it, the room, its players and their ready marks. */
 dialog .people { margin: .3rem 0; padding: 0; list-style: none; }
 dialog .people li { padding: .15rem 0; border-bottom: 1px solid var(--crt-rule); overflow-wrap: anywhere; }
+dialog .rooms li { display: flex; flex-wrap: wrap; align-items: center; gap: .2rem .6rem; }
+dialog .rooms .full { color: var(--crt-dim); font-size: .9em; }
 dialog .kind, dialog .waiting { color: var(--crt-dim); font-size: .9em; }
 dialog .host, dialog .ready { color: var(--crt-hot); font-size: .9em; }
 dialog #lobby-link { width: 100%; margin: .2rem 0; }

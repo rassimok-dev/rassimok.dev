@@ -20,16 +20,18 @@ const ONLINE = [{ nick: 'Anna', guest: false, kind: 'human' }, { nick: 'test', g
 const PRESENCE = {
   'POST /klad/api/presence': [[204]],
   'GET /klad/api/presence': [[200, { players: ONLINE }]],
+  'GET /klad/api/rooms': [[200, { rooms: [] }]],
 };
 const HEARTBEAT = 'POST /klad/api/presence';
 const ONLINE_LIST = 'GET /klad/api/presence';
+const ROOM_LIST = 'GET /klad/api/rooms';
 const CREATE = 'POST /klad/api/rooms';
 const POLL = 'GET /klad/api/rooms/' + ID;
 const JOIN = 'POST /klad/api/rooms/' + ID + '/join';
 const LEAVE = 'POST /klad/api/rooms/' + ID + '/leave';
 
 function room(changes) {
-  return { id: ID, state: 'lobby', host: { nick: 'Anna' }, players: [ANNA, MINE], level: 1, shape: 'landscape', size: 4,
+  return { id: ID, state: 'lobby', host: { nick: 'Anna' }, players: [ANNA, MINE], level: 1, shape: 'landscape', size: 4, listed: true,
     ...changes };
 }
 const HOSTED = room({ host: { nick: 'test' }, players: [{ ...MINE, host: true }] });
@@ -128,7 +130,7 @@ function setup(answers, options = {}) {
 }
 
 const count = (calls, request) => calls.filter((call) => call === request).length;
-const roomCalls = (calls) => calls.filter((call) => call.includes('/rooms'));
+const roomCalls = (calls) => calls.filter((call) => call.includes('/rooms') && call !== ROOM_LIST);
 
 async function joined(answers, options) {
   const run = setup({ ...PRESENCE, [JOIN]: [[200, room()]], [POLL]: [[200, room()]], ...answers }, options);
@@ -210,7 +212,7 @@ test('roomView turns the polled room into what the room view shows', () => {
       { nick: 'Anna', kind: 'human', isReady: true, isHost: true },
       { nick: 'test', kind: 'agent', isReady: false, isHost: false },
     ],
-    isMember: true, isHost: false, isReady: false, canStart: false,
+    isMember: true, isHost: false, isReady: false, isListed: true, canStart: false,
   });
 });
 
@@ -286,7 +288,7 @@ test('opening the lobby sends the heartbeat, then the online list, and repeats b
   await settle();
 
   // then
-  assert.deepEqual(server.calls, [HEARTBEAT, ONLINE_LIST]);
+  assert.deepEqual(server.calls, [HEARTBEAT, ONLINE_LIST, ROOM_LIST]);
   assert.deepEqual(lobby.state().online, ONLINE);
   assert.equal(lobby.state().phase, 'ready');
 
@@ -294,13 +296,13 @@ test('opening the lobby sends the heartbeat, then the online list, and repeats b
   await clock.advance(KLAD_LOBBY.PRESENCE_EVERY - 1);
 
   // then
-  assert.deepEqual(server.calls, [HEARTBEAT, ONLINE_LIST]);
+  assert.deepEqual(server.calls, [HEARTBEAT, ONLINE_LIST, ROOM_LIST]);
 
   // when
   await clock.advance(1);
 
   // then
-  assert.deepEqual(server.calls, [HEARTBEAT, ONLINE_LIST, HEARTBEAT, ONLINE_LIST]);
+  assert.deepEqual(server.calls, [HEARTBEAT, ONLINE_LIST, ROOM_LIST, HEARTBEAT, ONLINE_LIST, ROOM_LIST]);
 });
 
 test('a hidden tab sends no heartbeat, and showing it again sends one at once after 30 s', async () => {
@@ -315,7 +317,7 @@ test('a hidden tab sends no heartbeat, and showing it again sends one at once af
   await clock.advance(2 * 60 * 1000);
 
   // then
-  assert.deepEqual(server.calls, [HEARTBEAT, ONLINE_LIST]);
+  assert.deepEqual(server.calls, [HEARTBEAT, ONLINE_LIST, ROOM_LIST]);
   assert.equal(clock.pending(), 0);
 
   // when
@@ -324,7 +326,7 @@ test('a hidden tab sends no heartbeat, and showing it again sends one at once af
   await settle();
 
   // then
-  assert.deepEqual(server.calls, [HEARTBEAT, ONLINE_LIST, HEARTBEAT, ONLINE_LIST]);
+  assert.deepEqual(server.calls, [HEARTBEAT, ONLINE_LIST, ROOM_LIST, HEARTBEAT, ONLINE_LIST, ROOM_LIST]);
 });
 
 test('hiding and showing the tab quickly keeps to one heartbeat per 30 s', async () => {
@@ -371,7 +373,7 @@ test('nothing is sent while the lobby is closed, and nothing before it is first 
   await clock.advance(10 * 60 * 1000);
 
   // then
-  assert.deepEqual(server.calls, [HEARTBEAT, ONLINE_LIST]);
+  assert.deepEqual(server.calls, [HEARTBEAT, ONLINE_LIST, ROOM_LIST]);
   assert.equal(clock.pending(), 0);
 });
 
@@ -1382,7 +1384,7 @@ test('a join that answers racing (a reload in the race) opens one socket, and no
 
 /* ---- the request budget ---- */
 
-test('an hour with the lobby open sends about 240 requests outside a room and about 600 inside', async () => {
+test('an hour with the lobby open sends about 360 requests outside a room and about 600 inside', async () => {
   // given
   const outside = setup(PRESENCE);
   await outside.lobby.open();
@@ -1393,10 +1395,12 @@ test('an hour with the lobby open sends about 240 requests outside a room and ab
   await inside.clock.advance(HOUR - 1);
 
   // then
-  assert.equal(outside.server.calls.length, 240);
+  assert.equal(outside.server.calls.length, 360);
+  assert.equal(count(outside.server.calls, ROOM_LIST), 120);
   assert.equal(count(inside.server.calls, HEARTBEAT) + count(inside.server.calls, ONLINE_LIST), 240);
   assert.equal(count(inside.server.calls, POLL), 360);
-  assert.equal(inside.server.calls.length, 601);
+  assert.equal(count(inside.server.calls, ROOM_LIST), 1);
+  assert.equal(inside.server.calls.length, 602);
 });
 
 test('a tab hidden and shown every few seconds for an hour stays within the same budget', async () => {
@@ -1417,6 +1421,484 @@ test('a tab hidden and shown every few seconds for an hour stays within the same
   assert.ok(count(server.calls, HEARTBEAT) <= 120);
   assert.ok(count(server.calls, ONLINE_LIST) <= 120);
   assert.ok(count(server.calls, POLL) <= 360);
+});
+
+test('a tab hidden and shown every few seconds outside a room sends at most 120 room lists in an hour', async () => {
+  // given
+  const { lobby, server, clock, world } = setup(PRESENCE);
+  await lobby.open();
+
+  // when
+  while (clock.now() + 7000 <= HOUR) {
+    world.isVisible = false;
+    lobby.onVisibility();
+    await clock.advance(1000);
+    world.isVisible = true;
+    lobby.onVisibility();
+    await clock.advance(6000);
+  }
+
+  // then
+  assert.ok(count(server.calls, ROOM_LIST) <= 120);
+  assert.ok(server.calls.length <= 360);
+});
+
+/* ---- the open rooms ---- */
+
+const LISTED = [
+  { id: 'Room_id-42', state: 'lobby', host: { nick: 'Anna' }, players: 2, size: 4, level: 3, shape: 'portrait' },
+  { id: 'Room_id-43', state: 'lobby', host: { nick: 'Boris' }, players: 4, size: 4, level: 1, shape: 'landscape' },
+  { id: 'Room_id-44', state: 'racing', host: { nick: 'Vera' }, players: 2, size: 4, level: 2, shape: 'landscape' },
+  { id: 'Room_id-45', state: 'starting', host: { nick: 'Gleb' }, players: 3, size: 4, level: 2, shape: 'landscape' },
+];
+const LIST_OF = (rooms) => ({ ...PRESENCE, [ROOM_LIST]: [[200, { rooms }]] });
+
+test('the lobby lists the open rooms with host, counts, level and whether they can be joined', async () => {
+  // given
+  const { lobby, server } = setup(LIST_OF(LISTED));
+
+  // when
+  await lobby.open();
+  await settle();
+
+  // then
+  assert.deepEqual(server.calls, [HEARTBEAT, ONLINE_LIST, ROOM_LIST]);
+  assert.deepEqual(lobby.state().rooms.map((line) => [line.hostNick, line.players, line.size, line.level, line.shape]), [
+    ['Anna', 2, 4, 3, 'portrait'], ['Boris', 4, 4, 1, 'landscape'], ['Vera', 2, 4, 2, 'landscape'], ['Gleb', 3, 4, 2, 'landscape'],
+  ]);
+  assert.deepEqual(lobby.state().rooms.map((line) => line.canJoin), [true, false, false, false]);
+  assert.equal(lobby.state().isRoomsDown, false);
+});
+
+test('joining from the list posts the join and shows the room view, with the list gone', async () => {
+  // given
+  const { lobby, server } = setup({ ...LIST_OF(LISTED), [JOIN]: [[200, room()]], [POLL]: [[200, room()]] });
+  await lobby.open();
+  await settle();
+
+  // when
+  await lobby.joinFromList(ID);
+  await settle();
+
+  // then
+  assert.deepEqual(roomCalls(server.calls), [JOIN, POLL]);
+  assert.equal(lobby.state().roomId, ID);
+  assert.equal(lobby.state().room.isMember, true);
+});
+
+test('a full room from the list says room is full and the list is fetched again', async () => {
+  // given
+  const { lobby, server } = setup({ ...LIST_OF(LISTED), [JOIN]: [[409, { error: 'room_full' }]] });
+  await lobby.open();
+  await settle();
+
+  // when
+  await lobby.joinFromList(ID);
+  await settle();
+
+  // then
+  assert.equal(lobby.state().message, TEXT.roomFull);
+  assert.equal(lobby.state().roomId, null);
+  assert.equal(count(server.calls, ROOM_LIST), 2);
+});
+
+test('joinFromList sends nothing for a malformed id or while in a room', async () => {
+  // given
+  const { lobby, server } = await hosting(LIST_OF([]));
+  const before = server.calls.length;
+
+  // when
+  await lobby.joinFromList('x');
+  await lobby.joinFromList('Room_id-43');
+
+  // then
+  assert.equal(server.calls.length, before);
+  assert.equal(lobby.state().roomId, ID);
+});
+
+test('an empty list is an empty array, not a failure', async () => {
+  // given / when
+  const { lobby } = setup(LIST_OF([]));
+  await lobby.open();
+  await settle();
+
+  // then
+  assert.deepEqual(lobby.state().rooms, []);
+  assert.equal(lobby.state().isRoomsDown, false);
+});
+
+test('a failed list request marks the list down while presence and the rest work', async () => {
+  // given
+  const { lobby, clock } = setup({ ...PRESENCE, [ROOM_LIST]: [[OFFLINE], [200, { rooms: LISTED }]] });
+
+  // when
+  await lobby.open();
+  await settle();
+
+  // then
+  assert.equal(lobby.state().isRoomsDown, true);
+  assert.equal(lobby.state().rooms, null);
+  assert.deepEqual(lobby.state().online, ONLINE);
+  assert.equal(lobby.state().phase, 'ready');
+
+  // when
+  await clock.advance(KLAD_LOBBY.PRESENCE_EVERY);
+
+  // then
+  assert.equal(lobby.state().isRoomsDown, false);
+  assert.equal(lobby.state().rooms.length, 4);
+});
+
+test('a 500 on the list also marks it down', async () => {
+  // given / when
+  const { lobby } = setup({ ...PRESENCE, [ROOM_LIST]: [[500, { error: 'x' }]] });
+  await lobby.open();
+  await settle();
+
+  // then
+  assert.equal(lobby.state().isRoomsDown, true);
+});
+
+test('401 on the list means no player', async () => {
+  // given / when
+  const { lobby } = setup({ ...PRESENCE, [ROOM_LIST]: [[401, { error: 'no_session' }]] });
+  await lobby.open();
+  await settle();
+
+  // then
+  assert.equal(lobby.state().phase, 'no-nick');
+});
+
+test('entries with a bad id are left out of the list', async () => {
+  // given / when
+  const { lobby } = setup(LIST_OF([...LISTED, { id: '../x', state: 'lobby', host: { nick: 'Z' }, players: 1, size: 4, level: 1, shape: 'landscape' }]));
+  await lobby.open();
+  await settle();
+
+  // then
+  assert.equal(lobby.state().rooms.length, 4);
+});
+
+test('the list is not asked while in a room, and once more after leaving it', async () => {
+  // given
+  const { lobby, server, clock } = await hosting(LIST_OF(LISTED));
+  const before = count(server.calls, ROOM_LIST);
+
+  // when
+  await clock.advance(KLAD_LOBBY.PRESENCE_EVERY);
+
+  // then
+  assert.equal(count(server.calls, ROOM_LIST), before);
+
+  // when
+  await lobby.leave();
+  await settle();
+
+  // then
+  assert.equal(count(server.calls, ROOM_LIST), before + 1);
+  assert.equal(lobby.state().rooms.length, 4);
+});
+
+test('a room list is never fetched while the tab is hidden or the lobby closed', async () => {
+  // given
+  const { lobby, server, world } = setup(LIST_OF(LISTED));
+  world.isVisible = false;
+
+  // when
+  await lobby.open();
+  await settle();
+  lobby.close();
+
+  // then
+  assert.equal(count(server.calls, ROOM_LIST), 0);
+});
+
+test('leaving a room with the lobby closed fetches no list', async () => {
+  // given
+  const { lobby, server } = await hosting(LIST_OF(LISTED));
+  const before = count(server.calls, ROOM_LIST);
+  lobby.close();
+
+  // when
+  await lobby.leave();
+  await settle();
+
+  // then
+  assert.equal(count(server.calls, ROOM_LIST), before);
+});
+
+/* ---- link only ---- */
+
+test('createRoom(false) posts /rooms?listed=false, and no argument or true posts plain /rooms', async () => {
+  // given
+  const link = 'POST /klad/api/rooms?listed=false';
+  const hidden = setup({ ...PRESENCE, [link]: [[201, { id: ID }]], [POLL]: [[200, HOSTED]] });
+  await hidden.lobby.open();
+  await settle();
+
+  // when
+  await hidden.lobby.createRoom(false);
+  await settle();
+
+  // then
+  assert.deepEqual(roomCalls(hidden.server.calls), [link, POLL]);
+
+  // given
+  const plain = await hosting();
+  const other = setup({ ...PRESENCE, [CREATE]: [[201, { id: ID }]], [POLL]: [[200, HOSTED]] });
+  await other.lobby.open();
+  await settle();
+
+  // when
+  await other.lobby.createRoom(true);
+  await settle();
+
+  // then
+  assert.deepEqual(roomCalls(plain.server.calls), [CREATE, POLL]);
+  assert.deepEqual(roomCalls(other.server.calls), [CREATE, POLL]);
+});
+
+test('the host switches the room to link only with POST /listed, and the room answer shows it', async () => {
+  // given
+  const hiddenRoom = { ...HOSTED, listed: false };
+  const { lobby, server } = await hosting({ ['POST /klad/api/rooms/' + ID + '/listed']: [[200, hiddenRoom]], [POLL]: [[200, HOSTED], [200, hiddenRoom]] });
+  assert.equal(lobby.state().room.isListed, true);
+
+  // when
+  await lobby.setListed(false);
+  await settle();
+
+  // then
+  assert.ok(server.calls.includes('POST /klad/api/rooms/' + ID + '/listed {"listed":false}'));
+  assert.equal(lobby.state().room.isListed, false);
+});
+
+test('a member that is not the host gets not_host from the listed switch and keeps the room', async () => {
+  // given
+  const { lobby } = await joined({ ['POST /klad/api/rooms/' + ID + '/listed']: [[403, { error: 'not_host' }]] });
+
+  // when
+  await lobby.setListed(false);
+  await settle();
+
+  // then
+  assert.equal(lobby.state().message, TEXT.notHost);
+  assert.equal(lobby.state().roomId, ID);
+});
+
+/* ---- a non-member's room answer: host null, players [] ---- */
+
+const STRANGER_VIEW = room({ host: null, players: [] });
+
+test('a #room= entry joins by POST, so the member answer shows the room', async () => {
+  // given / when
+  const { lobby } = await joined();
+
+  // then
+  assert.equal(lobby.state().room.isMember, true);
+  assert.equal(lobby.state().room.players.length, 2);
+});
+
+test('a poll that answers as a non-member (host null, no players) ends the room view with the removed text', async () => {
+  // given
+  const { lobby, clock } = await joined({ [POLL]: [[200, room()], [200, STRANGER_VIEW]] });
+  await clock.advance(KLAD_LOBBY.ROOM_EVERY);
+
+  // then
+  assert.equal(lobby.state().roomId, null);
+  assert.equal(lobby.state().message, TEXT.removed);
+});
+
+test('a long unseen member polled as a non-member (host null, no players) is joined again', async () => {
+  // given
+  const { lobby, server, clock, world } = await joined({ [POLL]: [[200, room()], [200, STRANGER_VIEW], [200, room()]] });
+  world.isVisible = false;
+  lobby.onVisibility();
+  await clock.advance(90 * 1000);
+
+  // when
+  world.isVisible = true;
+  lobby.onVisibility();
+  await settle();
+
+  // then
+  assert.equal(count(server.calls, JOIN), 2);
+  assert.equal(lobby.state().room.isMember, true);
+});
+
+test('a room view without a member entry has no host and no ready state', () => {
+  // given / when
+  const view = KLAD_LOBBY.roomView(STRANGER_VIEW);
+
+  // then
+  assert.equal(view.isMember, false);
+  assert.equal(view.isHost, false);
+  assert.deepEqual(view.players, []);
+});
+
+test('roomView reads listed, and a missing one counts as listed', () => {
+  assert.equal(KLAD_LOBBY.roomView(room({ listed: false })).isListed, false);
+  assert.equal(KLAD_LOBBY.roomView(room({ listed: true })).isListed, true);
+  assert.equal(KLAD_LOBBY.roomView(room({ listed: undefined })).isListed, true);
+});
+
+/* ---- the page half, in a vm context with a stub page ---- */
+
+const fs = require('node:fs');
+const path = require('node:path');
+const vm = require('node:vm');
+
+function stubNode(tag, registry) {
+  const node = {
+    tag, textContent: '', className: '', hidden: false, disabled: false, checked: false, value: '', open: false,
+    children: [], listeners: {}, attributes: {},
+    addEventListener(type, listener) { this.listeners[type] = listener; },
+    setAttribute(name, value) { this.attributes[name] = value; },
+    focus() { registry.focused = this; }, select() {},
+    append(...items) { this.children.push(...items); },
+    replaceChildren(...items) { this.children = items; },
+    add() {},
+    showModal() { this.open = true; },
+    close() { this.open = false; },
+  };
+  return node;
+}
+
+function loadLobbyPage(answers) {
+  const registry = { focused: null, created: [] };
+  const elements = {};
+  const server = fakeServer(answers);
+  const document = {
+    visibilityState: 'visible',
+    activeElement: null,
+    getElementById: (id) => elements[id] || (elements[id] = stubNode('#' + id, registry)),
+    createElement: (tag) => { registry.created.push(tag); return stubNode(tag, registry); },
+    querySelector: () => null,
+    addEventListener() {},
+  };
+  const sandbox = {
+    document,
+    KLAD_LEVELS: [{ name: 'один' }, { name: 'два' }, { name: 'три' }],
+    KLAD_ONLINE: {
+      request: KLAD_ONLINE.request,
+      page: { player: () => ME, refresh: async () => {}, isAvailable: () => true, ask() {} },
+    },
+    fetch: server.fetch,
+    matchMedia: () => ({ matches: false }),
+    Option: function Option(text, value) { this.text = text; this.value = value; },
+    CustomEvent: function CustomEvent() {},
+    location: { protocol: 'https:', host: 'rassimok.dev', origin: 'https:' + '//rassimok.dev', hash: '' },
+    addEventListener() {},
+    Date, setTimeout: () => 0, clearTimeout: () => {},
+  };
+  vm.createContext(sandbox);
+  vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'lobby.js'), 'utf8'), sandbox);
+  return { elements, registry, server };
+}
+
+const textsOf = (node) => [node.textContent, ...node.children.flatMap((child) => (typeof child === 'string' ? [child] : textsOf(child)))];
+const buttonsOf = (node) => node.children.filter((child) => typeof child !== 'string').flatMap((child) =>
+  (child.tag === 'button' ? [child] : buttonsOf(child)));
+
+test('lobby page: each open room is one list item with host, counts, level and a Войти button; full and racing ones have none', async () => {
+  // given
+  const page = loadLobbyPage(LIST_OF(LISTED));
+
+  // when
+  page.elements['h-lobby'].listeners.click();
+  await settle();
+
+  // then
+  const items = page.elements['lobby-rooms'].children;
+  assert.equal(items.length, 4);
+  assert.deepEqual(items.map((item) => buttonsOf(item).length), [1, 0, 0, 0]);
+  assert.equal(buttonsOf(items[0])[0].textContent, 'Войти');
+  assert.equal(buttonsOf(items[0])[0].type, 'button');
+  assert.ok(textsOf(items[0]).includes('Anna'));
+  assert.ok(textsOf(items[0]).some((text) => text.startsWith('игроков 2 из 4, Этап 3: три')));
+  assert.ok(textsOf(items[1]).includes('заполнена'));
+  assert.ok(textsOf(items[2]).includes('идёт гонка'));
+  assert.ok(textsOf(items[3]).includes('гонка начинается'));
+  assert.equal(page.elements['lobby-rooms-title'].textContent, 'Открытые комнаты: 4');
+  assert.equal(page.elements['lobby-online-title'].textContent, 'Сейчас в лобби: 2');
+  assert.equal(page.elements['lobby-out'].hidden, false);
+});
+
+test('lobby page: a host nick like <img src=x> is shown as text, not as an element', async () => {
+  // given
+  const nick = '<img src=x onerror=alert(1)>';
+  const page = loadLobbyPage(LIST_OF([{ ...LISTED[0], host: { nick } }]));
+
+  // when
+  page.elements['h-lobby'].listeners.click();
+  await settle();
+
+  // then
+  assert.ok(textsOf(page.elements['lobby-rooms'].children[0]).includes(nick));
+  assert.ok(!page.registry.created.includes('img'));
+});
+
+test('lobby page: an empty list says so and points to Создать комнату; a failed one says the server is not answering', async () => {
+  // given
+  const empty = loadLobbyPage(LIST_OF([]));
+  const down = loadLobbyPage({ ...PRESENCE, [ROOM_LIST]: [[OFFLINE]] });
+
+  // when
+  empty.elements['h-lobby'].listeners.click();
+  down.elements['h-lobby'].listeners.click();
+  await settle();
+
+  // then
+  assert.match(empty.elements['lobby-rooms-status'].textContent, /Создать комнату/);
+  assert.equal(empty.elements['lobby-rooms-title'].textContent, 'Открытые комнаты: 0');
+  assert.equal(down.elements['lobby-rooms-status'].textContent, TEXT.roomsDown);
+  assert.equal(down.elements['lobby-online'].children.length, 2);
+});
+
+test('lobby page: the Войти button joins the room and the list part is hidden', async () => {
+  // given
+  const page = loadLobbyPage({ ...LIST_OF(LISTED), [JOIN]: [[200, room()]], [POLL]: [[200, room()]] });
+  page.elements['h-lobby'].listeners.click();
+  await settle();
+
+  // when
+  await buttonsOf(page.elements['lobby-rooms'].children[0])[0].listeners.click();
+  await settle();
+
+  // then
+  assert.ok(page.server.calls.includes(JOIN));
+  assert.equal(page.elements['lobby-out'].hidden, true);
+  assert.equal(page.elements['lobby-room'].hidden, false);
+});
+
+test('lobby page: the link-only box before Создать комнату sends listed=false, and the host switch sends the listed body', async () => {
+  // given
+  const link = 'POST /klad/api/rooms?listed=false';
+  const page = loadLobbyPage({
+    ...LIST_OF([]), [link]: [[201, { id: ID }]], [POLL]: [[200, { ...HOSTED, listed: false }]],
+    ['POST /klad/api/rooms/' + ID + '/listed']: [[200, HOSTED]],
+  });
+  page.elements['h-lobby'].listeners.click();
+  await settle();
+  page.elements['lobby-private'].checked = true;
+
+  // when
+  await page.elements['lobby-create'].listeners.click();
+  await settle();
+
+  // then
+  assert.ok(page.server.calls.includes(link));
+  assert.equal(page.elements['lobby-link-only'].checked, true);
+  assert.match(page.elements['lobby-listed-line'].textContent, /только по ссылке/);
+  assert.equal(page.elements['lobby-listed-row'].hidden, false);
+
+  // when
+  page.elements['lobby-link-only'].checked = false;
+  await page.elements['lobby-link-only'].listeners.change();
+  await settle();
+
+  // then
+  assert.ok(page.server.calls.includes('POST /klad/api/rooms/' + ID + '/listed {"listed":true}'));
 });
 
 /* ---- the socket module ---- */

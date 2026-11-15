@@ -25,6 +25,7 @@ const KLAD_LOBBY = (() => {
     removed: 'Вы больше не в этой комнате: вы вышли из неё в другой вкладке, или гонка началась без вас.',
     tooManyRooms: 'Сейчас открыто слишком много комнат. Попробуйте позже.',
     notHost: 'Это может только хозяин комнаты.',
+    roomsDown: 'Сервер не отвечает: список комнат не загрузился. Остальное в лобби работает.',
     notInLobby: 'Гонка уже начинается.',
     notReady: 'Старт возможен, когда готовы все, а игроков хотя бы двое.',
     refused: 'Сервер не принял это действие.',
@@ -46,6 +47,18 @@ const KLAD_LOBBY = (() => {
     return (protocol === 'http:' ? 'ws://' : 'wss://') + host + '/klad/api/race/' + id;
   }
 
+  /* One line of the open rooms. Only a lobby room with a free place can be
+     joined from the list; the API says the rest with its own errors. */
+  function roomLine(entry) {
+    const host = entry.host && typeof entry.host.nick === 'string' ? entry.host.nick : '';
+    return {
+      id: entry.id, state: entry.state, hostNick: host, players: entry.players, size: entry.size,
+      level: entry.level, shape: entry.shape,
+      isFull: entry.players >= entry.size,
+      canJoin: entry.state === 'lobby' && entry.players < entry.size,
+    };
+  }
+
   /* The player is the entry the API marks with "you": nicks may repeat
      among guests, so nick and kind cannot tell entries apart. An empty
      room has no players and no host. */
@@ -61,6 +74,7 @@ const KLAD_LOBBY = (() => {
       isMember: Boolean(mine),
       isHost,
       isReady: Boolean(mine && mine.isReady),
+      isListed: room.listed !== false,
       canStart: room.state === 'lobby' && isHost && players.length >= 2 && players.every((player) => player.isReady),
     };
   }
@@ -201,6 +215,9 @@ const KLAD_LOBBY = (() => {
     let message = '';
     let online = null;
     let isOnlineDown = false;
+    let rooms = null;
+    let isRoomsDown = false;
+    let roomsRequest = 0;
     let roomId = null;
     let room = null;
     let isRoomDown = false;
@@ -317,6 +334,25 @@ const KLAD_LOBBY = (() => {
         take(answer, true);
       }
       page.render();
+      if (roomId === null) listRooms();
+    }
+
+    /* The open rooms, only while the player is in no room. An answer that
+       comes back after a newer request or after joining a room is dropped. */
+    async function listRooms() {
+      if (!isActive() || roomId !== null) return;
+      const request = ++roomsRequest;
+      const answer = await call('GET', '/rooms');
+      if (request !== roomsRequest || phase !== 'ready') return;
+      if (answer.status === 401) {
+        lostPlayer();
+      } else if (answer.status === 200 && answer.data && Array.isArray(answer.data.rooms)) {
+        rooms = answer.data.rooms.filter((entry) => entry && isRoomId(entry.id)).map(roomLine);
+        isRoomsDown = false;
+      } else {
+        isRoomsDown = true;
+      }
+      page.render();
     }
 
     /* POST /presence first, so the list includes this player. */
@@ -333,6 +369,7 @@ const KLAD_LOBBY = (() => {
         isOnlineDown = true;
       }
       page.render();
+      await listRooms();
     }
 
     /* An answer that comes back after the player left the room is dropped. */
@@ -353,6 +390,7 @@ const KLAD_LOBBY = (() => {
       if (id === roomId) take(answer, request === roomRequest);
       page.render();
       roomPoll.now();
+      if (roomId === null) listRooms();
     }
 
     async function join(id) {
@@ -364,6 +402,13 @@ const KLAD_LOBBY = (() => {
       forgetRoom('');
       roomId = id;
       await enter();
+    }
+
+    /* The join button of the list: only while in no room and nothing is out. */
+    function joinFromList(id) {
+      if (isBusy || roomId !== null || !isRoomId(id)) return Promise.resolve();
+      message = '';
+      return join(id);
     }
 
     /* A re-join keeps the room shown until it answers. A leave asked for
@@ -403,18 +448,19 @@ const KLAD_LOBBY = (() => {
       else forgetRoom(TEXT.unavailable);
       page.render();
       if (!(isRejoin && isNetworkFailure)) roomPoll.now();
+      if (roomId === null) listRooms();
       resume();
     }
 
     /* A new room is level 1 in the landscape shape; a host in portrait
        sends its shape with that first level choice. A room made after the
        lobby closed is left at once. */
-    async function createRoom() {
+    async function createRoom(isListed) {
       if (isBusy || roomId !== null) return;
       isBusy = true;
       message = '';
       page.render();
-      const answer = await call('POST', '/rooms');
+      const answer = await call('POST', isListed === false ? '/rooms?listed=false' : '/rooms');
       isBusy = false;
       if (answer.status === 201 && answer.data && isRoomId(answer.data.id)) {
         forgetRoom('');
@@ -444,6 +490,18 @@ const KLAD_LOBBY = (() => {
 
     function start() {
       return act('start');
+    }
+
+    function setListed(isListed) {
+      return act('listed', { listed: isListed === true });
+    }
+
+    /* The player's own leave: the open rooms are fetched once more. */
+    function leaveRoom() {
+      const wasInRoom = roomId !== null;
+      const sent = leave();
+      if (wasInRoom) listRooms();
+      return sent;
     }
 
     function leave() {
@@ -519,14 +577,14 @@ const KLAD_LOBBY = (() => {
 
     function state() {
       return {
-        phase, message, online, isOnlineDown, roomId, isRoomDown, isBusy,
+        phase, message, online, isOnlineDown, rooms, isRoomsDown, roomId, isRoomDown, isBusy,
         room: room === null ? null : roomView(room),
         race: raceText(),
       };
     }
 
     return {
-      open, close, askNick, afterNick, createRoom, toggleReady, chooseLevel, start, leave, state,
+      open, close, askNick, afterNick, createRoom, joinFromList, toggleReady, chooseLevel, start, setListed, leave: leaveRoom, state,
       onVisibility: resume,
     };
   }
@@ -542,7 +600,10 @@ if (typeof module !== 'undefined') module.exports = KLAD_LOBBY;
 if (typeof document !== 'undefined') (() => {
   const $ = (id) => document.getElementById(id);
   const canvas = $('game'), dialog = $('lobby'), status = $('lobby-status'), noNick = $('lobby-no-nick'),
-        main = $('lobby-main'), onlineStatus = $('lobby-online-status'), onlineList = $('lobby-online'),
+        main = $('lobby-main'), onlineTitle = $('lobby-online-title'), roomsTitle = $('lobby-rooms-title'),
+        roomsStatus = $('lobby-rooms-status'), roomsList = $('lobby-rooms'), privateBox = $('lobby-private'),
+        listedLine = $('lobby-listed-line'), listedRow = $('lobby-listed-row'), linkOnlyBox = $('lobby-link-only'),
+        onlineStatus = $('lobby-online-status'), onlineList = $('lobby-online'),
         out = $('lobby-out'), createButton = $('lobby-create');
   const roomPart = $('lobby-room'), link = $('lobby-link'), copyButton = $('lobby-copy'), copyNote = $('lobby-copy-note'),
         roomStatus = $('lobby-room-status'), playerList = $('lobby-players'), levelLine = $('lobby-level-line'),
@@ -604,6 +665,7 @@ if (typeof document !== 'undefined') (() => {
   }
 
   function renderOnline(state) {
+    onlineTitle.textContent = 'Сейчас в лобби' + (state.online ? ': ' + state.online.length : '');
     onlineStatus.textContent = state.isOnlineDown ? TEXT.offline : (state.online ? '' : 'загрузка');
     onlineList.replaceChildren(...(state.online || []).map((player) => person(player.nick, [
       [player.guest ? 'guest' : 'account', player.guest ? 'гость' : 'аккаунт'],
@@ -611,10 +673,49 @@ if (typeof document !== 'undefined') (() => {
     ])));
   }
 
+  /* The room and its button are one list item. Nick and level text go in
+     with textContent only. */
+  function roomItem(line) {
+    const item = document.createElement('li');
+    const host = document.createElement('span');
+    host.textContent = line.hostNick;
+    const details = document.createElement('span');
+    details.className = 'kind';
+    details.textContent = 'игроков ' + line.players + ' из ' + line.size + ', ' + levelText(line);
+    item.append(host, details);
+    if (line.canJoin) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.textContent = 'Войти';
+      button.addEventListener('click', async () => {
+        await lobby.joinFromList(line.id);
+        if (!roomPart.hidden) copyButton.focus();
+      });
+      item.append(button);
+    } else {
+      const mark = document.createElement('span');
+      mark.className = 'full';
+      mark.textContent = line.state === 'racing' ? 'идёт гонка' : (line.state === 'starting' ? 'гонка начинается' : 'заполнена');
+      item.append(mark);
+    }
+    return item;
+  }
+
+  function renderRooms(state) {
+    const lines = state.rooms || [];
+    roomsTitle.textContent = 'Открытые комнаты' + (state.rooms ? ': ' + lines.length : '');
+    roomsStatus.textContent = state.isRoomsDown ? TEXT.roomsDown
+      : (state.rooms === null ? 'загрузка' : (lines.length === 0 ? 'Открытых комнат нет. Нажмите «Создать комнату».' : ''));
+    roomsList.replaceChildren(...lines.map(roomItem));
+  }
+
   function renderRoom(state) {
     const view = state.room;
     const isLobby = Boolean(view && view.state === 'lobby');
     link.value = location.origin + '/klad/#room=' + state.roomId;
+    listedLine.textContent = view ? (view.isListed ? 'Комната в списке открытых комнат.' : 'Комната только по ссылке: в списке её нет.') : '';
+    listedRow.hidden = !(view && view.isHost);
+    if (view && (document.activeElement !== linkOnlyBox || !state.isBusy)) linkOnlyBox.checked = !view.isListed;
     roomStatus.textContent = state.isRoomDown ? TEXT.offline
       : (view ? 'Игроков: ' + view.players.length + ' из ' + view.size : 'загрузка');
     playerList.replaceChildren(...(view ? view.players : []).map((player) => {
@@ -647,6 +748,7 @@ if (typeof document !== 'undefined') (() => {
     out.hidden = !isReady || state.roomId !== null;
     roomPart.hidden = !isReady || state.roomId === null;
     if (isReady) renderOnline(state);
+    if (isReady && state.roomId === null) renderRooms(state);
     if (isReady && state.roomId !== null) renderRoom(state);
     if (state.roomId === null) copyNote.textContent = '';
   }
@@ -679,7 +781,7 @@ if (typeof document !== 'undefined') (() => {
   $('lobby-choose').addEventListener('click', () => lobby.askNick());
 
   createButton.addEventListener('click', async () => {
-    await lobby.createRoom();
+    await lobby.createRoom(!privateBox.checked);
     if (!roomPart.hidden) copyButton.focus();
   });
   copyButton.addEventListener('click', async () => {
@@ -694,6 +796,7 @@ if (typeof document !== 'undefined') (() => {
     copyNote.textContent = isCopied ? 'Ссылка скопирована.' : 'Скопировать не получилось: ссылка выделена, скопируйте её сами.';
   });
   readyButton.addEventListener('click', () => lobby.toggleReady());
+  linkOnlyBox.addEventListener('change', () => lobby.setListed(!linkOnlyBox.checked));
   levelSelect.addEventListener('change', () => lobby.chooseLevel(Number(levelSelect.value)));
   startButton.addEventListener('click', async () => {
     await lobby.start();

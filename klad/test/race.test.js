@@ -87,6 +87,7 @@ function setup(room = ROOM) {
     clock,
     isVisible: () => world.isVisible,
     format: KLAD_TICKS.format,
+    ticksPerSecond: KLAD_TICKS.PER_SECOND,
     engine: { start: (level, shape) => engine.start(level, shape), stop: () => engine.stop(), position: () => engine.position },
   }, page);
   const socket = KLAD_LOBBY.connect('ws://test/klad/api/race/' + ID, sockets.FakeWebSocket, clock);
@@ -292,14 +293,138 @@ test('ghosts come from pos messages by slot, so two guests named Anna stay apart
   ]);
 });
 
-test('a ghost takes the latest position and faces the way it moved', () => {
+/* Sender ticks of one 200 ms position step. */
+const STEP_TICKS = KLAD_TICKS.PER_SECOND / 5;
+const pos = (x, y, tick) => ({ type: 'pos', slot: 1, nick: 'Anna', x, y, tick });
+const ghostOf = (race) => race.ghosts()[0];
+
+test('a ghost halfway between two positions of one attempt is at the midpoint', () => {
   // given
-  const { race, say } = racing();
-  say({ type: 'pos', slot: 1, nick: 'Anna', x: 4, y: 5, tick: 10 });
+  const { race, clock, say } = racing();
+  say(pos(4, 5, 24));
+  clock.advance(200);
+  say(pos(5, 5, 48));
   // when
-  say({ type: 'pos', slot: 1, nick: 'Anna', x: 3.5, y: 5, tick: 34 });
+  clock.advance(KLAD_RACE.GHOST_DELAY - 100);
+  // then
+  assert.deepEqual(race.ghosts(), [{ slot: 1, nick: 'Anna', x: 4.5, y: 5, direction: 1, alpha: KLAD_RACE.GHOST_ALPHA }]);
+});
+
+test('a ghost takes the position it reaches and faces the way it moved', () => {
+  // given
+  const { race, clock, say } = racing();
+  say(pos(4, 5, 10));
+  clock.advance(200);
+  // when
+  say(pos(3.5, 5, 10 + STEP_TICKS));
+  clock.advance(1000);
   // then
   assert.deepEqual(race.ghosts(), [{ slot: 1, nick: 'Anna', x: 3.5, y: 5, direction: -1, alpha: KLAD_RACE.GHOST_ALPHA }]);
+});
+
+test('a ghost walking one way never moves back, also when one message is 150 ms late and the next comes 50 ms after it', () => {
+  // given
+  const { race, clock, say } = racing();
+  const arrivals = [[0, 4], [200, 5], [550, 6], [600, 7], [800, 8]];
+  const seen = [];
+  let tick = 0;
+  let time = 0;
+  // when
+  for (const [at, x] of arrivals) {
+    for (; time < at; time += 10) {
+      clock.advance(10);
+      if (ghostOf(race)) seen.push(ghostOf(race).x);
+    }
+    say(pos(x, 5, tick));
+    tick += STEP_TICKS;
+  }
+  for (let step = 0; step < 100; step++) {
+    clock.advance(10);
+    seen.push(ghostOf(race).x);
+  }
+  // then
+  assert.deepEqual(seen, [...seen].sort((first, second) => first - second));
+  assert.equal(seen[seen.length - 1], 8);
+});
+
+test('a position with a lower tick than the one before is shown at once at its place', () => {
+  // given
+  const { race, clock, say } = racing();
+  say(pos(4, 5, 5000));
+  clock.advance(200);
+  say(pos(5, 5, 5000 + STEP_TICKS));
+  clock.advance(1000);
+  // when
+  say(pos(6, 5, 30));
+  // then
+  assert.equal(ghostOf(race).x, 6);
+  assert.equal(ghostOf(race).y, 5);
+});
+
+test('a step of more than 3 cells is shown at once, a fall step of 1.8 cells still slides', () => {
+  // given
+  const { race, clock, say } = racing();
+  say(pos(4, 2, 0));
+  clock.advance(200);
+  // when
+  say(pos(4, 3.8, STEP_TICKS));
+  const slidingY = ghostOf(race).y;
+  clock.advance(1000);
+  say(pos(4, 8, 2 * STEP_TICKS));
+  // then
+  assert.equal(slidingY, 2);
+  assert.equal(ghostOf(race).y, 8);
+});
+
+test('with no newer position a ghost stays at the last one and never runs ahead, and fades as before', () => {
+  // given
+  const { race, clock, say } = racing();
+  say(pos(4, 5, 0));
+  clock.advance(200);
+  say(pos(5, 5, STEP_TICKS));
+  // when
+  clock.advance(KLAD_RACE.FADE_AFTER);
+  const atTwoSeconds = ghostOf(race);
+  clock.advance(KLAD_RACE.FADE_FOR / 2);
+  const halfWay = ghostOf(race);
+  // then
+  assert.equal(atTwoSeconds.x, 5);
+  assert.equal(atTwoSeconds.alpha, KLAD_RACE.GHOST_ALPHA);
+  assert.equal(halfWay.x, 5);
+  assert.equal(halfWay.alpha, KLAD_RACE.GHOST_ALPHA / 2);
+});
+
+test('after the sender pauses for a second the ghost goes on from where it stood, with no jump back', () => {
+  // given
+  const { race, clock, say } = racing();
+  say(pos(4, 5, 0));
+  clock.advance(200);
+  say(pos(5, 5, STEP_TICKS));
+  clock.advance(1000);
+  say(pos(6, 5, 2 * STEP_TICKS));
+  const seen = [];
+  // when
+  for (let step = 0; step < 60; step++) {
+    clock.advance(10);
+    seen.push(ghostOf(race).x);
+  }
+  // then
+  assert.deepEqual(seen, [...seen].sort((first, second) => first - second));
+  assert.ok(seen[0] >= 5);
+  assert.equal(seen[seen.length - 1], 6);
+});
+
+test('the positions kept per ghost are capped, also at 10 a second for 4 minutes', () => {
+  // given
+  const { race, clock, say } = racing();
+  // when
+  for (let index = 0; index < 4 * 60 * 10; index++) {
+    say(pos(1 + (index % 20), 5, index * KLAD_TICKS.PER_SECOND / 10));
+    clock.advance(100);
+  }
+  // then
+  assert.equal(race.ghostSampleCount(1), KLAD_RACE.MAX_SAMPLES);
+  assert.equal(race.ghosts().length, 1);
 });
 
 test('a ghost with no update for 2 s fades out, and comes back with the next position', () => {
@@ -318,7 +443,7 @@ test('a ghost with no update for 2 s fades out, and comes back with the next pos
   assert.equal(atTwoSeconds, KLAD_RACE.GHOST_ALPHA);
   assert.equal(halfWay, KLAD_RACE.GHOST_ALPHA / 2);
   assert.deepEqual(faded, []);
-  assert.equal(race.ghosts()[0].x, 6);
+  assert.equal(race.ghosts()[0].alpha, KLAD_RACE.GHOST_ALPHA);
 });
 
 test('pos messages with a bad slot or position make no ghost', () => {
@@ -404,6 +529,22 @@ test('a dropped socket shows reconnecting, keeps the game, and the state after t
     { slot: 1, nick: 'Anna', x: 9, y: 3, direction: 1, alpha: KLAD_RACE.GHOST_ALPHA },
     { slot: 2, nick: 'Anna', x: 2, y: 2, direction: 1, alpha: KLAD_RACE.GHOST_ALPHA },
   ]);
+});
+
+test('a state after a reconnect replaces the ghosts at once, even in the middle of a slide', () => {
+  // given
+  const { race, clock, server, say } = racing();
+  say(pos(4, 5, 0));
+  clock.advance(200);
+  say(pos(5, 5, STEP_TICKS));
+  clock.advance(KLAD_RACE.GHOST_DELAY - 100);
+  // when
+  server().onclose({ code: NETWORK_DROP });
+  clock.advance(500);
+  server().onopen();
+  say({ ...STATE, state: 'racing', positions: [{ slot: 1, x: 9, y: 3, tick: 900 }] });
+  // then
+  assert.deepEqual(race.ghosts(), [{ slot: 1, nick: 'Anna', x: 9, y: 3, direction: 1, alpha: KLAD_RACE.GHOST_ALPHA }]);
 });
 
 test('a finish made while reconnecting goes out after the reconnect, and not again once the server has it', () => {

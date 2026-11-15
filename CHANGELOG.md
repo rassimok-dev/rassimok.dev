@@ -3,6 +3,47 @@
 Dated entries, newest first. Written for a reader picking this up cold —
 or a future session needing to know what already exists and why.
 
+## 2026-11-15 - Klad ghost race: ghosts move smoothly (RAS-40)
+
+Other players' runners hopped about five times a second, because a ghost
+was drawn at the last received position until the next `pos` arrived (a
+step of 1 cell walking, 1.8 falling), and unevenly when the network delayed
+a message. The receiver now interpolates; the sender and the API are
+unchanged (`pos` every 200 ms, contract section 8 as it was). This replaces
+the 2026-11-13 (eighth) decision "a ghost is drawn from the latest
+position".
+
+### Decisions worth not relitigating
+
+- **Each ghost keeps its last 10 positions with the sender's `tick`, and is
+  drawn 250 ms in the past on the line between the two around that
+  moment.** Positions are spaced by the sender's ticks (the rate is
+  `KLAD_TICKS.PER_SECOND`, passed to `race.js` as `ticksPerSecond` like
+  `format`, not repeated), so a message that comes late does not change the
+  spacing. A position is shown no earlier than it arrived: its time is the
+  previous one plus the tick gap, but never before arrival minus 250 ms
+  and never after arrival (so a sender running faster than the clock
+  cannot make the lag grow). A move starts at its time minus the tick gap,
+  so after a pause (no `pos` for a second, ticks that go on) the ghost
+  stands where it was and then goes on, with no jump back.
+- **Never extrapolate.** After the last position the ghost stays; a guess
+  that is wrong would be a hop back. The 2 s fade is unchanged.
+- **At once, no slide:** a lower `tick` than before (a new attempt after a
+  death; `intro()` resets the count) or a step over 3 cells (Euclidean, in
+  cells) starts the list again at that position. A fall step of 1.8 cells
+  is below 3 and slides. A `state` after a reconnect clears the ghosts and
+  takes its `positions` the same way, so they show at once.
+- **The cap is 10 positions per ghost**, so a member that sends 10 a
+  second for 4 minutes does not grow memory; the oldest is dropped.
+- **The delay costs jitter room only 250 ms minus the 200 ms spacing.** A
+  message up to about 50 ms late is absorbed fully; one 150 ms late makes
+  the ghost wait at its last position and then catch up in one frame (it
+  never goes back). A longer delay (350 ms absorbs 150 ms) would hide it
+  but is over the "about a third of a second behind" the ticket asks for.
+  `GHOST_DELAY` is one constant if this is changed.
+- **Facing follows the received x** against the previous position, as
+  before, and slots still separate the ghosts.
+
 ## 2026-11-13 (eighth) - Klad ghost race: countdown, ghosts, finish screen
 
 When the host starts, every player in the room plays the same level on

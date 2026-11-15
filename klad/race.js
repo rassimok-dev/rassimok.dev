@@ -10,6 +10,9 @@ const KLAD_RACE = (() => {
   const GHOST_ALPHA = 0.55;
   const FADE_AFTER = 2 * 1000;
   const FADE_FOR = 1000;
+  const GHOST_DELAY = 250;
+  const MAX_STEP = 3;
+  const MAX_SAMPLES = 10;
   const NOTICE_FOR = 8 * 1000;
   const SLOTS = 4;
   const LAST_CELL = 24;
@@ -32,7 +35,7 @@ const KLAD_RACE = (() => {
 
   /* environment and page are described in klad/README.md (Race). */
   function create(environment, page) {
-    const { clock, engine } = environment;
+    const { clock, engine, ticksPerSecond } = environment;
     const ghosts = new Map();
     let socket = null;
     let phase = 'idle';
@@ -83,18 +86,51 @@ const KLAD_RACE = (() => {
       return player && typeof player.nick === 'string' ? player.nick : '';
     }
 
+    /* A ghost keeps its last positions with the times they are shown at: a
+       sample is shown at `at` and the move to it starts at `start`, spaced by
+       the sender's ticks, never earlier than its arrival allows. A lower tick
+       (a new attempt) or a step over MAX_STEP starts the list again, so that
+       position shows at once. */
     function takePosition(entry, nick) {
       const isValid = isObject(entry) && Number.isInteger(entry.slot) && entry.slot >= 0 && entry.slot < SLOTS
-        && entry.slot !== mySlot && Number.isFinite(entry.x) && Number.isFinite(entry.y)
+        && entry.slot !== mySlot && Number.isFinite(entry.x) && Number.isFinite(entry.y) && Number.isFinite(entry.tick)
         && entry.x >= 0 && entry.x <= LAST_CELL && entry.y >= 0 && entry.y <= LAST_CELL;
       if (!isValid) return;
+      const now = clock.now();
       const previous = ghosts.get(entry.slot);
-      let direction = previous ? previous.direction : 1;
-      if (previous && entry.x !== previous.x) direction = entry.x < previous.x ? -1 : 1;
+      const last = previous ? previous.samples[previous.samples.length - 1] : null;
+      const isContinuing = last !== null && entry.tick >= last.tick
+        && Math.hypot(entry.x - last.x, entry.y - last.y) <= MAX_STEP;
+      let direction = last ? last.direction : 1;
+      if (isContinuing && entry.x !== last.x) direction = entry.x < last.x ? -1 : 1;
+      const sample = { x: entry.x, y: entry.y, tick: entry.tick, start: now, at: now, direction };
+      const samples = isContinuing ? previous.samples : [];
+      if (isContinuing) {
+        const gap = (entry.tick - last.tick) * SECOND / ticksPerSecond;
+        sample.at = Math.min(Math.max(last.at + gap, now - GHOST_DELAY), now);
+        sample.start = Math.max(last.at, sample.at - gap);
+      }
+      samples.push(sample);
+      if (samples.length > MAX_SAMPLES) samples.shift();
       ghosts.set(entry.slot, {
-        slot: entry.slot, nick: typeof nick === 'string' ? nick : nickOf(entry.slot), x: entry.x, y: entry.y, direction,
-        seenAt: clock.now(),
+        slot: entry.slot, nick: typeof nick === 'string' ? nick : nickOf(entry.slot), samples, seenAt: now,
       });
+    }
+
+    /* On the straight line between the two samples around `time`; before the
+       first or after the last one it stays at that sample, never ahead. */
+    function placeAt(samples, time) {
+      let index = samples.length - 1;
+      while (index > 0 && time < samples[index].start) index--;
+      const to = samples[index];
+      const place = { x: to.x, y: to.y, direction: to.direction };
+      if (index > 0 && time < to.at) {
+        const from = samples[index - 1];
+        const share = (time - to.start) / (to.at - to.start);
+        place.x = from.x + (to.x - from.x) * share;
+        place.y = from.y + (to.y - from.y) * share;
+      }
+      return place;
     }
 
     function go() {
@@ -225,16 +261,20 @@ const KLAD_RACE = (() => {
       page.render();
     }
 
-    /* Drawn by the engine every frame, from the latest position. */
+    /* Drawn by the engine every frame, GHOST_DELAY in the past. */
     function visibleGhosts() {
       const now = clock.now();
       const list = [];
       for (const ghost of ghosts.values()) {
         const age = now - ghost.seenAt;
         const alpha = age <= FADE_AFTER ? GHOST_ALPHA : GHOST_ALPHA * (1 - (age - FADE_AFTER) / FADE_FOR);
-        if (alpha > 0) list.push({ slot: ghost.slot, nick: ghost.nick, x: ghost.x, y: ghost.y, direction: ghost.direction, alpha });
+        if (alpha > 0) list.push({ slot: ghost.slot, nick: ghost.nick, ...placeAt(ghost.samples, now - GHOST_DELAY), alpha });
       }
       return list;
+    }
+
+    function ghostSampleCount(slot) {
+      return ghosts.has(slot) ? ghosts.get(slot).samples.length : 0;
     }
 
     /* The server's order: place 1, 2, ... by the receipt of finish, then
@@ -270,10 +310,10 @@ const KLAD_RACE = (() => {
       return { phase, count, level, shape, notice: notice(), places: places === null ? null : placesView() };
     }
 
-    return { begin, finish, ghosts: visibleGhosts, state };
+    return { begin, finish, ghosts: visibleGhosts, ghostSampleCount, state };
   }
 
-  return { create, TEXT, PING_EVERY, POSITION_EVERY, GHOST_ALPHA, FADE_AFTER, FADE_FOR, NOTICE_FOR };
+  return { create, TEXT, PING_EVERY, POSITION_EVERY, GHOST_ALPHA, FADE_AFTER, FADE_FOR, GHOST_DELAY, MAX_STEP, MAX_SAMPLES, NOTICE_FOR };
 })();
 if (typeof module !== 'undefined') module.exports = KLAD_RACE;
 
@@ -297,6 +337,7 @@ if (typeof document !== 'undefined') (() => {
     clock,
     isVisible: () => document.visibilityState === 'visible',
     format: KLAD_TICKS.format,
+    ticksPerSecond: KLAD_TICKS.PER_SECOND,
     engine: {
       start: (level, shape) => KLAD_GAME.startRace(level, shape, {
         onFinish: (ticks) => race.finish(ticks),

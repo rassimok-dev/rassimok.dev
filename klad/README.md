@@ -20,7 +20,7 @@ proxy (below), it is self-contained on purpose so it can be removed in one go.
 | `test/levels.test.js` | `node --test`: shape, legend, key-then-exit reachability, revision, fastest clear above the API floor |
 | `test/online.test.js` | `node --test`: `online.js` against a fake `fetch`: request shapes, when results wait or go, a skip during a save, blocked cookies, login codes, verify answers and merges, the read-back after a login, a login ending a skip, logout, 400, 401, 404, 409, 429, offline |
 | `test/lobby.test.js` | `node --test`: `lobby.js` against a fake `fetch`, a fake clock and a fake `WebSocket`: the room id form and the `#room=` link, the room view and the Start condition, presence and room polls only while open and visible, the poll after an own action, 404, 409 `room_full`, the socket at `starting` and at `racing` after a reload, once (backoff, 1008, the cap in all, its stop), the not-available text when the API drops a player whose socket never opened, the re-join after the sweep (heartbeat 204 not counted, a tap on Ready, 57 s, network failures, a poll answered after a hide), another link and the leave button during a join, the answers after the close, the request budget for an hour |
-| `test/race.test.js` | `node --test`: `race.js` on the lobby's real socket module with a fake `WebSocket`, a fake clock and a fake engine: the countdown and go, a missed go, the position rate only while racing, visible and in play, one ping timer across reconnects, finish once and its resend after a reconnect, ghosts by slot, their fade and resync, the results view, close 1000, offline, a second race, a reload in the race and after the own finish; `race.js`'s page half in a `vm` context with stub dialogs: Escape on the finish screen leaves the room, "Назад в комнату" and go do not; and `klad.js` in a `vm` context with a stub page: the host's shape whatever the orientation, the exit and deaths in a race with no `klad:clear`, `klad:run` or game over, `stopRace`, ghosts drawn as canvas text |
+| `test/race.test.js` | `node --test`: `race.js` on the lobby's real socket module with a fake `WebSocket`, a fake clock and a fake engine: the countdown and go, a missed go, the position rate only while racing, visible and in play, one ping timer across reconnects, finish once and its resend after a reconnect, ghosts by slot, their interpolation (midpoint, no step back, new attempt and long step at once, a pause, the cap), fade and resync, the results view, close 1000, offline, a second race, a reload in the race and after the own finish; `race.js`'s page half in a `vm` context with stub dialogs: Escape on the finish screen leaves the room, "Назад в комнату" and go do not; and `klad.js` in a `vm` context with a stub page: the host's shape whatever the orientation, the exit and deaths in a race with no `klad:clear`, `klad:run` or game over, `stopRace`, ghosts drawn as canvas text |
 | `test/proxy.test.js` | `node --test`: the API proxy against a fake `fetch` |
 | `test/ticks.test.js` | `node --test`: the time formatter |
 | `MECHANICS.md` | the original rules as reconstructed from sources |
@@ -151,9 +151,16 @@ player's game: no shared world, no collision.
   shows this player unfinished.
 - Ghosts: one per other slot, in a fixed colour per slot
   (`--crt-ghost-0` to `--crt-ghost-3`; guests may share a nick), the runner
-  sprite at 0.55 opacity with the nick drawn on the canvas, from the latest
-  position. With no update for 2 s a ghost fades out over 1 s. A `state`
-  after a reconnect replaces them with its `positions`.
+  sprite at 0.55 opacity with the nick drawn on the canvas. A ghost is
+  smoothed on the receiving side: it keeps its last 10 positions with the
+  sender's `tick` and is drawn 250 ms in the past, on the straight line
+  between the two positions around that moment, spaced by the ticks (the
+  tick rate is `KLAD_TICKS.PER_SECOND`, passed in the environment as
+  `ticksPerSecond`). It never runs ahead of the last position. A position
+  with a lower `tick` (a new attempt) or a step over 3 cells shows at once;
+  a fall step of 1.8 cells slides. With no update for 2 s a ghost fades out
+  over 1 s. A `state` after a reconnect replaces the ghosts with its
+  `positions`, shown at once. The sender and the API are unchanged.
 - In a race a death costs no life and there is no game over. The race
   dispatches no `klad:clear` or `klad:run`, so it never reaches the boards,
   and it leaves the URL hash alone.

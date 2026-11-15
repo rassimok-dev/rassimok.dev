@@ -66,9 +66,11 @@ no room (in a room it would invite a join that silently leaves it).
   a room.
 - Texts: headings "Сейчас в лобби: N" and "Открытые комнаты: N" (without
   the count until the first answer). The note says every player with a nick
-  (guest or account; `GET /rooms` needs only a session) sees a listed room's host nick and player count, also during its race,
-  and that link only hides a room from later lists but does not take back a
-  link already seen. A failed list says "Сервер не отвечает: список комнат
+  (guest or account; `GET /rooms` needs only a session) sees a listed
+  room's host nick and player count, also during its race; that any such
+  player can join an open room and then sees its members; and that link
+  only hides a room from later lists but does not take back a link already
+  seen. A failed list says "Сервер не отвечает: список комнат
   не загрузился. Остальное в лобби работает." The count counts the 20
   rooms the API returns, so it caps at 20.
 - Not verified here: the two-browser run on production and the 360 px

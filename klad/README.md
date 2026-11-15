@@ -67,6 +67,9 @@ checks again) and plays as before.
   address itself only once a login creates or opens an account, and it
   mails nothing but login codes. Both footers and the login part say so in
   full, the nick prompt in short; the meta description names only the hash.
+  The site's privacy page (`/privacy/`, outside this folder), linked from
+  both footers and, in a new tab, from the login part's privacy note, says
+  all of it in one place.
 - Any open `<dialog>` holds the game: play pauses, timers stop and game keys
   are ignored. Closing it puts the focus back on the field.
 - Nicks come from other players, so every text is set with `textContent`.
@@ -249,9 +252,12 @@ the same object, never rebuilt.
 3. In `.github/workflows/ci.yml`: drop `klad/index.html` from html-validate,
    the `--exclude-dir=klad` and the klad script check in "No JavaScript", the
    `*.js` third-party grep, and the "Level sanity" step.
-4. Remove the `/klad/` links in `index.html` and the game parts of
-   `README.md`: the opening line, the exceptions under "Principles" (the
-   cookie, the stored data and how to delete it), the `/klad/*` header row
+4. Remove the `/klad/` links in `index.html`; in `privacy/index.html` the
+   game's sections and links in both languages (keep the site, the contact
+   and the pages on Cloudflare Pages, without the proxy); and the game parts
+   of `README.md`: the opening line, the exceptions under "Principles" (the
+   cookie, the stored data and how to delete it, and the game in "One privacy
+   page"), the `/klad/*` header row
    and the note below the table, the section "The game's API", check 5
    under "CI", and the `functions/` sentence under "Deployment".
 5. Delete the `API_ORIGIN` variable in the Pages project settings.

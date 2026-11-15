@@ -21,12 +21,18 @@ position".
   `KLAD_TICKS.PER_SECOND`, passed to `race.js` as `ticksPerSecond` like
   `format`, not repeated), so a message that comes late does not change the
   spacing. A position is shown at the previous one's time plus the tick
-  gap, never after its arrival (so a sender running faster than the clock
-  cannot make the lag grow). When the previous position's time is already
+  gap, but never sooner than half a send interval (`POSITION_EVERY / 2`,
+  100 ms) after the previous one, even when it arrives at once behind it:
+  messages that come bunched after a stall (TCP delivers them together)
+  would otherwise get a slide of zero length and hop. The time may so run
+  a little past the arrival, by a bounded amount (a bunched pair about
+  350 ms behind in all, three after a stall 450 ms, a hostile burst of 10
+  about 1150 ms, draining within a second); a sender running faster than
+  the clock still cannot make the lag grow without bound. When the previous position's time is already
   behind the drawn moment (a pause, a lost frame, latency that rose for
   good), the new one is anchored at its arrival instead and its move starts
   no earlier than the drawn moment, so the ghost waits where it stands and
-  slides, with no hop and no hop on the messages after it. A move
+  slides, and the messages after it keep the floor above. A move
   otherwise starts at its time minus the tick gap.
 - **Never extrapolate.** After the last position the ghost stays; a guess
   that is wrong would be a hop back. The 2 s fade is unchanged.
@@ -40,10 +46,11 @@ position".
 - **The delay costs jitter room only 250 ms minus the 200 ms spacing.** A
   message up to about 50 ms late is absorbed fully; a later one makes the
   ghost wait at its last position and then slide to it, re-anchored at
-  its arrival, so the margin comes back. No steady scenario moves a ghost
-  more than 0.2 cell per 10 ms frame; the one residual is a late message
-  followed by an early one, which crosses a cell in 50 ms. Do not keep a
-  one-frame catch-up on purpose. A longer delay is not needed and would go
+  its arrival, so the margin comes back. No scenario tested (late message, bunched
+  pair, three after a stall, rising latency, lost ticks) moves a ghost more
+  than 0.25 cell per 10 ms frame. Right after a stall the lag may briefly
+  pass 350 ms, which is the price of the floor. Do not keep a one-frame
+  catch-up on purpose. A longer delay is not needed and would go
   over the "about a third of a second behind" the ticket asks for;
   `GHOST_DELAY` is one constant.
 - **Facing follows the received x** against the previous position, as

@@ -371,12 +371,34 @@ test('a ghost does not hop on every message when the latency rises by 150 ms for
 test('a ghost does not hop on every message after the sender loses ticks in one 300 ms frame', () => {
   // given
   const { race, clock, say } = racing();
-  const arrivals = [[0, 0], [200, STEP_TICKS], [400, 2 * STEP_TICKS], [700, 3.5 * STEP_TICKS]];
-  for (let index = 1; index < 9; index++) arrivals.push([700 + index * 200, (3.5 + index) * STEP_TICKS]);
+  const arrivals = [[0, 0], [200, STEP_TICKS], [400, 2 * STEP_TICKS], [700, 2.5 * STEP_TICKS]];
+  for (let index = 1; index < 9; index++) arrivals.push([700 + index * 200, (2.5 + index) * STEP_TICKS]);
   // when
   const seen = walkFrames(race, clock, say, arrivals);
   // then
   assert.equal(seen[seen.length - 1], 15);
+  assert.ok(biggestFrameMove(seen) <= MAX_FRAME_MOVE);
+});
+
+test('a ghost does not hop when a late message is followed at once by the next one', () => {
+  // given
+  const { race, clock, say } = racing();
+  const arrivals = [[0, 0], [200, STEP_TICKS], [590, 2 * STEP_TICKS], [590, 3 * STEP_TICKS], [800, 4 * STEP_TICKS]];
+  // when
+  const seen = walkFrames(race, clock, say, arrivals);
+  // then
+  assert.equal(seen[seen.length - 1], 8);
+  assert.ok(biggestFrameMove(seen) <= MAX_FRAME_MOVE);
+});
+
+test('a ghost does not hop when three messages arrive together after a 450 ms stall', () => {
+  // given
+  const { race, clock, say } = racing();
+  const arrivals = [[0, 0], [200, STEP_TICKS], [650, 2 * STEP_TICKS], [650, 3 * STEP_TICKS], [650, 4 * STEP_TICKS]];
+  // when
+  const seen = walkFrames(race, clock, say, arrivals);
+  // then
+  assert.equal(seen[seen.length - 1], 8);
   assert.ok(biggestFrameMove(seen) <= MAX_FRAME_MOVE);
 });
 

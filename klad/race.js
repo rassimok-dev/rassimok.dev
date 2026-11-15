@@ -86,11 +86,8 @@ const KLAD_RACE = (() => {
       return player && typeof player.nick === 'string' ? player.nick : '';
     }
 
-    /* A ghost keeps its last positions with the times they are shown at: a
-       sample is shown at `at` and the move to it starts at `start`, spaced by
-       the sender's ticks, never earlier than its arrival allows. A lower tick
-       (a new attempt) or a step over MAX_STEP starts the list again, so that
-       position shows at once. */
+    /* Positions are spaced by the sender's ticks, not by when they arrive.
+       A lower tick (a new attempt) or a long step shows at once. */
     function takePosition(entry, nick) {
       const isValid = isObject(entry) && Number.isInteger(entry.slot) && entry.slot >= 0 && entry.slot < SLOTS
         && entry.slot !== mySlot && Number.isFinite(entry.x) && Number.isFinite(entry.y) && Number.isFinite(entry.tick)
@@ -108,7 +105,7 @@ const KLAD_RACE = (() => {
       if (isContinuing) {
         const gap = (entry.tick - last.tick) * SECOND / ticksPerSecond;
         const shown = now - GHOST_DELAY;
-        sample.at = last.at < shown ? now : Math.min(last.at + gap, now);
+        sample.at = last.at < shown ? now : Math.min(last.at + gap, Math.max(now, last.at + POSITION_EVERY / 2));
         sample.start = Math.max(last.at, sample.at - gap, shown);
       }
       samples.push(sample);

@@ -322,9 +322,10 @@ function fakeClock() {
   };
 }
 
-function loadChatPage(sendAnswers = []) {
+function loadChatPage(sendAnswers = [], restoredBoxes = []) {
   const registry = { focused: null, created: [], closeEvents: [] };
   const elements = {};
+  for (const id of restoredBoxes) elements[id] = { ...stubNode('#' + id, registry), checked: true };
   const listeners = {};
   const sent = [];
   const toggled = [];
@@ -362,10 +363,11 @@ function loadChatPage(sendAnswers = []) {
     await elements['lobby-chat-form'].listeners.submit({ preventDefault() { isPrevented = true; } });
     return isPrevented;
   };
-  return { elements, registry, sent, toggled, clock, chatPage, show, submit, pressKey, fireCloseEvents };
+  return { elements, registry, sent, toggled, clock, chatPage, listeners, show, submit, pressKey, fireCloseEvents };
 }
 
 const textsOf = (node) => [node.textContent, ...node.children.flatMap((child) => (typeof child === 'string' ? [child] : textsOf(child)))];
+/* The lobby's live region is written only while the lobby dialog is open. */
 const spokenOf = (page) => page.elements['lobby-chat-live'].children.map((item) => item.textContent);
 const hideButtonOf = (line) => line.children.find((child) => typeof child !== 'string' && child.tag === 'button') || null;
 const linesOf = (page) => page.elements['lobby-chat-lines'].children;
@@ -373,6 +375,7 @@ const linesOf = (page) => page.elements['lobby-chat-lines'].children;
 test('chat page: a text and a nick like <img src=x> and a typed web address show as text, and nothing is made from them', () => {
   // given
   const page = loadChatPage();
+  page.elements.lobby = { open: true };
   const hostile = '<img src=x onerror=alert(1)>';
   const address = 'www.example.test/klad?x=<b>1</b>';
 
@@ -463,6 +466,7 @@ test('chat page: an empty or blank field sends nothing, and nothing changes when
 test('chat page: a new message is announced once, and the list is rebuilt only when its lines change', () => {
   // given
   const page = loadChatPage();
+  page.elements.lobby = { open: true };
   const live = page.elements['lobby-chat-live'];
   const list = page.elements['lobby-chat-lines'];
   page.show(stateOf([anna(1, 'one')]));
@@ -505,6 +509,7 @@ test('chat page: Скрыть чат hides the chat and stops its announcements'
 test('chat page: hiding a member empties the live region, and a later message is still announced', () => {
   // given
   const page = loadChatPage();
+  page.elements.lobby = { open: true };
   page.show(stateOf([anna(1, 'one'), twin(2, 'two')]));
   const spokenBefore = spokenOf(page);
 
@@ -522,6 +527,7 @@ test('chat page: hiding a member empties the live region, and a later message is
 test('chat page: the part shows only in a room that has answered, says when there is nothing yet, and starts clean in a new room', async () => {
   // given
   const page = loadChatPage([{ status: 429, data: null }]);
+  page.elements.lobby = { open: true };
   const part = page.elements['lobby-chat'];
 
   // when
@@ -569,6 +575,7 @@ test('chat page: another member\'s line has a скрыть button named with the
 test('chat page: a nick that becomes shared gets the member number on the shown lines, in the button name and in the announcement', () => {
   // given
   const page = loadChatPage();
+  page.elements.lobby = { open: true };
   const messages = [anna(1, 'one'), twin(2, 'two')];
   page.show(stateOf(messages));
   const namesBefore = linesOf(page).map((line) => line.children[0].textContent);
@@ -899,4 +906,67 @@ test('chat page: the pop-ups have their own polite live region inside the stage,
   assert.match(rule, /pointer-events: none/);
   assert.match(motion, /\.popups p \{ animation/);
   assert.doesNotMatch(rule, /animation/);
+});
+
+test('chat page: a held C is stopped in the field it opened until the key comes up, and so is a held Enter or C in the race field', () => {
+  // given
+  const page = loadChatPage();
+  page.chatPage.setRace(true);
+  const inRaceField = { tagName: 'INPUT', id: 'race-chat-text' };
+  const inOtherField = { tagName: 'INPUT', id: 'lobby-chat-text' };
+  page.pressKey('KeyC');
+
+  // when
+  const heldC = page.pressKey('KeyC', { repeat: true, target: inOtherField });
+  page.listeners.keyup({ code: 'KeyC' });
+  const heldCAfterKeyUp = page.pressKey('KeyC', { repeat: true, target: inOtherField });
+  const held = ['Enter', 'NumpadEnter', 'KeyC'].map((code) => page.pressKey(code, { repeat: true, target: inRaceField }));
+  const heldEnterElsewhere = page.pressKey('Enter', { repeat: true, target: inOtherField });
+  const firstEnter = page.pressKey('Enter', { target: inRaceField });
+
+  // then
+  assert.equal(heldC, true);
+  assert.equal(heldCAfterKeyUp, false);
+  assert.deepEqual(held, [true, true, true]);
+  assert.equal(heldEnterElsewhere, false);
+  assert.equal(firstEnter, false);
+});
+
+test('chat page: a message over the closed race dialog is not written into its live region, and is not read when the dialog opens', () => {
+  // given
+  const page = loadChatPage();
+  page.chatPage.setRace(true);
+  page.elements.lobby = { open: false };
+  page.show(stateOf([anna(1, 'one')]));
+  const writtenWhileClosed = page.elements['race-chat-live'].children.length;
+
+  // when
+  page.pressKey('KeyC');
+  page.show(stateOf([anna(1, 'one'), anna(2, 'two')]));
+
+  // then
+  assert.equal(writtenWhileClosed, 0);
+  assert.deepEqual(page.elements['race-chat-live'].children.map((item) => item.textContent), ['Anna: two']);
+  assert.deepEqual(spokenOf(page), []);
+});
+
+test('chat page: a restored tick in a Скрыть чат box is cleared at load, and the chat shows', () => {
+  // given
+  const page = loadChatPage([], ['lobby-chat-hide', 'race-chat-hide']);
+
+  // when
+  page.show(stateOf([anna(1, 'one')]));
+
+  // then
+  assert.equal(page.elements['lobby-chat-hide'].checked, false);
+  assert.equal(page.elements['race-chat-hide'].checked, false);
+  assert.equal(page.elements['lobby-chat-lines'].children.length, 1);
+});
+
+test('chat page: a pop-up is one line on a short screen', () => {
+  // given
+  const css = fs.readFileSync(path.join(__dirname, '..', 'klad.css'), 'utf8');
+
+  // then
+  assert.match(css, /@media \(max-height: 500px\) \{\s*\.popups p \{ -webkit-line-clamp: 1; \}/);
 });

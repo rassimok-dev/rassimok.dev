@@ -80,9 +80,9 @@ checks again) and plays as before.
 - Room chat (RAS-54): only a room's members read its messages, each only
   what was sent after they joined. The API keeps the last 30 messages of
   each room in memory only, never in the database or a log; they go with
-  the room or a restart of the server. The chat note, both footers and the
-  nick prompt name hello.rassimok@gmail.com as the contact for reports, as
-  plain text inside the `email_off` markers (no `mailto:`), with one rule:
+  the room or a restart of the server. The chat note, both footers, the
+  nick prompt and the race chat dialog name hello.rassimok@gmail.com as the
+  contact for reports, as plain text inside the `email_off` markers (no `mailto:`), with one rule:
   nothing illegal, no harassment.
 - Any open `<dialog>` holds the game: play pauses, timers stop and game keys
   are ignored. Closing it puts the focus back on the field.
@@ -328,7 +328,8 @@ player's game: no shared world, no collision.
   holds `klad.js`); Escape or "Закрыть" closes it with the focus back on the
   field, and the game stays on its pause screen until P or ОГОНЬ; in a race
   that screen also names the chat key. C is ignored while typing, with
-  Ctrl, Meta or Alt, held down, or over another dialog. It works after the
+  Ctrl, Meta or Alt, or over another dialog; a held C opens it once and its
+  repeats (and a held Enter, NumpadEnter or C in the field) are stopped. It works after the
   own finish too. When the race ends it closes and the pop-ups go.
 - A hostile member's input is bounded: a `pos` outside cells 0 to 24 makes no
   ghost, and a result time over the race cap (4 minutes and 10 s) shows as

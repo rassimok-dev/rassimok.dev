@@ -364,6 +364,12 @@ dialog .gone { color: var(--crt-dim); font-size: .9em; }
 @media (prefers-reduced-motion: no-preference) {
   .popups p { animation: popup-in .2s ease-out; }
 }
+/* A landscape phone is at most about 430 px high (large ones 430, small
+   ones 360 to 390): there each pop-up is one line, so three cover less of
+   the field. */
+@media (max-height: 500px) {
+  .popups p { -webkit-line-clamp: 1; }
+}
 @keyframes popup-in {
   from { opacity: 0; }
 }

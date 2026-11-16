@@ -130,6 +130,7 @@ if (typeof document !== 'undefined') (() => {
   const shownPopups = new Map();
   let lastState = null;
   let isInRace = false;
+  let isChatKeyDown = false;
 
   /* Nick, marks and text go in with textContent only, so a typed tag or web
      address stays text. Another member's line has its own hide button, so
@@ -173,7 +174,7 @@ if (typeof document !== 'undefined') (() => {
 
   /* One chat view: the lobby's part and the race dialog have the same
      lines, announcements and send field, under ids with their own prefix. */
-  function createView(prefix) {
+  function createView(prefix, isDialogOpen) {
     const hideBox = $(prefix + '-hide'), body = $(prefix + '-body'), list = $(prefix + '-lines'), empty = $(prefix + '-empty'),
           live = $(prefix + '-live'), form = $(prefix + '-form'), field = $(prefix + '-text'), problem = $(prefix + '-problem');
     const watch = chat.watcher();
@@ -188,7 +189,9 @@ if (typeof document !== 'undefined') (() => {
        or on the list when the line went, and on Скрыть чат once the list is
        empty: a held Enter there toggles nothing and sends no draft. A draft
        does not follow the player into another room, and a hidden member's
-       last announcement leaves the live region. */
+       last announcement leaves the live region. The region is written only
+       while its dialog is open; the mark moves either way, so a message that
+       came over a closed dialog is not read when it opens. */
     function render(state) {
       if (state.roomId !== shownRoom) {
         shownRoom = state.roomId;
@@ -202,7 +205,7 @@ if (typeof document !== 'undefined') (() => {
         live.replaceChildren();
       }
       const fresh = watch(state);
-      if (fresh.length > 0) live.replaceChildren(...fresh.map(spoken));
+      if (fresh.length > 0 && isDialogOpen()) live.replaceChildren(...fresh.map(spoken));
       body.hidden = chat.isHidden();
       const lines = chat.lines(state);
       const keys = lines.map((line) => line.n + ' ' + line.name).join('\n');
@@ -238,9 +241,13 @@ if (typeof document !== 'undefined') (() => {
     return { hideBox, live, field, render };
   }
 
-  const lobbyView = createView('lobby-chat');
-  const raceView = createView('race-chat');
+  const lobbyView = createView('lobby-chat', () => $('lobby').open);
+  const raceView = createView('race-chat', () => raceDialog.open);
   const views = [lobbyView, raceView];
+  /* The attribute autocomplete is not allowed on a checkbox, so a form
+     state a browser restored is cleared here, never read: a hide lasts only
+     while the page is open. */
+  for (const view of views) view.hideBox.checked = false;
 
   /* The pop-ups live in one region with its own polite announcements; each
      one is a node of its own, added once and removed when it expires, so
@@ -301,12 +308,23 @@ if (typeof document !== 'undefined') (() => {
   }
 
   /* preventDefault, or the typed "c" lands in the field that just got the
-     focus. */
+     focus. The repeats of a held C go to that field too, so they are stopped
+     until the key comes up. A held Enter or C in the field is stopped as
+     well: Enter would send the kept draft again and again. */
+  const heldKeys = ['Enter', 'NumpadEnter', 'KeyC'];
   document.addEventListener('keydown', (event) => {
+    if (event.repeat && ((event.code === 'KeyC' && isChatKeyDown) || (event.target.id === 'race-chat-text' && heldKeys.includes(event.code)))) {
+      event.preventDefault();
+      return;
+    }
     if (event.code !== 'KeyC' || event.repeat || event.ctrlKey || event.metaKey || event.altKey) return;
     if (/^(INPUT|TEXTAREA|SELECT)$/.test(event.target.tagName) || !isInRace) return;
     event.preventDefault();
     openChat();
+    isChatKeyDown = raceDialog.open;
+  });
+  document.addEventListener('keyup', (event) => {
+    if (event.code === 'KeyC') isChatKeyDown = false;
   });
   raceButton.addEventListener('click', openChat);
   $('race-chat-close').addEventListener('click', () => raceDialog.close());
@@ -318,10 +336,10 @@ if (typeof document !== 'undefined') (() => {
      for the others). At its end the dialog closes before the results screen
      opens, so the focus goes to that screen, and the pop-ups go. */
   KLAD_CHAT.page = {
-    setRace(isRacing) {
-      isInRace = isRacing;
-      raceButton.hidden = !isRacing;
-      if (isRacing) return;
+    setRace(isOn) {
+      isInRace = isOn;
+      raceButton.hidden = !isOn;
+      if (isOn) return;
       popups.clear();
       if (raceDialog.open) raceDialog.close();
       if (document.activeElement === raceButton) canvas.focus({ preventScroll: true });

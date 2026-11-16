@@ -110,8 +110,9 @@ function setup(answers, options = {}) {
   const world = { isVisible: true, player: 'player' in options ? options.player : ME, shape: options.shape || 'landscape' };
   const page = {
     asked: 0,
+    renders: 0,
     races: [],
-    render() {},
+    render() { this.renders++; },
     askNick() { this.asked++; },
     race(polledRoom, socket) { this.races.push({ room: polledRoom, socket }); },
   };
@@ -2791,6 +2792,21 @@ test('a chat frame of the race socket is kept at once, as another member\'s mess
 
   // then
   assert.deepEqual(lobby.state().messages, [kept(annaSays(4, 'go go'))]);
+});
+
+test('a chat frame renders the page at once, a hostile one does not', async () => {
+  // given
+  const { page, say } = await racing();
+  const rendersBefore = page.renders;
+
+  // when
+  say(chatFrame(4, 'go go'));
+  const rendersAfterFrame = page.renders;
+  say(chatFrame(5, 'x'.repeat(121)));
+
+  // then
+  assert.equal(rendersAfterFrame, rendersBefore + 1);
+  assert.equal(page.renders, rendersAfterFrame);
 });
 
 test('a chat frame does not move the after number, so the poll after the race lists what the socket missed and shows each once', async () => {

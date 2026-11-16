@@ -3,7 +3,7 @@
 Dated entries, newest first. Written for a reader picking this up cold —
 or a future session needing to know what already exists and why.
 
-## 2026-11-16 - Race: chat pop-ups and a chat dialog (RAS-56)
+## 2026-11-16 (later) - Race: chat pop-ups and a chat dialog (RAS-56)
 
 During a race another member's chat message shows as a pop-up, and the
 player can write: the HUD button "Чат" and the key C open a chat dialog.
@@ -45,8 +45,14 @@ notes say "in the room", not "in the lobby".
   кнопка «Чат»"). The key is handled in `chat.js` on `document`, not in
   `klad.js`, so the engine knows nothing of chat; it calls
   `preventDefault` (else the typed "c" lands in the field that just got the
-  focus) and is ignored while typing, with Ctrl, Meta or Alt (copy), held
-  down, outside a race and over another dialog.
+  focus) and is ignored while typing, with Ctrl, Meta or Alt (copy),
+  outside a race and over another dialog. A held C opens the dialog once:
+  its repeats go to the field that took the focus, so they are stopped
+  (`preventDefault`) until the key comes up (`keyup`), checked before the
+  typing test. Repeats of Enter, NumpadEnter and C in the race dialog's
+  field are stopped too, so a held Enter cannot send the kept draft (or a
+  refused text again and again); the RAS-54 rule that the draft stays
+  after a failed send is unchanged.
 - **`race.js` tells the chat whether the race is on.** One call,
   `KLAD_CHAT.page.setRace(isOn)`, on each change of phase, made before the
   countdown or results dialog opens: so a chat dialog still open closes
@@ -80,6 +86,23 @@ notes say "in the room", not "in the lobby".
   the touch pad (a separate grid row) is never covered, on a 360 px phone
   too. Nodes are added once and removed on expiry, so the polite live
   region reads each message once and `#race-notice` is untouched.
+- **On a short screen a pop-up is one line.** Under
+  `@media (max-height: 500px)` the clamp is one line instead of two: a
+  landscape phone is about 340 to 430 px high, a desktop window is far
+  above 500 px, and 500 leaves room for browser bars. Three pop-ups and
+  about 6 s stay, so no decision of 2026-11-15 changes. Residual: one
+  member at the API limit (5 messages per 10 s) can keep 3 pop-ups up for
+  the whole race; the remedies are "Скрыть чат" or "скрыть" on the line,
+  both in the chat dialog, which pauses the own game.
+- **A live region is written only while its dialog is open.** The race
+  dialog's and the lobby's regions take announcements only while their
+  dialog is shown; the watcher mark moves either way, so a message that
+  came over a closed dialog is not read when it opens (the pop-up
+  announced it once). A browser that restores form state could tick a
+  "Скрыть чат" box while the chat shows; `autocomplete="off"` is not
+  allowed on a checkbox (html-validate), so `chat.js` unticks both boxes
+  at load and never reads them, since a hide lasts only while the page is
+  open.
 - **A dialog's close handler guards the focus.** The canvas gets the focus
   after the chat dialog closes only when no other dialog is open, as in
   the lobby and the race dialog; otherwise the end of a race with the chat
@@ -88,8 +111,15 @@ notes say "in the room", not "in the lobby".
   it; the only HTML additions are the button, the pop-up region and one
   dialog, with the contact address inside the email_off markers.
 
+Known edge, not fixed here: a dialog opened on the death or intro screen of
+a race ("ПОГИБ", then the level intro) does not keep the game paused after
+it closes; the timers run on and play resumes by itself, with no P or
+ОГОНЬ. It predates RAS-56 and applies to every dialog (`klad.js` holds only
+from `play`); it needs an engine change and its own ticket (follow-up).
+
 Not verified here: a race on the live API with two browsers (a Pages
-preview cannot run one); the phone layout on a real 360 px screen.
+preview cannot run one); the phone layout on a real 360 px screen; the
+repeats of a held key and a restored checkbox in a real browser.
 
 ## 2026-11-16 - Lobby: chat in the room (RAS-54)
 

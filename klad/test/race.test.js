@@ -797,8 +797,9 @@ function loadGame(options = {}) {
     windowListeners.keyup(event);
   }
   const key = (code) => hold(code, 0);
+  const typeIn = (code) => windowListeners.keydown({ code, repeat: false, target: { tagName: 'INPUT', dataset: {} }, preventDefault() {} });
   const title = () => elements['msg-title'].textContent;
-  return { game, events, texts, hashes, elements, run, key, hold, title };
+  return { game, events, texts, hashes, elements, run, key, hold, typeIn, title };
 }
 
 function raceHooks() {
@@ -807,6 +808,30 @@ function raceHooks() {
   hooks.ghosts = () => hooks.ghostList;
   return hooks;
 }
+
+test('klad.js: keys typed in a text field, such as the lobby chat, start no game and move no runner', () => {
+  // given
+  const { game, run, key, typeIn, title } = loadGame();
+  const titleBefore = title();
+  game.startRace(1, 'landscape', raceHooks());
+  const start = game.racePosition();
+
+  // when
+  for (const code of ['Enter', 'Space', 'ArrowRight', 'ArrowDown', 'KeyD']) typeIn(code);
+  run(1);
+  const afterTyping = game.racePosition();
+  game.stopRace();
+  for (const code of ['Enter', 'Space', 'KeyZ']) typeIn(code);
+  run(1);
+  const titleAfterTyping = title();
+  key('Enter');
+
+  // then
+  assert.equal(titleBefore, 'КЛАД');
+  assert.deepEqual([afterTyping.x, afterTyping.y], [start.x, start.y]);
+  assert.equal(titleAfterTyping, 'КЛАД');
+  assert.notEqual(title(), 'КЛАД');
+});
 
 test('klad.js: a race plays the host\'s shape whatever this device\'s orientation, and keeps it after a death', () => {
   // given

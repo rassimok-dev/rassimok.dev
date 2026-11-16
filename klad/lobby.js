@@ -1,6 +1,7 @@
-/* КЛАД lobby: presence, rooms by invite link, ready marks, race start.
-   The first half has no DOM, so the node tests can require it. The
-   interface is in klad/README.md. */
+/* КЛАД lobby: presence, rooms by invite link, ready marks, race start, and
+   the room chat's messages and send (chat.js shows them). The first half
+   has no DOM, so the node tests can require it. The interface is in
+   klad/README.md. */
 'use strict';
 const KLAD_LOBBY = (() => {
   const PRESENCE_EVERY = 30 * 1000;
@@ -15,6 +16,9 @@ const KLAD_LOBBY = (() => {
   const FIRST_SHAPE = 'landscape';
   const ROOM_LINK = '#room=';
   const ROOM_ID = /^[A-Za-z0-9_-]{10}$/;
+  const CHAT_KEPT = 30;
+  const CHAT_TEXT_MAX = 120;
+  const AFTER_MAX = 999999999;
   const TEXT = {
     unavailable: 'Сервер игры сейчас недоступен. Играть можно и без него.',
     offline: 'Нет связи с сервером. Игра работает и без него.',
@@ -75,6 +79,7 @@ const KLAD_LOBBY = (() => {
     const entries = room.players || [];
     const players = entries.map((player) => ({
       nick: player.nick, kind: player.kind, isReady: player.ready === true, isHost: player.host === true,
+      member: player.member, isMine: player.you === true,
     }));
     const mine = players[entries.findIndex((player) => player.you === true)];
     const isHost = Boolean(mine && mine.isHost);
@@ -85,6 +90,21 @@ const KLAD_LOBBY = (() => {
       isReady: Boolean(mine && mine.isReady),
       isListed: room.listed !== false,
       canStart: room.state === 'lobby' && isHost && players.length >= 2 && players.every((player) => player.isReady),
+    };
+  }
+
+  /* n goes back to the API as after=, which takes at most 9 digits, so a
+     larger one would make every later poll a 400. */
+  function isMessage(message) {
+    return Boolean(message) && Number.isInteger(message.n) && message.n >= 1 && message.n <= AFTER_MAX
+      && Number.isInteger(message.member) && typeof message.nick === 'string' && typeof message.kind === 'string'
+      && typeof message.text === 'string' && message.text.length >= 1 && message.text.length <= CHAT_TEXT_MAX;
+  }
+
+  function chatMessage(message) {
+    return {
+      n: message.n, member: message.member, nick: message.nick, kind: message.kind,
+      isGuest: message.guest === true, isMine: message.you === true, text: message.text,
     };
   }
 
@@ -238,6 +258,10 @@ const KLAD_LOBBY = (() => {
     let roomRequest = 0;
     let lastSeen = -Infinity;
     let socket = null;
+    let messages = [];
+    let chatAfter = 0;
+    let hiddenMembers = new Set();
+    let isSending = false;
 
     /* No room poll while an own action is out: its answer would be dropped
        as older. Every action ends with a poll of its own. */
@@ -245,6 +269,7 @@ const KLAD_LOBBY = (() => {
     const presence = every(clock, PRESENCE_EVERY, isActive, beat);
     const roomPoll = every(clock, ROOM_EVERY, () => isActive() && roomId !== null && !isBusy, poll);
     const roomPath = (action) => '/rooms/' + roomId + (action ? '/' + action : '');
+    const pollPath = () => roomPath() + (chatAfter > 0 ? '?after=' + chatAfter : '');
 
     /* What runs is decided here alone; a room link waits for a visible tab. */
     function resume() {
@@ -264,6 +289,7 @@ const KLAD_LOBBY = (() => {
       socket = null;
     }
 
+    /* Member numbers count from 1 in every room, so the hides go with the room. */
     function forgetRoom(text) {
       closeSocket();
       roomId = null;
@@ -271,7 +297,23 @@ const KLAD_LOBBY = (() => {
       isRoomDown = false;
       roomRequest++;
       message = text;
+      messages = [];
+      chatAfter = 0;
+      hiddenMembers = new Set();
       roomPoll.stop();
+    }
+
+    /* A room answer holds every message above the after number it was asked
+       with, so only room answers move that number: the send's answer can
+       carry a number above messages of others that have not arrived yet. */
+    function keepMessages(list, isRoomAnswer) {
+      if (!Array.isArray(list)) return;
+      for (const message of list.filter(isMessage)) {
+        if (!messages.some((kept) => kept.n === message.n)) messages.push(chatMessage(message));
+        if (isRoomAnswer) chatAfter = Math.max(chatAfter, message.n);
+      }
+      messages.sort((first, second) => first.n - second.n);
+      messages = messages.slice(-CHAT_KEPT);
     }
 
     function forgetRooms() {
@@ -305,6 +347,7 @@ const KLAD_LOBBY = (() => {
       } else {
         lastSeen = clock.now();
         room = data;
+        keepMessages(data.messages, true);
         if (data.state === 'lobby') closeSocket();
         else if ((data.state === 'starting' || data.state === 'racing') && socket === null) startRace();
       }
@@ -338,7 +381,7 @@ const KLAD_LOBBY = (() => {
     async function poll() {
       const request = ++roomRequest;
       const wasLongUnseen = isLongUnseen();
-      const answer = await call('GET', roomPath());
+      const answer = await call('GET', pollPath());
       if (request !== roomRequest) {
         page.render();
         return;
@@ -513,6 +556,28 @@ const KLAD_LOBBY = (() => {
       return act('listed', { listed: isListed === true });
     }
 
+    /* A chat message is one request: unlike act() it takes no room answer,
+       so it neither holds the poll nor asks for one. null means nothing was
+       sent, or the player left the room before the answer. */
+    async function sendMessage(text) {
+      if (room === null || isSending) return null;
+      const id = roomId;
+      isSending = true;
+      const answer = await call('POST', roomPath('messages'), { text });
+      isSending = false;
+      if (id !== roomId) return null;
+      if (answer.status === 201) keepMessages([answer.data], false);
+      else if (answer.status === 401) lostPlayer();
+      page.render();
+      return answer;
+    }
+
+    function toggleMemberHidden(member) {
+      if (hiddenMembers.has(member)) hiddenMembers.delete(member);
+      else hiddenMembers.add(member);
+      page.render();
+    }
+
     /* The player's own leave: the open rooms are fetched once more. */
     function leaveRoom() {
       const wasInRoom = roomId !== null;
@@ -597,11 +662,13 @@ const KLAD_LOBBY = (() => {
         phase, message, online, isOnlineDown, rooms, isRoomsDown, roomId, isRoomDown, isBusy,
         room: room === null ? null : roomView(room),
         race: raceText(),
+        messages: messages.slice(), hiddenMembers: [...hiddenMembers],
       };
     }
 
     return {
       open, close, askNick, afterNick, createRoom, joinFromList, toggleReady, chooseLevel, start, setListed, leave: leaveRoom, state,
+      sendMessage, toggleMemberHidden,
       onVisibility: resume,
     };
   }
@@ -609,6 +676,7 @@ const KLAD_LOBBY = (() => {
   return {
     create, connect, roomIdOf, inviteMailto, isRoomId, raceUrl, roomView, TEXT,
     PRESENCE_EVERY, ROOM_EVERY, SWEEP_AFTER, REJOIN_AFTER, SOCKET_TRIES, SOCKET_RECONNECTS, SOCKET_FIRST_WAIT,
+    CHAT_KEPT,
   };
 })();
 if (typeof module !== 'undefined') module.exports = KLAD_LOBBY;
@@ -746,6 +814,45 @@ if (typeof document !== 'undefined') (() => {
     if (focusedId) focusRoomButton(focusedId);
   }
 
+  /* A member hidden in the chat is found by the member number: two guests
+     may share a nick. */
+  function memberItem(player, isHidden) {
+    const marks = [];
+    if (player.isHost) marks.push(['host', 'хозяин']);
+    marks.push(player.isReady ? ['ready', 'готов'] : ['waiting', 'не готов']);
+    const item = person(player.nick, marks);
+    if (!player.isMine && Number.isInteger(player.member)) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.textContent = 'скрыть в чате';
+      button.dataset.member = String(player.member);
+      button.setAttribute('aria-pressed', String(isHidden));
+      button.addEventListener('click', () => lobby.toggleMemberHidden(player.member));
+      item.append(' ', button);
+    }
+    return item;
+  }
+
+  const memberKey = (player, state) => [player.member, player.nick, player.isHost, player.isReady, player.isMine,
+    state.hiddenMembers.includes(player.member)].join('|');
+  let shownPlayers = null;
+
+  /* Rebuilt only when a line changed, as the room list: a rebuild on every
+     poll would take the keyboard focus off a "скрыть в чате" button. */
+  function renderPlayers(state) {
+    const players = state.room ? state.room.players : [];
+    const keys = players.map((player) => memberKey(player, state)).join('\n');
+    if (keys === shownPlayers) return;
+    const focused = document.activeElement;
+    const focusedMember = focused && focused.dataset && playerList.contains(focused) ? focused.dataset.member : null;
+    playerList.replaceChildren(...players.map((player) => memberItem(player, state.hiddenMembers.includes(player.member))));
+    shownPlayers = keys;
+    if (focusedMember) {
+      const button = Array.from(playerList.querySelectorAll('button')).find((item) => item.dataset.member === focusedMember);
+      (button || copyButton).focus();
+    }
+  }
+
   function renderRoom(state) {
     const view = state.room;
     const isLobby = Boolean(view && view.state === 'lobby');
@@ -758,12 +865,7 @@ if (typeof document !== 'undefined') (() => {
     if (view && (document.activeElement !== linkOnlyBox || !state.isBusy)) linkOnlyBox.checked = !view.isListed;
     roomStatus.textContent = state.isRoomDown ? TEXT.offline
       : (view ? 'Игроков: ' + view.players.length + ' из ' + view.size : 'загрузка');
-    playerList.replaceChildren(...(view ? view.players : []).map((player) => {
-      const marks = [];
-      if (player.isHost) marks.push(['host', 'хозяин']);
-      marks.push(player.isReady ? ['ready', 'готов'] : ['waiting', 'не готов']);
-      return person(player.nick, marks);
-    }));
+    renderPlayers(state);
     levelLine.textContent = view ? levelText(view) : '';
     levelRow.hidden = !(view && view.isHost);
     if (view && (document.activeElement !== levelSelect || !state.isBusy)) levelSelect.value = String(view.level);
@@ -791,6 +893,7 @@ if (typeof document !== 'undefined') (() => {
     if (isReady && state.roomId === null) renderRooms(state);
     if (isReady && state.roomId !== null) renderRoom(state);
     if (state.roomId === null) copyNote.textContent = '';
+    document.dispatchEvent(new CustomEvent('klad:lobby', { detail: state }));
   }
 
   /* Focus goes back to the field, as after the other dialogs. */
@@ -849,7 +952,8 @@ if (typeof document !== 'undefined') (() => {
 
   document.addEventListener('visibilitychange', () => lobby.onVisibility());
   addEventListener('hashchange', openLink);
-  /* race.js opens the lobby again and leaves the room from its finish screen. */
-  KLAD_LOBBY.page = { open: () => showLobby(), leave: () => lobby.leave() };
+  /* race.js opens the lobby again and leaves the room from its finish
+     screen; chat.js sends through it and reads the state from klad:lobby. */
+  KLAD_LOBBY.page = { open: () => showLobby(), leave: () => lobby.leave(), sendMessage: (text) => lobby.sendMessage(text) };
   openLink();
 })();

@@ -3,6 +3,215 @@
 Dated entries, newest first. Written for a reader picking this up cold —
 or a future session needing to know what already exists and why.
 
+## 2026-11-16 - Lobby: chat in the room (RAS-54)
+
+The members of a lobby room can write to each other before a race. The room
+view has a part "Чат" at its end: the room's messages oldest first, each
+with the nick, `гость` or `аккаунт`, `человек` or `агент`, and `вы` on the
+player's own; a one-line field with "Отправить" (Enter sends); a switch
+"Скрыть чат"; and "скрыть в чате" next to each other member in the members
+list. The API side is RAS-53 (contract section 7): messages travel in the
+10 s room poll, a send is `POST /rooms/<id>/messages`. The user decided Q1
+to Q10 on 2026-11-15, each as recommended (room members only, inside the
+room poll, everyone writes, memory only and the last 30 per room, 120
+characters and 5 per 10 s, the allow-list, nick and both marks, hiding on
+the device, the notes with the chat, a new `klad/chat.js`), and named
+hello.rassimok@gmail.com as the contact for reports with a one-line rule.
+The privacy texts change in the same go, as RAS-53's order b requires:
+until now only someone calling the API by hand could chat. They also carry
+RAS-59 (guests deleted automatically about 90 days after their last
+visit), which went live on 2026-11-15.
+
+### Decisions worth not relitigating
+
+- **`chat.js` loads after `lobby.js`, so the messages stay in `lobby.js`.**
+  While the parser waits for a later script to download, the page goes on
+  running network answers, so a room answer can arrive before `chat.js`
+  has run. The lobby therefore keeps the room's messages, the `after`
+  number and the member hides, and never refers to `KLAD_CHAT`. `chat.js`
+  keeps no room data: the lobby dispatches `klad:lobby` on `document` at
+  the end of every render with its `state()` as `detail` (as the race
+  takes its socket from `klad:race`), and `chat.js` sends through
+  `KLAD_LOBBY.page.sendMessage`. A `chat.js` that loads late catches up at
+  the next render (tested). The Agent notes had the messages "handed to the
+  chat"; this keeps them where the answers arrive.
+- **The `after` number moves only with room answers.** A room answer holds
+  every message above the `after` it was asked with. The send's 201 shows
+  the own message at once, but its `n` can be above messages of others
+  that have not arrived yet; `after=<that n>` would lose them. So the own
+  message is shown at once, the next poll still asks from the last room
+  answer, and the own one is not shown twice (messages are kept by `n`).
+  A late answer is dropped with its messages (the lobby shows only the
+  newest room answer) and a lost one moves nothing, so the next poll asks
+  from the last `n` shown and nothing is lost.
+- **`?after=` only above 0.** Absent means 0 in the contract, so a room
+  nobody writes in polls exactly the old path, and the hour-long request
+  test keeps its 360 polls and 602 requests unchanged.
+- **A send is not an action.** It does not set the action guard (the poll
+  timer does not reschedule while it is set), does not count as a room
+  request (an in-flight poll would be dropped) and asks for no poll: one
+  message is one request (the hour with one message sent is 603). It has
+  its own one-at-a-time guard. 401 means no player, as everywhere; a 404
+  only shows "вас уже нет в этой комнате, или её больше нет" and keeps the
+  text, and the next regular poll (at most 10 s) decides with the existing
+  rules whether the room is gone, the player was removed or a re-join is
+  due, so a send can never cause a join.
+- **What the game shows of an answer.** A message is left out, and moves no
+  number, unless `n` is an integer from 1 to 999999999 (`after` takes at
+  most 9 digits; a larger `n` would make every later poll a 400), `member`
+  is an integer, nick and kind are strings and the text is 1 to 120
+  characters. The 201 is checked the same way. The page keeps the last 30,
+  like the API.
+- **Hides.** "скрыть в чате" works by member number, so one of two guests
+  with one nick can be hidden. The hides go with the room (numbers start at
+  1 in every room, so a hide carried over would hide a stranger) and stay
+  through a re-join of the same room. "Скрыть чат" lasts while the page is
+  open, across rooms. Neither is stored: no localStorage, a reload forgets
+  both. The buttons are in the members list, which `lobby.js` renders, so
+  the set lives there next to the member numbers. The list is rebuilt only
+  when a member line changes and the focus follows to the same member's
+  button (the RAS-46 fix for the room list); otherwise every poll would take
+  the focus off it. Member numbers are not shown: a twin is told apart by
+  the line's marks or by trying the button.
+- **Announcements.** The visible list is not a live region, so rebuilding
+  it (a hide, a new line) announces nothing. A visually hidden
+  `aria-live="polite"` region gets one node per new message of another
+  member, replaced with each batch, so several messages in one poll are all
+  read and none twice. Own messages, hidden ones and those that came while
+  the chat was hidden are never announced. The mark of what was announced
+  is moved only by others' messages, because the own one can arrive first.
+- **Layout.** The chat is the last block of the room view, after Ready,
+  Start, Leave and the hint: still under the members list, as the ticket
+  says, but the room's controls stay in view on a phone. The lines scroll in
+  their own box (12rem, `tabindex="0"` and labelled by the heading so a
+  keyboard can scroll it), follow the newest while scrolled to the end,
+  and the dialog still scrolls. The field has the label "Сообщение", 16 px
+  (the existing dialog rule), `maxlength="120"` (a longer paste is cut, as
+  in the nick field), `enterkeyhint="send"` and its own form, so Enter sends
+  and never reaches Старт; `klad.js` already ignores keys typed in a field
+  (now tested). The focus goes back to the field after a send, also after a
+  click on "Отправить"; the field is never disabled. Its text is emptied
+  only after a 201 and only if it did not change meanwhile.
+- **Texts.** A refused text names the rules ("до 120 знаков в одну строку:
+  латинские и русские буквы, цифры, пробел и знаки препинания, без эмодзи",
+  the contract's allow-list in plain words; the same line is under the
+  field), 429 says at most 5 messages per 10 s, any other failure says the
+  server is not answering. Each keeps the typed text.
+- **The address on the klad page is plain text** inside `<!--email_off-->`
+  and `<!--/email_off-->` (the chat note, both footers, the nick prompt): a
+  `mailto:` link there would need the RAS-48 new-tab handling, and an
+  address without the markers would bring Cloudflare's decoder script,
+  which the klad CSP's `script-src 'self'` would let run. The privacy page
+  keeps its `mailto:` links, inside the markers.
+- `_headers` and the CSP are unchanged; the new script is same-origin under
+  `script-src 'self'`.
+
+### Privacy texts
+
+Every claim was checked against the API's CHANGELOG (2026-11-15 fourth,
+RAS-53; sixth, RAS-59) and contract section 7: only the room's members read
+a message, each only what was sent after their join (non-members get
+`messages` empty, a re-join reads only later ones); any player with a nick
+can join a listed room; members see nick, kind and guest or account; the
+last 30 per room, in memory only, never in the database or a log line;
+gone with the room (10 minutes after it empties, or when its host opens a
+new room) and with a restart; leaving and logging out keep them; deleting
+the player, and a login that merges the guest into an existing account,
+removes them from every room; a page that already showed one keeps it
+until it reloads; guests whose sessions have all expired, or without a
+session and last seen 90 days ago, are deleted with sessions and results,
+the first request after a start and then once a day; accounts never, their
+expired sessions daily.
+
+- Chat note (new, under the field): who reads, what they see, the 30 in
+  memory, not in the database or a log, when they go, that a sent message
+  cannot be taken back (leaving does not remove it; deleting the nick
+  removes it from the server, but not from screens that already have it),
+  the rule (nothing illegal, no insults or harassment) and the address.
+- Both footers and the nick prompt: added sentences on the guest purge and
+  on the chat (who reads it, the 30 in memory, not in the database or a log,
+  gone with the room or a restart) with the rule and the address; nothing
+  removed. The rule reads the same everywhere: "ничего незаконного, никаких
+  оскорблений и травли" / "nothing illegal, no harassment".
+- Login note (boards), reworded: "иначе они останутся под ником гостя, и
+  игра уже не сможет их удалить." now ends "... удалить (сервер удалит
+  этого гостя сам примерно через 90 дней после его последнего захода)."
+- `privacy/index.html`, new: a section "Чат в комнате" / "Room chat", and a
+  bullet under "Что видят другие игроки" / "What other players see".
+  Reworded, in both languages (old -> new, English quoted):
+  - "Updated 15 November 2026." -> "Updated 16 November 2026."
+  - The cookie key item "(a key that expired or was cleared from the
+    browser stays until the nick is deleted)" -> "(a key cleared from the
+    browser stays until it expires; the server deletes an account's expired
+    keys on its own, about once a day, and a guest's keys go with the
+    guest)".
+  - "All of this stays until you delete it; nothing deletes it on its own."
+    -> "An account and all of this stay until you delete it. A guest (a
+    nick without an account) is deleted by the server on its own, with its
+    keys and results, about 90 days after your last visit to the game, when
+    its cookie expires."
+  - "When the cookie expires after 90 days without a visit or is cleared
+    with the browser's data, the guest and its results stay on the server,
+    and the game can no longer delete them." -> "When the cookie is cleared
+    with the browser's data, the game can no longer delete the guest; the
+    server deletes it with its results on its own, about 90 days after your
+    last visit. When you have not played for 90 days, the cookie expires and
+    the server deletes the guest the same way."
+  - "... and then the game can no longer delete it. So delete the guest
+    first, then log in." -> "... and then the game can no longer delete it;
+    the server deletes it on its own about 90 days after that guest's last
+    visit. To avoid the wait, delete the guest first, then log in."
+  - "... and it can no longer be deleted from the browser; until the page is
+    reloaded, the game saves no further nick." -> "... and it can no longer
+    be deleted from the browser; the server deletes it on its own after
+    about 90 days. Until the page is reloaded, the game saves no further
+    nick."
+  - "If the game can no longer delete your nick (its cookie was lost,
+    cleared or expired), write to ... and I will delete it and its results
+    by hand." (twice: deletion and contact) -> "If the game can no longer
+    delete your nick (its cookie was lost or cleared) and you do not want to
+    wait the 90 days, write to ... and I will delete it and its results by
+    hand sooner."
+  - "The API writes no email address into its log." -> "The API writes no
+    email address and no chat text into its log."
+- `README.md`: the guest purge sentence under "Collect almost nothing", a
+  new principle "Room chat in memory only", and "One privacy page" names
+  the two operator's promises (deletion by hand for those who do not want
+  to wait, the contact for chat reports).
+
+### Tests
+
+329 pass (291 before). `klad/test/lobby.test.js` +21: messages kept by
+`n` and `after` on the next polls; an action answer repeating them; a lost
+and a late poll answer; hostile messages (text not a string, 121 and 0
+characters, no `n`, 0, 1.5, 1e10, no member, a nick that is not a string,
+`null`, a list that is not a list); the own message at once without moving
+`after`; one request and no poll per send, a poll in flight during a send
+kept, and 603 requests in an hour with one; 400, 429, 404, 500, offline and 401; one at a time and an answer after
+leaving; nothing before the room answered; hides by number and the reset in
+a new room; a re-join keeping messages, `after` and hides; the cap of 30;
+and the page: the hide buttons and their focus, the `klad:lobby` event,
+`lobby.js` with `chat.js` in one `vm` context from a room link (lines as
+text, one POST with the typed text, no `img` or `a` made), and `chat.js`
+loaded after the room answered. New `klad/test/chat.test.js` (16): marks,
+order, a hidden member next to a twin, announcements once and never the
+own, the own message first, "Скрыть чат", a new room, the send texts; the
+page half with a stub `KLAD_LOBBY.page`: `<img src=x>` and a web address
+as text, Enter and the focus, the text kept on each failure and while
+typing during a send, a blank field, announcements once, "Скрыть чат",
+the part hidden until the room answered. `klad/test/race.test.js` +1:
+keys typed in a text field start no game and move no runner. Checked by
+mutation (a send moving `after`, a send asking for a poll, a send counted
+as a room request, hides kept
+across rooms, no length check, own messages moving the mark, the field
+always emptied, the members list always rebuilt): each fails a test.
+
+### Not verified here
+
+The two-browser run on production, the 360 px layout and a screen reader in
+a real browser, no console errors or CSP violations on a Pages response,
+and that Cloudflare leaves the four addresses on `/klad/` alone.
+
 ## 2026-11-15 (sixth) - Lobby: invite a friend by mail through the player's own mail app (RAS-48)
 
 The room view has a link "Отправить по почте" next to "Копировать". It opens

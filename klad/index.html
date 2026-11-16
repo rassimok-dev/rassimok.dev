@@ -20,6 +20,7 @@
     <button type="button" id="h-sound" aria-pressed="true">Звук вкл</button>
     <button type="button" id="h-board" aria-keyshortcuts="T">Таблицы</button>
     <button type="button" id="h-lobby">Лобби</button>
+    <button type="button" id="h-chat" aria-keyshortcuts="C" hidden>Чат</button>
   </header>
 
   <main id="stage" class="stage">
@@ -30,6 +31,7 @@
     </div>
     <p id="online-notice" class="notice" role="status"></p>
     <p id="race-notice" class="notice race-notice" role="status"></p>
+    <div id="chat-popups" class="popups" aria-live="polite"></div>
   </main>
 
   <div class="pad" role="group" aria-label="Управление">
@@ -280,6 +282,27 @@
       <button type="button" id="race-leave">Выйти из комнаты</button>
     </p>
   </div>
+</dialog>
+
+<dialog id="race-chat" aria-labelledby="race-chat-title">
+  <h2 id="race-chat-title">Чат гонки</h2>
+  <p class="note">Пока этот диалог открыт, ваша игра на паузе: остальные бегут дальше. Escape закрывает чат, игра остаётся на паузе до P или ОГОНЬ.</p>
+  <p><label><input type="checkbox" id="race-chat-hide"> Скрыть чат</label></p>
+  <div id="race-chat-body">
+    <ul id="race-chat-lines" class="chat" tabindex="0" aria-labelledby="race-chat-title"></ul>
+    <p id="race-chat-empty" class="note"></p>
+    <div id="race-chat-live" class="visually-hidden" aria-live="polite"></div>
+    <form id="race-chat-form">
+      <p class="field"><label for="race-chat-text">Сообщение</label>
+        <input id="race-chat-text" name="text" type="text" maxlength="120" autocomplete="off"
+               enterkeyhint="send" aria-describedby="race-chat-rules">
+        <button type="submit">Отправить</button></p>
+      <p id="race-chat-rules" class="note">До 120 знаков в одну строку: латинские и русские буквы, цифры, пробел и знаки препинания, без эмодзи.</p>
+    </form>
+    <p id="race-chat-problem" class="error" role="alert"></p>
+    <p class="note">Это тот же чат комнаты, что в лобби: его читают только участники комнаты, и каждый видит лишь сообщения, отправленные после его входа. Новые сообщения других участников на несколько секунд появляются внизу поля, пока вы играете; «Скрыть чат» их отключает. Сервер держит последние 30 сообщений комнаты только в памяти, не в базе данных и не в журнале. Правило: ничего незаконного, никакой травли. Жалобы: <!--email_off-->hello.rassimok@gmail.com<!--/email_off-->.</p>
+  </div>
+  <p class="actions"><button type="button" id="race-chat-close">Закрыть</button></p>
 </dialog>
 <script src="/klad/levels.js"></script>
 <script src="/klad/ticks.js"></script>

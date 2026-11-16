@@ -401,6 +401,7 @@ if (typeof document !== 'undefined') (() => {
     placesPart.replaceChildren(...(state.places === null ? [] : [placesTable(state.places)]));
     if (state.phase !== shownPhase) {
       shownPhase = state.phase;
+      KLAD_CHAT.page.setRace(state.phase === 'racing' || state.phase === 'finished');
       showDialogFor(state.phase);
     }
     const isInDialog = dialog.open;

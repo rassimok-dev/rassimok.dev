@@ -110,8 +110,9 @@ function setup(answers, options = {}) {
   const world = { isVisible: true, player: 'player' in options ? options.player : ME, shape: options.shape || 'landscape' };
   const page = {
     asked: 0,
+    renders: 0,
     races: [],
-    render() {},
+    render() { this.renders++; },
     askNick() { this.asked++; },
     race(polledRoom, socket) { this.races.push({ room: polledRoom, socket }); },
   };
@@ -2764,4 +2765,133 @@ test('a browser without WebSocket, or one that refuses it, reports offline at on
     assert.equal(socket.status(), 'offline');
     assert.equal(clock.pending(), 0);
   }
+});
+
+/* ---- chat frames on the race socket (RAS-56) ---- */
+
+const chatFrame = (n, text, changes) => ({
+  type: 'chat', n, member: 1, slot: 0, nick: 'Anna', kind: 'human', guest: false, text, ...changes,
+});
+const STARTING = room({ state: 'starting', players: [{ ...ANNA, ready: true }, { ...MINE, ready: true }] });
+
+async function racing() {
+  const run = await joined();
+  run.server.answers[POLL] = [[200, STARTING]];
+  await run.clock.advance(KLAD_LOBBY.ROOM_EVERY);
+  run.sockets.made[0].onopen();
+  run.say = (frame) => run.sockets.made[0].onmessage({ data: JSON.stringify(frame) });
+  return run;
+}
+
+test('a chat frame of the race socket is kept at once, as another member\'s message', async () => {
+  // given
+  const { lobby, say } = await racing();
+
+  // when
+  say(chatFrame(4, 'go go'));
+
+  // then
+  assert.deepEqual(lobby.state().messages, [kept(annaSays(4, 'go go'))]);
+});
+
+test('a chat frame renders the page at once, a hostile one does not', async () => {
+  // given
+  const { page, say } = await racing();
+  const rendersBefore = page.renders;
+
+  // when
+  say(chatFrame(4, 'go go'));
+  const rendersAfterFrame = page.renders;
+  say(chatFrame(5, 'x'.repeat(121)));
+
+  // then
+  assert.equal(rendersAfterFrame, rendersBefore + 1);
+  assert.equal(page.renders, rendersAfterFrame);
+});
+
+test('a chat frame does not move the after number, so the poll after the race lists what the socket missed and shows each once', async () => {
+  // given
+  const { lobby, server, clock, say } = await racing();
+  say(chatFrame(2, 'two'));
+  server.answers[POLL] = [[200, room({ messages: [annaSays(1, 'one'), annaSays(2, 'two'), annaSays(3, 'three')] })]];
+
+  // when
+  await clock.advance(KLAD_LOBBY.ROOM_EVERY);
+
+  // then
+  assert.equal(count(server.calls, POLL + '?after=2'), 0);
+  assert.equal(count(server.calls, POLL), 3);
+  assert.deepEqual(numbersOf(lobby), [1, 2, 3]);
+  assert.equal(lobby.state().room.state, 'lobby');
+});
+
+test('hostile chat frames show nothing: no text, a text that is not a string, empty or over 120 characters, a bad n, nick or kind, another type', async () => {
+  // given
+  const { lobby, say } = await racing();
+  const { text, ...withoutText } = chatFrame(1, 'x');
+  const hostile = [
+    withoutText,
+    chatFrame(1, 42),
+    chatFrame(1, null),
+    chatFrame(1, { toString: () => 'x' }),
+    chatFrame(1, ''),
+    chatFrame(1, 'x'.repeat(121)),
+    chatFrame('1', 'x'),
+    chatFrame(0, 'x'),
+    chatFrame(1.5, 'x'),
+    chatFrame(1000000000, 'x'),
+    chatFrame(1, 'x', { member: 'one' }),
+    chatFrame(1, 'x', { nick: 7 }),
+    chatFrame(1, 'x', { kind: 'robot' }),
+    chatFrame(1, 'x', { type: 'pos' }),
+    chatFrame(1, 'x', { type: undefined }),
+    null,
+    'chat',
+    [],
+  ];
+
+  // when
+  for (const frame of hostile) say(frame);
+
+  // then
+  assert.deepEqual(lobby.state().messages, []);
+});
+
+test('a chat frame of 120 characters is kept, and one that says it is the player\'s own is still another member\'s', async () => {
+  // given
+  const { lobby, say } = await racing();
+
+  // when
+  say(chatFrame(1, 'x'.repeat(120), { you: true }));
+
+  // then
+  assert.equal(lobby.state().messages.length, 1);
+  assert.equal(lobby.state().messages[0].isMine, false);
+});
+
+test('chat frames keep at most 30 messages, and a repeated frame shows once', async () => {
+  // given
+  const { lobby, say } = await racing();
+
+  // when
+  for (let n = 1; n <= 32; n++) say(chatFrame(n, 'm' + n));
+  say(chatFrame(32, 'm32'));
+
+  // then
+  assert.equal(lobby.state().messages.length, KLAD_LOBBY.CHAT_KEPT);
+  assert.equal(numbersOf(lobby)[0], 3);
+  assert.equal(numbersOf(lobby)[29], 32);
+});
+
+test('a chat frame after the race is over, with the room back in the lobby, shows nothing', async () => {
+  // given
+  const { lobby, server, clock, sockets } = await racing();
+  server.answers[POLL] = [[200, room()]];
+  await clock.advance(KLAD_LOBBY.ROOM_EVERY);
+
+  // when
+  sockets.made[0].onmessage({ data: JSON.stringify(chatFrame(1, 'late')) });
+
+  // then
+  assert.deepEqual(lobby.state().messages, []);
 });

@@ -246,8 +246,12 @@ if (typeof document !== 'undefined') (() => {
   const views = [lobbyView, raceView];
   /* The attribute autocomplete is not allowed on a checkbox, so a form
      state a browser restored is cleared here, never read: a hide lasts only
-     while the page is open. */
+     while the page is open. Chrome restores after load, just before
+     pageshow, and fires no change, so pageshow sets the boxes again. */
   for (const view of views) view.hideBox.checked = false;
+  addEventListener('pageshow', () => {
+    for (const view of views) view.hideBox.checked = chat.isHidden();
+  });
 
   /* The pop-ups live in one region with its own polite announcements; each
      one is a node of its own, added once and removed when it expires, so
@@ -303,6 +307,7 @@ if (typeof document !== 'undefined') (() => {
   function openChat() {
     if (!isInRace || document.querySelector('dialog[open]') !== null) return;
     popups.clear();
+    raceView.live.replaceChildren();
     raceDialog.showModal();
     (chat.isHidden() ? raceView.hideBox : raceView.field).focus();
   }

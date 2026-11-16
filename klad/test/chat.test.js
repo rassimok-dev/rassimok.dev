@@ -327,6 +327,7 @@ function loadChatPage(sendAnswers = [], restoredBoxes = []) {
   const elements = {};
   for (const id of restoredBoxes) elements[id] = { ...stubNode('#' + id, registry), checked: true };
   const listeners = {};
+  const windowListeners = {};
   const sent = [];
   const toggled = [];
   const clock = fakeClock();
@@ -339,6 +340,7 @@ function loadChatPage(sendAnswers = [], restoredBoxes = []) {
   };
   const sandbox = {
     document,
+    addEventListener: (type, listener) => { windowListeners[type] = listener; },
     setTimeout: (task, wait) => clock.setTimeout(task, wait),
     clearTimeout: (timer) => clock.clearTimeout(timer),
     KLAD_LOBBY: {
@@ -363,7 +365,7 @@ function loadChatPage(sendAnswers = [], restoredBoxes = []) {
     await elements['lobby-chat-form'].listeners.submit({ preventDefault() { isPrevented = true; } });
     return isPrevented;
   };
-  return { elements, registry, sent, toggled, clock, chatPage, listeners, show, submit, pressKey, fireCloseEvents };
+  return { elements, registry, sent, toggled, clock, chatPage, listeners, windowListeners, show, submit, pressKey, fireCloseEvents };
 }
 
 const textsOf = (node) => [node.textContent, ...node.children.flatMap((child) => (typeof child === 'string' ? [child] : textsOf(child)))];
@@ -488,7 +490,9 @@ test('chat page: a new message is announced once, and the list is rebuilt only w
 test('chat page: Скрыть чат hides the chat and stops its announcements', () => {
   // given
   const page = loadChatPage();
+  page.elements.lobby = { open: true };
   page.show(stateOf([anna(1, 'one')]));
+  const spokenBefore = spokenOf(page);
   const box = page.elements['lobby-chat-hide'];
   const live = page.elements['lobby-chat-live'];
 
@@ -500,6 +504,7 @@ test('chat page: Скрыть чат hides the chat and stops its announcements'
   page.show(stateOf([anna(1, 'one'), anna(2, 'two')]));
 
   // then
+  assert.deepEqual(spokenBefore, ['Anna: one']);
   assert.deepEqual(spokenWhenHidden, []);
   assert.equal(page.elements['lobby-chat-body'].hidden, true);
   assert.equal(live.replaced, replacedBefore);
@@ -961,6 +966,26 @@ test('chat page: a restored tick in a Скрыть чат box is cleared at load
   assert.equal(page.elements['lobby-chat-hide'].checked, false);
   assert.equal(page.elements['race-chat-hide'].checked, false);
   assert.equal(page.elements['lobby-chat-lines'].children.length, 1);
+});
+
+test('chat page: a tick a browser restores after load is set back from the switch at pageshow', () => {
+  // given
+  const page = loadChatPage();
+  page.show(stateOf([anna(1, 'one')]));
+  page.elements['lobby-chat-hide'].checked = true;
+  page.elements['race-chat-hide'].checked = true;
+
+  // when
+  page.windowListeners.pageshow({ persisted: false });
+  const afterRestore = [page.elements['lobby-chat-hide'].checked, page.elements['race-chat-hide'].checked];
+  page.elements['lobby-chat-hide'].checked = true;
+  page.elements['lobby-chat-hide'].listeners.change();
+  page.windowListeners.pageshow({ persisted: false });
+
+  // then
+  assert.deepEqual(afterRestore, [false, false]);
+  assert.equal(page.elements['lobby-chat-hide'].checked, true);
+  assert.equal(page.elements['race-chat-hide'].checked, true);
 });
 
 test('chat page: a pop-up is one line on a short screen', () => {

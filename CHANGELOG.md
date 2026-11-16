@@ -88,7 +88,7 @@ notes say "in the room", not "in the lobby".
   region reads each message once and `#race-notice` is untouched.
 - **On a short screen a pop-up is one line.** Under
   `@media (max-height: 500px)` the clamp is one line instead of two: a
-  landscape phone is about 340 to 430 px high, a desktop window is far
+  landscape phone is about 360 to 430 px high, a desktop window is far
   above 500 px, and 500 leaves room for browser bars. Three pop-ups and
   about 6 s stay, so no decision of 2026-11-15 changes. Residual: one
   member at the API limit (5 messages per 10 s) can keep 3 pop-ups up for
@@ -101,8 +101,10 @@ notes say "in the room", not "in the lobby".
   announced it once). A browser that restores form state could tick a
   "Скрыть чат" box while the chat shows; `autocomplete="off"` is not
   allowed on a checkbox (html-validate), so `chat.js` unticks both boxes
-  at load and never reads them, since a hide lasts only while the page is
-  open.
+  at load and sets them from the switch again at `pageshow` (Chrome
+  restores after load, just before `pageshow`, with no change event); it
+  never reads them, since a hide lasts only while the page is open. The
+  race dialog's region is emptied when the dialog opens.
 - **A dialog's close handler guards the focus.** The canvas gets the focus
   after the chat dialog closes only when no other dialog is open, as in
   the lobby and the race dialog; otherwise the end of a race with the chat

@@ -24,8 +24,23 @@ keeps a player's own results together and follows nobody, so there is still
 no cookie banner. A player can delete the nick and every result from the
 game's boards screen, in the same browser, as long as it keeps the game's
 cookie; an account, its email included, also from any device after logging
-in with a code sent to that address. The footers say this, and CI enforces
+in with a code sent to that address. Guests are deleted automatically about
+90 days after their last visit, with their sessions and results; accounts
+stay until deleted. The footers say this, and CI enforces
 what a grep can check (see below), so the claims cannot quietly become false.
+
+**Room chat in memory only.** In a lobby room the members can write to each
+other. Only that room's members read a message, each only what was sent
+after they joined, with the sender's nick, kind and guest or account, and
+the member number in the room when two members share a nick. The API keeps the last 30 messages of each room in
+memory, never in the database or a log line; they go with the room (10
+minutes after it empties, or when its host opens a new room) or a restart,
+and deleting a player removes their messages from every room. The chat
+note and the privacy page say all of this; both footers of the game and its
+nick prompt say it in short (who reads it, the last 30 in memory only,
+never in the database or a log, gone with the room or a restart). All of
+them name hello.rassimok@gmail.com as the contact for reports, with one
+rule: nothing illegal, no harassment.
 
 **One privacy page.** `/privacy/` (`privacy/index.html`) says all of it in
 one place, Russian first and English after: what the site and the game keep,
@@ -36,8 +51,9 @@ requests. The home page, both footers of the game and the privacy note of
 its login part (in a new tab) link to it. Plain HTML on `style.css`, no
 JavaScript, under the site-wide headers. Google's OAuth consent screen wants
 such a page on the app's own domain, linked from the home page. It says only
-what the code does, with one exception: deletion by hand on request, which
-is the operator's promise, not the code's. So a change that stores, shows or
+what the code does, with two exceptions that are the operator's promises,
+not the code's: deletion by hand on request, for anyone who does not want to
+wait for the automatic deletion of guests, and the contact for chat reports. So a change that stores, shows or
 mails more changes the page in the same go.
 
 **Zero third-party requests.** Fonts are the usual leak here: loading Google

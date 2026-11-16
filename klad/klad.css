@@ -288,6 +288,32 @@ dialog .host, dialog .ready { color: var(--crt-hot); font-size: .9em; }
 dialog #lobby-link { width: 100%; margin: .2rem 0; }
 dialog button[aria-pressed="true"] { color: var(--crt-hot); border-color: var(--crt-hot); }
 
+/* The room chat: the lines scroll in their own box, so a long chat does not
+   push the field off a phone screen. Positioned, so the hidden names of the
+   hide buttons stay inside the box and add no scroll to the dialog. */
+dialog .chat {
+  position: relative;
+  max-height: 12rem;
+  overflow-y: auto;
+  margin: .3rem 0;
+  padding: .1rem .4rem;
+  list-style: none;
+  border: 1px solid var(--crt-rule);
+}
+dialog .chat:empty { display: none; }
+dialog .chat li { padding: .1rem 0; overflow-wrap: anywhere; }
+dialog .chat .nick { font-weight: 600; }
+dialog #lobby-chat-text { width: 100%; margin: .2rem 0; }
+/* Read by screen readers, not shown. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
 /* The race: the countdown, the finish screen and its notice at the top of
    the field (the online notice keeps the bottom). */
 .race-notice { top: .6rem; bottom: auto; }

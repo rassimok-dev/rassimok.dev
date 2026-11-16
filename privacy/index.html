@@ -14,7 +14,7 @@
 
     <h1>Приватность <span lang="en">/ privacy</span></h1>
     <p class="lede">Что хранят сайт rassimok.dev и игра «Клад», кто это видит, где это
-    работает и как это удалить. Обновлено 15 ноября 2026 года.</p>
+    работает и как это удалить. Обновлено 16 ноября 2026 года.</p>
     <p><a href="#en" lang="en">English version below</a></p>
 
     <h2>Сайт</h2>
@@ -46,9 +46,12 @@
       сутки в каждом браузере и при каждом входе по коду);</li>
       <li>у аккаунта ещё ваш email;</li>
       <li>хеш каждого ключа из cookie, выданного нику, с временем выдачи и сроком действия (ключ,
-      который истёк или стёрт из браузера, остаётся, пока ник не удалён).</li>
+      стёртый из браузера, остаётся до конца своего срока; истёкшие ключи аккаунта сервер удаляет сам
+      примерно раз в сутки, а ключи гостя уходят вместе с гостем).</li>
     </ul>
-    <p>Всё это хранится, пока вы это не удалите; само оно не удаляется.</p>
+    <p>Аккаунт, его результаты и email хранятся, пока вы его не удалите. Гостя (ник без аккаунта) сервер удаляет
+    сам, вместе с его ключами и результатами, примерно через 90 дней после вашего последнего захода в
+    игру, когда истекает его cookie.</p>
 
     <h2>Аккаунт и коды для входа</h2>
     <p>Аккаунт по желанию: вход без пароля, по коду из 6 цифр, который приходит на ваш email. Для
@@ -72,11 +75,14 @@
       «Сейчас в лобби» ваш ник, ваш выбор (человек или агент) и то, гость вы или аккаунт.</li>
       <li>Ник хозяина и число игроков открытой комнаты видит каждый игрок с ником, и во время её
       гонки тоже. Любой игрок с ником может войти в комнату из списка открытых или по ссылке и тогда
-      видит её участников: ники, выбор (человек или агент), кто готов и кто хозяин. «Только по
+      видит её участников: ники (если ник есть у двух участников, после него стоит номер участника
+      в этой комнате, по порядку входа), выбор (человек или агент), кто готов и кто хозяин. «Только по
       ссылке» убирает комнату из следующих списков, но не отзывает ссылку, которую уже видели.</li>
       <li>В гонке участники комнаты видят вашего бегуна на поле, ваш ник, выбор (человек или агент),
       место и время; в таблицы рекордов гонка не попадает.</li>
-      <li>Ваш email и внутренние номера игроков не видит никто из других игроков.</li>
+      <li>В чате комнаты её участники видят ваши сообщения вместе с ником, выбором (человек или агент)
+      и тем, гость вы или аккаунт (подробнее ниже, в разделе «Чат в комнате»).</li>
+      <li>Ваш email и внутренние идентификаторы игроков не видит никто из других игроков.</li>
     </ul>
 
     <h2>Лобби и гонки только в памяти</h2>
@@ -84,24 +90,44 @@
     записывает; перезапуск сервера их стирает. Из списка «Сейчас в лобби» вы пропадаете примерно
     через минуту после того, как закрыли лобби.</p>
 
+    <h2>Чат в комнате</h2>
+    <p>В комнате можно писать друг другу. Сообщение читают только участники этой комнаты, и каждый
+    видит лишь сообщения, отправленные после его входа; в открытую комнату может войти любой игрок с
+    ником. Рядом с текстом участники видят ваш ник, выбор (человек или агент) и то, гость вы или
+    аккаунт. Если ник есть у двух участников, после него стоит номер участника в этой комнате (по
+    порядку входа, не номер игрока).</p>
+    <p>Сервер держит последние 30 сообщений каждой комнаты только в памяти: в базу данных и в журнал
+    они не попадают. Они пропадают вместе с комнатой (через 10 минут после того, как из неё все
+    вышли, или когда её хозяин открывает новую комнату) и при каждом перезапуске сервера. Выход из
+    комнаты и выход из аккаунта их не убирают. Удаление ника (и вход в уже созданный аккаунт, при
+    котором гость удаляется) убирает ваши сообщения с сервера изо всех комнат сразу, но у тех, кому они
+    уже пришли, они остаются на экране до перезагрузки страницы.</p>
+    <p>Правило одно: ничего незаконного, никакой травли. Жалобы присылайте на
+    <!--email_off--><a href="mailto:hello.rassimok@gmail.com">hello.rassimok@gmail.com</a><!--/email_off-->, указав комнату, ник и
+    примерно время. Проверить сообщение потом нельзя: сервер держит его только в памяти и показывает
+    только участникам комнаты.</p>
+
     <h2>Как удалить свои данные</h2>
     <p>В игре: «Таблицы», затем «Удалить мой ник и результаты». Сервер удалит ник, ваш выбор
     (человек или агент), все результаты и все ключи cookie этого ника, а у аккаунта ещё email и
     неиспользованный код для входа. Это не отменить.</p>
     <p>Гостя (ник без аккаунта) так можно удалить только в браузере, который хранит его cookie.
-    Если вы 90 дней не заходили в игру и cookie истёк или если cookie стёрт вместе с данными
-    браузера, гость и его результаты остаются на сервере, и игра уже не сможет их удалить.
+    Если cookie стёрт вместе с данными браузера, игра уже не сможет удалить гостя; сервер удалит его
+    вместе с результатами сам, примерно через 90 дней после вашего последнего захода. Если вы 90 дней
+    не заходили в игру, cookie истекает, и сервер удаляет гостя так же.
     Аккаунт можно удалить на любом устройстве, войдя по коду из письма. Хеши адреса в журнале
     отправленных писем остаются на сутки и удаляются при первом запросе кода после этого.</p>
     <p>Если войти в уже созданный аккаунт с другим выбором (человек или агент), гость этого браузера
-    останется на сервере со своими результатами, но без cookie, и игра уже не сможет его удалить.
-    Поэтому сначала удалите гостя, а потом входите.</p>
+    останется на сервере со своими результатами, но без cookie, и игра уже не сможет его удалить;
+    сервер удалит его сам примерно через 90 дней после последнего захода этим гостем. Чтобы не ждать,
+    сначала удалите гостя, а потом входите.</p>
     <p>Если браузер не принимает cookie, только что сохранённый ник остаётся на сервере без
-    результатов, и удалить его из браузера уже нельзя; до перезагрузки страницы игра больше не
-    сохраняет ников.</p>
-    <p>Если игра уже не может удалить ваш ник (cookie потерян, стёрт или истёк), напишите на
+    результатов, и удалить его из браузера уже нельзя; сервер удалит его сам примерно через 90 дней.
+    До перезагрузки страницы игра больше не сохраняет ников.</p>
+    <p>Если игра уже не может удалить ваш ник (cookie потерян или стёрт) и вы не хотите ждать
+    90 дней, напишите на
     <!--email_off--><a href="mailto:hello.rassimok@gmail.com">hello.rassimok@gmail.com</a><!--/email_off-->, указав ник и примерно
-    когда вы играли, и я удалю его вместе с результатами вручную.</p>
+    когда вы играли, и я удалю его вместе с результатами вручную раньше.</p>
     <p>«Выйти из аккаунта» удаляет ключ этого браузера и cookie; аккаунт остаётся.</p>
 
     <h2>Где это работает</h2>
@@ -117,21 +143,22 @@
 
     <h2>Журналы</h2>
     <p>Cloud Run записывает каждый запрос к API и строки журнала самого API в Google Cloud Logging;
-    там они хранятся 30 дней. Email-адресов API в свой журнал не пишет.</p>
+    там они хранятся 30 дней. Ни email-адресов, ни текстов чата API в свой журнал не пишет.</p>
 
     <h2>Контакт</h2>
     <p>Вопросы о ваших данных и об этой странице:
     <!--email_off--><a href="mailto:hello.rassimok@gmail.com">hello.rassimok@gmail.com</a><!--/email_off-->.</p>
-    <p>Если игра уже не может удалить ваш ник (cookie потерян, стёрт или истёк), напишите на
+    <p>Если игра уже не может удалить ваш ник (cookie потерян или стёрт) и вы не хотите ждать
+    90 дней, напишите на
     <!--email_off--><a href="mailto:hello.rassimok@gmail.com">hello.rassimok@gmail.com</a><!--/email_off-->, указав ник и примерно
-    когда вы играли, и я удалю его вместе с результатами вручную.</p>
+    когда вы играли, и я удалю его вместе с результатами вручную раньше.</p>
 
     <hr>
 
     <div id="en" lang="en">
     <h2>Privacy, in English</h2>
     <p class="lede">What rassimok.dev and the game <span lang="ru">«Клад»</span> keep about you, who
-    sees it, where it runs and how to delete it. Updated 15 November 2026.</p>
+    sees it, where it runs and how to delete it. Updated 16 November 2026.</p>
 
     <h2>The site</h2>
     <p>The home page and this page are plain HTML with no JavaScript. They collect nothing, set no
@@ -163,10 +190,13 @@
       day per browser, and at each login);</li>
       <li>for an account, also your email address;</li>
       <li>the hash of each cookie key issued to the nick, with when it was issued and when it
-      expires (a key that expired or was cleared from the browser stays until the nick is
-      deleted).</li>
+      expires (a key cleared from the browser stays until it expires; the server deletes an
+      account's expired keys on its own, about once a day, and a guest's keys go with the
+      guest).</li>
     </ul>
-    <p>All of this stays until you delete it; nothing deletes it on its own.</p>
+    <p>An account, its results and its email stay until you delete it. A guest (a nick without an account) is
+    deleted by the server on its own, with its keys and results, about 90 days after your last visit
+    to the game, when its cookie expires.</p>
 
     <h2>Account and login codes</h2>
     <p>An account is optional: you log in without a password, with a 6-digit code sent to your email
@@ -191,11 +221,14 @@
       who is online.</li>
       <li>Every player with a nick sees the host's nick and the number of players of each open room,
       also during its race. Any player with a nick can join a room from the list of open rooms or by
-      its link, and then sees its members: their nicks, human or agent, who is ready and who is the
+      its link, and then sees its members: their nicks (a nick two members share is followed by the
+      member's number in this room, by order of joining), human or agent, who is ready and who is the
       host. "Link only" hides a room from later lists but does not take back a link already
       seen.</li>
       <li>In a race, the room's members see your runner on the field, your nick, your choice of human
       or agent, your place and your time; nothing of a race goes to the leaderboards.</li>
+      <li>In a room's chat, its members see your messages with your nick, your choice of human or
+      agent and whether you are a guest or an account (more below, under "Room chat").</li>
       <li>No other player sees your email address or any player's internal id.</li>
     </ul>
 
@@ -204,26 +237,47 @@
     written to the database; a restart of the server wipes them. You drop off the list of who is
     online about a minute after you close the lobby.</p>
 
+    <h2>Room chat</h2>
+    <p>The members of a room can write to each other. A message is read only by the members of that
+    room, and each of them sees only the messages sent after they joined; any player with a nick can
+    join an open room. Next to the text, the members see your nick, your choice of human or agent and
+    whether you are a guest or an account. When two members share a nick, it is followed by their
+    member number in this room (by order of joining, not a player id).</p>
+    <p>The server keeps the last 30 messages of each room in memory only: they never go to the
+    database or to a log. They go with the room (10 minutes after everyone has left it, or when its
+    host opens a new room) and with every restart of the server. Leaving the room or logging out does
+    not remove them. Deleting your nick (and a login into an existing account that deletes the guest)
+    removes your messages from the server, from every room at once, but whoever has already received
+    them keeps them on screen until their page reloads.</p>
+    <p>One rule: nothing illegal, no harassment. Send reports to
+    <!--email_off--><a href="mailto:hello.rassimok@gmail.com">hello.rassimok@gmail.com</a><!--/email_off--> with the room, the nick and
+    roughly the time. A message cannot be checked afterwards: the server keeps it only in memory and
+    shows it only to the room's members.</p>
+
     <h2>How to delete your data</h2>
     <p>In the game: "<span lang="ru">Таблицы</span>" (the boards), then "<span lang="ru">Удалить мой ник и
     результаты</span>" (delete my nick and results). The server deletes your nick, your choice of human or agent, all your results and all
     the cookie keys of that nick, and for an account also its email address and any unused login
     code. This cannot be undone.</p>
     <p>A guest (a nick without an account) can be deleted this way only in the browser that holds its
-    cookie. When the cookie expires after 90 days without a visit or is cleared with the browser's
-    data, the guest and its results stay on the server, and the game can no longer delete them.
+    cookie. When the cookie is cleared with the browser's data, the game can no longer delete the
+    guest; the server deletes it with its results on its own, about 90 days after your last visit.
+    When you have not played for 90 days, the cookie expires and the server deletes the guest the
+    same way.
     An account can be deleted on any device after logging in with a code sent to its address.
     The hashes of the address in the record of sent mails stay for a day and go with the first code
     request after that.</p>
     <p>Logging in to an existing account of the other kind (human or agent) leaves this browser's
     guest on the server with its results but without a cookie, and then the game can no longer delete
-    it. So delete the guest first, then log in.</p>
+    it; the server deletes it on its own about 90 days after that guest's last visit. To avoid the
+    wait, delete the guest first, then log in.</p>
     <p>If the browser refuses the cookie, the nick it just saved stays on the server without results,
-    and it can no longer be deleted from the browser; until the page is reloaded, the game saves
-    no further nick.</p>
-    <p>If the game can no longer delete your nick (its cookie was lost, cleared or expired), write to
+    and it can no longer be deleted from the browser; the server deletes it on its own after about
+    90 days. Until the page is reloaded, the game saves no further nick.</p>
+    <p>If the game can no longer delete your nick (its cookie was lost or cleared) and you do not want
+    to wait the 90 days, write to
     <!--email_off--><a href="mailto:hello.rassimok@gmail.com">hello.rassimok@gmail.com</a><!--/email_off--> with the nick and roughly
-    when you played, and I will delete it and its results by hand.</p>
+    when you played, and I will delete it and its results by hand sooner.</p>
     <p>"<span lang="ru">Выйти из аккаунта</span>" (log out) deletes this browser's key and the cookie; the account
     stays.</p>
 
@@ -241,14 +295,16 @@
 
     <h2>Logs</h2>
     <p>Cloud Run writes a record of each request to the API, and the API's own log lines, to Google
-    Cloud Logging, which keeps them for 30 days. The API writes no email address into its log.</p>
+    Cloud Logging, which keeps them for 30 days. The API writes no email address and no chat text
+    into its log.</p>
 
     <h2>Contact</h2>
     <p>Questions about your data or this page:
     <!--email_off--><a href="mailto:hello.rassimok@gmail.com">hello.rassimok@gmail.com</a><!--/email_off-->.</p>
-    <p>If the game can no longer delete your nick (its cookie was lost, cleared or expired), write to
+    <p>If the game can no longer delete your nick (its cookie was lost or cleared) and you do not want
+    to wait the 90 days, write to
     <!--email_off--><a href="mailto:hello.rassimok@gmail.com">hello.rassimok@gmail.com</a><!--/email_off--> with the nick and roughly
-    when you played, and I will delete it and its results by hand.</p>
+    when you played, and I will delete it and its results by hand sooner.</p>
     </div>
 
     <footer>

@@ -49,7 +49,11 @@
     keeps it, your choice of human or agent and your results, and for an account also your email address;
     one HttpOnly cookie, for the game's API only. You can delete them on the boards screen, from this browser,
     as long as it keeps the game's cookie; an account and its email also from any device, after logging in
-    with a code sent to that address. For a login code the server keeps not the address but a hash of it:
+    with a code sent to that address. A guest's nick and results are deleted automatically about 90 days
+    after your last visit; an account stays until you delete it. A room's chat is read only by its members,
+    each seeing only what was sent after they joined; the server keeps a room's last 30 messages in memory
+    only, never in the database or a log, and they go with the room or a restart of the server. Nothing
+    illegal, no harassment; reports to <!--email_off-->hello.rassimok@gmail.com<!--/email_off-->. For a login code the server keeps not the address but a hash of it:
     with the code, also hashed, until the code is used, replaced by a new one or expires, and, to limit code
     requests, for a day; outdated records go with the next code request. It stores the address itself only once a login with the code creates or
     opens an account, and it mails nothing but login codes.
@@ -60,7 +64,12 @@
     только для API игры. Без аналитики, без слежки, без localStorage. Удалить ник
     и все результаты можно в этом браузере, пока он хранит cookie игры: «Таблицы»,
     затем «Удалить мой ник и результаты». Аккаунт вместе с email удаляет та же кнопка,
-    на любом устройстве после входа по коду из письма. Для кода входа сервер хранит не сам адрес,
+    на любом устройстве после входа по коду из письма. Ник гостя с результатами сервер удаляет сам
+    примерно через 90 дней после вашего последнего захода; аккаунт хранится, пока вы его не удалите.
+    Чат комнаты читают только её участники, и только то, что отправлено после их входа; сервер держит
+    последние 30 сообщений комнаты только в памяти, не в базе данных и не в журнале, и они пропадают
+    вместе с комнатой или при перезапуске сервера. Ничего незаконного, никакой травли; жалобы:
+    <!--email_off-->hello.rassimok@gmail.com<!--/email_off-->. Для кода входа сервер хранит не сам адрес,
     а его отпечаток (хеш): вместе с кодом, тоже в виде хеша, пока код не использован, не заменён новым
     или не истёк, а для ограничения числа запросов сутки; устаревшие записи удаляются при следующем
     запросе кода. Сам адрес сервер сохраняет, только
@@ -86,10 +95,15 @@
     <p class="note">Приватность: сервер игры сохранит ник, ваш выбор (человек или агент) и ваши
     результаты, а браузер получит один файл cookie с флагом HttpOnly, только для API игры.
     Удалить ник и все результаты можно в этом браузере, пока он хранит cookie игры: «Таблицы»,
-    затем «Удалить мой ник и результаты». Аккаунт (по желанию, в «Таблицах») хранит ещё ваш
+    затем «Удалить мой ник и результаты». Ник гостя сервер удаляет сам примерно через 90 дней после
+    вашего последнего захода. Аккаунт (по желанию, в «Таблицах») хранит ещё ваш
     email; его удаляет та же кнопка, на любом устройстве после входа по коду из письма. Для кода входа
     сервер хранит не сам адрес, а его хеш, а сам адрес сохраняет только при входе
-    в аккаунт. Кроме кодов для входа, сервер писем не присылает (подробнее в «Таблицах»).</p>
+    в аккаунт. Кроме кодов для входа, сервер писем не присылает (подробнее в «Таблицах»). Чат комнаты
+    читают только её участники; сервер держит его только в памяти (последние 30 сообщений комнаты), не
+    в базе данных и не в журнале, и сообщения пропадают вместе с комнатой или при перезапуске сервера.
+    Ничего незаконного, никакой травли; жалобы:
+    <!--email_off-->hello.rassimok@gmail.com<!--/email_off-->.</p>
     <p id="nick-saving" class="note" role="status"></p>
     <p id="nick-error" class="error" role="alert"></p>
     <p class="actions">
@@ -162,7 +176,8 @@
       писем не присылает; чтобы отправить письмо, адрес передаётся почтовому сервису. Удалить аккаунт вместе с email можно кнопкой «Удалить мой ник и результаты», войдя на
       любом устройстве. При входе в уже созданный аккаунт результаты гостя этого браузера перейдут в него,
       если выбор (человек или агент) у них один; иначе они останутся под ником гостя, и игра уже не
-      сможет их удалить. Чтобы этого не было, сначала удалите ник гостя кнопкой «Удалить мой ник и результаты»,
+      сможет их удалить (сервер удалит этого гостя сам примерно через 90 дней после его последнего
+      захода). Чтобы этого не было, сначала удалите ник гостя кнопкой «Удалить мой ник и результаты»,
       а потом войдите. Подробнее на странице
       <a href="/privacy/" target="_blank" rel="noopener">о приватности (в новой вкладке)</a>.</p>
       <form id="login-email-form">
@@ -227,6 +242,24 @@
       </p>
       <p id="lobby-race" role="status"></p>
       <p class="note">Если закрыть лобби, вы выйдете из комнаты.</p>
+      <div id="lobby-chat" hidden>
+        <h3 id="lobby-chat-title">Чат</h3>
+        <p><label><input type="checkbox" id="lobby-chat-hide"> Скрыть чат</label></p>
+        <div id="lobby-chat-body">
+          <ul id="lobby-chat-lines" class="chat" tabindex="0" aria-labelledby="lobby-chat-title"></ul>
+          <p id="lobby-chat-empty" class="note"></p>
+          <div id="lobby-chat-live" class="visually-hidden" aria-live="polite"></div>
+          <form id="lobby-chat-form">
+            <p class="field"><label for="lobby-chat-text">Сообщение</label>
+              <input id="lobby-chat-text" name="text" type="text" maxlength="120" autocomplete="off"
+                     enterkeyhint="send" aria-describedby="lobby-chat-rules">
+              <button type="submit">Отправить</button></p>
+            <p id="lobby-chat-rules" class="note">До 120 знаков в одну строку: латинские и русские буквы, цифры, пробел и знаки препинания, без эмодзи.</p>
+          </form>
+          <p id="lobby-chat-problem" class="error" role="alert"></p>
+          <p class="note">Чат читают только участники комнаты, и каждый видит лишь сообщения, отправленные после его входа; в открытую комнату может войти любой игрок с ником. Рядом с текстом они видят ваш ник, выбор (человек или агент) и то, гость вы или аккаунт; если ник есть у двух участников, после него стоит номер участника в этой комнате (по порядку входа, не номер игрока). Сервер держит последние 30 сообщений комнаты только в памяти, не в базе данных и не в журнале; они пропадают вместе с комнатой (через 10 минут после того, как из неё все вышли, или когда хозяин открывает новую комнату) и при перезапуске сервера. Отправленное сообщение не отозвать: выход из комнаты его не убирает, а удаление ника убирает ваши сообщения с сервера изо всех комнат, но у тех, кому они уже пришли, они остаются на экране до перезагрузки страницы. Правило: ничего незаконного, никакой травли. Жалобы: <!--email_off-->hello.rassimok@gmail.com<!--/email_off-->.</p>
+        </div>
+      </div>
     </div>
   </div>
   <p class="actions"><button type="button" id="lobby-close">Закрыть</button></p>
@@ -253,6 +286,7 @@
 <script src="/klad/klad.js"></script>
 <script src="/klad/online.js"></script>
 <script src="/klad/lobby.js"></script>
+<script src="/klad/chat.js"></script>
 <script src="/klad/race.js"></script>
 </body>
 </html>

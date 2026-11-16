@@ -25,16 +25,20 @@ const KLAD_CHAT = (() => {
     return text;
   }
 
-  function lineOf(message) {
+  /* The name carries the member number only when two members of the room
+     share the nick (sharedNicks from the lobby's state). */
+  function lineOf(message, sharedNicks) {
     const marks = [
       message.isGuest ? ['guest', 'гость'] : ['account', 'аккаунт'],
       ['kind', KIND[message.kind] || message.kind],
     ];
     if (message.isMine) marks.push(['mine', 'вы']);
-    return { n: message.n, member: message.member, nick: message.nick, marks, isMine: message.isMine, text: message.text };
+    const name = message.nick + (sharedNicks.includes(message.nick) ? ' #' + message.member : '');
+    return { n: message.n, member: message.member, nick: message.nick, name, marks, isMine: message.isMine, text: message.text };
   }
 
-  /* state is the lobby's: roomId, messages oldest first, hiddenMembers. */
+  /* state is the lobby's: roomId, messages oldest first, hiddenMembers,
+     sharedNicks. */
   function create() {
     let isChatHidden = false;
     let roomId = null;
@@ -43,7 +47,7 @@ const KLAD_CHAT = (() => {
     const isShown = (state, message) => !isChatHidden && !state.hiddenMembers.includes(message.member);
 
     function lines(state) {
-      return state.messages.filter((message) => isShown(state, message)).map(lineOf);
+      return state.messages.filter((message) => isShown(state, message)).map((message) => lineOf(message, state.sharedNicks));
     }
 
     /* Another member's message is announced once, when it arrives; one that
@@ -56,7 +60,7 @@ const KLAD_CHAT = (() => {
       }
       const others = state.messages.filter((message) => !message.isMine && message.n > announcedUpTo);
       for (const message of others) announcedUpTo = Math.max(announcedUpTo, message.n);
-      return others.filter((message) => isShown(state, message)).map(lineOf);
+      return others.filter((message) => isShown(state, message)).map((message) => lineOf(message, state.sharedNicks));
     }
 
     return {
@@ -82,12 +86,14 @@ if (typeof document !== 'undefined') (() => {
   let shownLines = null;
 
   /* Nick, marks and text go in with textContent only, so a typed tag or web
-     address stays text. */
+     address stays text. Another member's line has its own hide button, so
+     a member who wrote and then left can still be hidden; it has no
+     pressed state, since the line goes with the hide. */
   function lineItem(line) {
     const item = document.createElement('li');
     const nick = document.createElement('span');
     nick.className = 'nick';
-    nick.textContent = line.nick;
+    nick.textContent = line.name;
     item.append(nick);
     for (const [className, text] of line.marks) {
       const mark = document.createElement('span');
@@ -98,43 +104,67 @@ if (typeof document !== 'undefined') (() => {
     const text = document.createElement('span');
     text.textContent = line.text;
     item.append(': ', text);
+    if (!line.isMine) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.textContent = 'скрыть';
+      const whose = document.createElement('span');
+      whose.className = 'visually-hidden';
+      whose.textContent = ' в чате: ' + line.name;
+      button.append(whose);
+      button.dataset.line = String(line.n);
+      button.addEventListener('click', () => KLAD_LOBBY.page.toggleMemberHidden(line.member));
+      item.append(' ', button);
+    }
     return item;
   }
 
   function spoken(line) {
     const item = document.createElement('p');
-    item.textContent = line.nick + ': ' + line.text;
+    item.textContent = line.name + ': ' + line.text;
     return item;
   }
 
   /* The live region holds only the newest messages, one node each, so
      several in one poll are all read and none twice. The list is rebuilt
      only when its lines change and follows the newest while it is
-     scrolled to the end. */
+     scrolled to the end; a focused hide button keeps the focus on its line,
+     or on the list (the field once the list is empty) when the line went.
+     A draft does not follow the player into another room. */
   function render(state) {
     lastState = state;
     if (state.roomId !== shownRoom) {
       shownRoom = state.roomId;
       problem.textContent = '';
       live.replaceChildren();
+      field.value = '';
     }
     const fresh = chat.fresh(state);
     if (fresh.length > 0) live.replaceChildren(...fresh.map(spoken));
     part.hidden = state.phase !== 'ready' || state.room === null;
     body.hidden = chat.isHidden();
     const lines = chat.lines(state);
-    const keys = lines.map((line) => line.n).join(',');
+    const keys = lines.map((line) => line.n + ' ' + line.name).join('\n');
     if (keys !== shownLines) {
       const isAtEnd = list.scrollTop + list.clientHeight >= list.scrollHeight - 2;
+      const focused = document.activeElement;
+      const focusedLine = focused && focused.dataset && list.contains(focused) ? focused.dataset.line : null;
       list.replaceChildren(...lines.map(lineItem));
       shownLines = keys;
       if (isAtEnd) list.scrollTop = list.scrollHeight;
+      if (focusedLine) {
+        const button = Array.from(list.querySelectorAll('button')).find((item) => item.dataset.line === focusedLine);
+        (button || (lines.length > 0 ? list : field)).focus();
+      }
     }
     empty.textContent = state.messages.length === 0 ? KLAD_CHAT.TEXT.empty : '';
   }
 
+  /* Emptied on hiding, so the last batch is not read out again when the
+     chat shows again. */
   hideBox.addEventListener('change', () => {
     chat.setHidden(hideBox.checked);
+    if (hideBox.checked) live.replaceChildren();
     if (lastState !== null) render(lastState);
   });
 

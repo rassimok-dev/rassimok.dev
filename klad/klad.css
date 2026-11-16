@@ -289,8 +289,10 @@ dialog #lobby-link { width: 100%; margin: .2rem 0; }
 dialog button[aria-pressed="true"] { color: var(--crt-hot); border-color: var(--crt-hot); }
 
 /* The room chat: the lines scroll in their own box, so a long chat does not
-   push the field off a phone screen. */
+   push the field off a phone screen. Positioned, so the hidden names of the
+   hide buttons stay inside the box and add no scroll to the dialog. */
 dialog .chat {
+  position: relative;
   max-height: 12rem;
   overflow-y: auto;
   margin: .3rem 0;

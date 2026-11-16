@@ -35,8 +35,10 @@ after they joined. The API keeps the last 30 messages of each room in
 memory, never in the database or a log line; they go with the room (10
 minutes after it empties, or when its host opens a new room) or a restart,
 and deleting a player removes their messages from every room. The chat
-note, both footers of the game, its nick prompt and the privacy page say
-so, and name hello.rassimok@gmail.com as the contact for reports, with one
+note and the privacy page say all of this; both footers of the game and its
+nick prompt say it in short (who reads it, the last 30 in memory only,
+never in the database or a log, gone with the room or a restart). All of
+them name hello.rassimok@gmail.com as the contact for reports, with one
 rule: nothing illegal, no harassment.
 
 **One privacy page.** `/privacy/` (`privacy/index.html`) says all of it in

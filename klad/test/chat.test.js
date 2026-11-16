@@ -19,7 +19,7 @@ const twin = (n, text) => ({ n, member: 3, nick: 'Anna', kind: 'agent', isGuest:
 const mine = (n, text) => ({ n, member: 2, nick: 'test', kind: 'agent', isGuest: true, isMine: true, text });
 
 function stateOf(messages, changes) {
-  return { phase: 'ready', roomId: ID, room: { id: ID }, messages, hiddenMembers: [], ...changes };
+  return { phase: 'ready', roomId: ID, room: { id: ID }, messages, hiddenMembers: [], sharedNicks: [], ...changes };
 }
 
 const numbersOf = (lines) => lines.map((line) => line.n);
@@ -28,16 +28,30 @@ const numbersOf = (lines) => lines.map((line) => line.n);
 
 test('a line shows the nick, guest or account, human or agent, and marks the own line', () => {
   // when
-  const other = KLAD_CHAT.lineOf(anna(1, 'hello'));
-  const own = KLAD_CHAT.lineOf(mine(2, 'hi'));
+  const other = KLAD_CHAT.lineOf(anna(1, 'hello'), []);
+  const own = KLAD_CHAT.lineOf(mine(2, 'hi'), []);
 
   // then
   assert.deepEqual(other, {
-    n: 1, member: 1, nick: 'Anna', marks: [['account', 'аккаунт'], ['kind', 'человек']], isMine: false, text: 'hello',
+    n: 1, member: 1, nick: 'Anna', name: 'Anna', marks: [['account', 'аккаунт'], ['kind', 'человек']], isMine: false, text: 'hello',
   });
   assert.deepEqual(own, {
-    n: 2, member: 2, nick: 'test', marks: [['guest', 'гость'], ['kind', 'агент'], ['mine', 'вы']], isMine: true, text: 'hi',
+    n: 2, member: 2, nick: 'test', name: 'test', marks: [['guest', 'гость'], ['kind', 'агент'], ['mine', 'вы']], isMine: true,
+    text: 'hi',
   });
+});
+
+test('a nick two members share is named with the member number, another nick is not', () => {
+  // given
+  const chat = KLAD_CHAT.create();
+  const messages = [anna(1, 'one'), twin(2, 'two'), mine(3, 'three')];
+
+  // when
+  const lines = chat.lines(stateOf(messages, { sharedNicks: ['Anna'] }));
+
+  // then
+  assert.deepEqual(lines.map((line) => line.name), ['Anna #1', 'Anna #3', 'test']);
+  assert.deepEqual(lines.map((line) => line.nick), ['Anna', 'Anna', 'test']);
 });
 
 test('lines keep the order and leave out a hidden member, but not another member with the same nick', () => {
@@ -145,10 +159,15 @@ test('the send answer picks the text: none for 201, the allowed characters for 4
 function stubNode(tag, registry) {
   return {
     tag, textContent: '', className: '', hidden: false, checked: false, value: '',
-    children: [], listeners: {}, replaced: 0, scrollTop: 0, scrollHeight: 0, clientHeight: 0,
+    children: [], listeners: {}, attributes: {}, dataset: {}, replaced: 0, scrollTop: 0, scrollHeight: 0, clientHeight: 0,
     addEventListener(type, listener) { this.listeners[type] = listener; },
+    setAttribute(name, value) { this.attributes[name] = value; },
     append(...items) { this.children.push(...items); },
     replaceChildren(...items) { this.children = items; this.replaced++; },
+    querySelectorAll(selector) {
+      return this.children.flatMap((child) => (typeof child === 'string' ? [] : [...(child.tag === selector ? [child] : []), ...child.querySelectorAll(selector)]));
+    },
+    contains(other) { return other === this || this.children.some((child) => typeof child !== 'string' && child.contains(other)); },
     focus() { registry.focused = this; },
   };
 }
@@ -158,14 +177,21 @@ function loadChatPage(sendAnswers = []) {
   const elements = {};
   const listeners = {};
   const sent = [];
+  const toggled = [];
   const document = {
+    get activeElement() { return registry.focused; },
     getElementById: (id) => elements[id] || (elements[id] = stubNode('#' + id, registry)),
     createElement: (tag) => { registry.created.push(tag); return stubNode(tag, registry); },
     addEventListener: (type, listener) => { listeners[type] = listener; },
   };
   const sandbox = {
     document,
-    KLAD_LOBBY: { page: { sendMessage: async (text) => { sent.push(text); return sendAnswers.shift(); } } },
+    KLAD_LOBBY: {
+      page: {
+        sendMessage: async (text) => { sent.push(text); return sendAnswers.shift(); },
+        toggleMemberHidden: (member) => toggled.push(member),
+      },
+    },
   };
   vm.createContext(sandbox);
   vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'chat.js'), 'utf8'), sandbox);
@@ -175,11 +201,13 @@ function loadChatPage(sendAnswers = []) {
     await elements['lobby-chat-form'].listeners.submit({ preventDefault() { isPrevented = true; } });
     return isPrevented;
   };
-  return { elements, registry, sent, show, submit };
+  return { elements, registry, sent, toggled, show, submit };
 }
 
 const textsOf = (node) => [node.textContent, ...node.children.flatMap((child) => (typeof child === 'string' ? [child] : textsOf(child)))];
 const spokenOf = (page) => page.elements['lobby-chat-live'].children.map((item) => item.textContent);
+const hideButtonOf = (line) => line.children.find((child) => typeof child !== 'string' && child.tag === 'button') || null;
+const linesOf = (page) => page.elements['lobby-chat-lines'].children;
 
 test('chat page: a text and a nick like <img src=x> and a typed web address show as text, and nothing is made from them', () => {
   // given
@@ -196,7 +224,8 @@ test('chat page: a text and a nick like <img src=x> and a typed web address show
   assert.ok(textsOf(lines[0]).includes(hostile));
   assert.equal(textsOf(lines[0]).filter((text) => text === hostile).length, 2);
   assert.ok(textsOf(lines[1]).includes(address));
-  assert.deepEqual(page.registry.created.filter((tag) => tag !== 'li' && tag !== 'span' && tag !== 'p'), []);
+  assert.equal(hideButtonOf(lines[0]).children[0].textContent, ' в чате: ' + hostile);
+  assert.deepEqual(page.registry.created.filter((tag) => !['li', 'span', 'p', 'button'].includes(tag)), []);
   assert.deepEqual(spokenOf(page), [hostile + ': ' + hostile, 'Anna: ' + address]);
 });
 
@@ -301,10 +330,12 @@ test('chat page: Скрыть чат hides the chat and stops its announcements'
   // when
   box.checked = true;
   box.listeners.change();
+  const spokenWhenHidden = spokenOf(page);
   const replacedBefore = live.replaced;
   page.show(stateOf([anna(1, 'one'), anna(2, 'two')]));
 
   // then
+  assert.deepEqual(spokenWhenHidden, []);
   assert.equal(page.elements['lobby-chat-body'].hidden, true);
   assert.equal(live.replaced, replacedBefore);
   assert.equal(page.elements['lobby-chat-lines'].children.length, 0);
@@ -322,13 +353,80 @@ test('chat page: the part shows only in a room that has answered, says when ther
   const emptyText = page.elements['lobby-chat-empty'].textContent;
   page.elements['lobby-chat-text'].value = 'hi';
   await page.submit();
+  const keptText = page.elements['lobby-chat-text'].value;
   page.show(stateOf([anna(1, 'one')], { roomId: OTHER }));
 
   // then
   assert.equal(isHiddenWhileLoading, true);
   assert.equal(part.hidden, false);
   assert.equal(emptyText, TEXT.empty);
+  assert.equal(keptText, 'hi');
+  assert.equal(page.elements['lobby-chat-text'].value, '');
   assert.equal(page.elements['lobby-chat-empty'].textContent, '');
   assert.equal(page.elements['lobby-chat-problem'].textContent, '');
   assert.deepEqual(spokenOf(page), ['Anna: one']);
+});
+
+test('chat page: another member\'s line has a скрыть button named with the nick in a hidden span, which hides that member by number', () => {
+  // given
+  const page = loadChatPage();
+  page.show(stateOf([anna(1, 'one'), mine(2, 'two')]));
+  const [annaLine, ownLine] = linesOf(page);
+  const button = hideButtonOf(annaLine);
+
+  // when
+  button.listeners.click();
+
+  // then
+  assert.equal(button.type, 'button');
+  assert.equal(button.textContent, 'скрыть');
+  assert.equal(button.children.length, 1);
+  assert.equal(button.children[0].className, 'visually-hidden');
+  assert.equal(button.children[0].textContent, ' в чате: Anna');
+  assert.deepEqual(button.attributes, {});
+  assert.equal(hideButtonOf(ownLine), null);
+  assert.deepEqual(page.toggled, [1]);
+});
+
+test('chat page: a nick that becomes shared gets the member number on the shown lines, in the button name and in the announcement', () => {
+  // given
+  const page = loadChatPage();
+  const messages = [anna(1, 'one'), twin(2, 'two')];
+  page.show(stateOf(messages));
+  const namesBefore = linesOf(page).map((line) => line.children[0].textContent);
+
+  // when
+  page.show(stateOf(messages, { sharedNicks: ['Anna'] }));
+  const namesAfter = linesOf(page).map((line) => line.children[0].textContent);
+  page.show(stateOf([...messages, twin(3, 'three')], { sharedNicks: ['Anna'] }));
+
+  // then
+  assert.deepEqual(namesBefore, ['Anna', 'Anna']);
+  assert.deepEqual(namesAfter, ['Anna #1', 'Anna #3']);
+  assert.equal(hideButtonOf(linesOf(page)[1]).children[0].textContent, ' в чате: Anna #3');
+  assert.deepEqual(spokenOf(page), ['Anna #3: three']);
+});
+
+test('chat page: a focused скрыть keeps the focus on its line through a rebuild, then goes to the list, and to the field once no line is left', () => {
+  // given
+  const page = loadChatPage();
+  const list = page.elements['lobby-chat-lines'];
+  page.show(stateOf([anna(1, 'one'), twin(2, 'two')]));
+  hideButtonOf(linesOf(page)[0]).focus();
+
+  // when
+  page.show(stateOf([anna(1, 'one'), twin(2, 'two'), anna(3, 'three')]));
+  const rebuiltButton = hideButtonOf(linesOf(page)[0]);
+  const keptOn = page.registry.focused;
+  page.show(stateOf([anna(1, 'one'), twin(2, 'two'), anna(3, 'three')], { hiddenMembers: [1] }));
+  const afterHide = page.registry.focused;
+  hideButtonOf(linesOf(page)[0]).focus();
+  page.show(stateOf([anna(1, 'one'), twin(2, 'two'), anna(3, 'three')], { hiddenMembers: [1, 3] }));
+
+  // then
+  assert.equal(linesOf(page).length, 0);
+  assert.equal(keptOn, rebuiltButton);
+  assert.equal(keptOn.dataset.line, '1');
+  assert.equal(afterHide, list);
+  assert.equal(page.registry.focused, page.elements['lobby-chat-text']);
 });

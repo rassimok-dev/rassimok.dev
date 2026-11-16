@@ -97,7 +97,8 @@ const KLAD_LOBBY = (() => {
      larger one would make every later poll a 400. */
   function isMessage(message) {
     return Boolean(message) && Number.isInteger(message.n) && message.n >= 1 && message.n <= AFTER_MAX
-      && Number.isInteger(message.member) && typeof message.nick === 'string' && typeof message.kind === 'string'
+      && Number.isInteger(message.member) && typeof message.nick === 'string'
+      && (message.kind === 'human' || message.kind === 'agent')
       && typeof message.text === 'string' && message.text.length >= 1 && message.text.length <= CHAT_TEXT_MAX;
   }
 
@@ -106,6 +107,20 @@ const KLAD_LOBBY = (() => {
       n: message.n, member: message.member, nick: message.nick, kind: message.kind,
       isGuest: message.guest === true, isMine: message.you === true, text: message.text,
     };
+  }
+
+  /* Nicks that two members of the room have, among the members and the
+     senders of the kept messages; these are shown with the member number.
+     The player's own entries count as one, since a re-join gives a new
+     number. */
+  function sharedNicks(players, messages) {
+    const membersByNick = new Map();
+    for (const entry of [...players, ...messages]) {
+      if (!Number.isInteger(entry.member)) continue;
+      if (!membersByNick.has(entry.nick)) membersByNick.set(entry.nick, new Set());
+      membersByNick.get(entry.nick).add(entry.isMine ? 'mine' : entry.member);
+    }
+    return [...membersByNick].filter(([, members]) => members.size >= 2).map(([nick]) => nick);
   }
 
   /* Every attempt is a Workers request on the shared quota, so retries are
@@ -658,11 +673,13 @@ const KLAD_LOBBY = (() => {
     }
 
     function state() {
+      const view = room === null ? null : roomView(room);
       return {
         phase, message, online, isOnlineDown, rooms, isRoomsDown, roomId, isRoomDown, isBusy,
-        room: room === null ? null : roomView(room),
+        room: view,
         race: raceText(),
         messages: messages.slice(), hiddenMembers: [...hiddenMembers],
+        sharedNicks: sharedNicks(view === null ? [] : view.players, messages),
       };
     }
 
@@ -674,7 +691,7 @@ const KLAD_LOBBY = (() => {
   }
 
   return {
-    create, connect, roomIdOf, inviteMailto, isRoomId, raceUrl, roomView, TEXT,
+    create, connect, roomIdOf, inviteMailto, isRoomId, raceUrl, roomView, sharedNicks, TEXT,
     PRESENCE_EVERY, ROOM_EVERY, SWEEP_AFTER, REJOIN_AFTER, SOCKET_TRIES, SOCKET_RECONNECTS, SOCKET_FIRST_WAIT,
     CHAT_KEPT,
   };
@@ -814,17 +831,26 @@ if (typeof document !== 'undefined') (() => {
     if (focusedId) focusRoomButton(focusedId);
   }
 
+  const isNumbered = (player, state) => Number.isInteger(player.member) && state.sharedNicks.includes(player.nick);
+  const nameOf = (player, state) => player.nick + (isNumbered(player, state) ? ' #' + player.member : '');
+
   /* A member hidden in the chat is found by the member number: two guests
-     may share a nick. */
-  function memberItem(player, isHidden) {
+     may share a nick. The button's name carries the nick in a hidden span,
+     so each one says whose lines it hides. */
+  function memberItem(player, state) {
+    const isHidden = state.hiddenMembers.includes(player.member);
     const marks = [];
     if (player.isHost) marks.push(['host', 'хозяин']);
     marks.push(player.isReady ? ['ready', 'готов'] : ['waiting', 'не готов']);
-    const item = person(player.nick, marks);
+    const item = person(nameOf(player, state), marks);
     if (!player.isMine && Number.isInteger(player.member)) {
       const button = document.createElement('button');
       button.type = 'button';
       button.textContent = 'скрыть в чате';
+      const whose = document.createElement('span');
+      whose.className = 'visually-hidden';
+      whose.textContent = ': ' + nameOf(player, state);
+      button.append(whose);
       button.dataset.member = String(player.member);
       button.setAttribute('aria-pressed', String(isHidden));
       button.addEventListener('click', () => lobby.toggleMemberHidden(player.member));
@@ -833,7 +859,7 @@ if (typeof document !== 'undefined') (() => {
     return item;
   }
 
-  const memberKey = (player, state) => [player.member, player.nick, player.isHost, player.isReady, player.isMine,
+  const memberKey = (player, state) => [player.member, nameOf(player, state), player.isHost, player.isReady, player.isMine,
     state.hiddenMembers.includes(player.member)].join('|');
   let shownPlayers = null;
 
@@ -845,7 +871,7 @@ if (typeof document !== 'undefined') (() => {
     if (keys === shownPlayers) return;
     const focused = document.activeElement;
     const focusedMember = focused && focused.dataset && playerList.contains(focused) ? focused.dataset.member : null;
-    playerList.replaceChildren(...players.map((player) => memberItem(player, state.hiddenMembers.includes(player.member))));
+    playerList.replaceChildren(...players.map((player) => memberItem(player, state)));
     shownPlayers = keys;
     if (focusedMember) {
       const button = Array.from(playerList.querySelectorAll('button')).find((item) => item.dataset.member === focusedMember);
@@ -953,7 +979,11 @@ if (typeof document !== 'undefined') (() => {
   document.addEventListener('visibilitychange', () => lobby.onVisibility());
   addEventListener('hashchange', openLink);
   /* race.js opens the lobby again and leaves the room from its finish
-     screen; chat.js sends through it and reads the state from klad:lobby. */
-  KLAD_LOBBY.page = { open: () => showLobby(), leave: () => lobby.leave(), sendMessage: (text) => lobby.sendMessage(text) };
+     screen; chat.js sends and hides members through it and reads the state
+     from klad:lobby. */
+  KLAD_LOBBY.page = {
+    open: () => showLobby(), leave: () => lobby.leave(), sendMessage: (text) => lobby.sendMessage(text),
+    toggleMemberHidden: (member) => lobby.toggleMemberHidden(member),
+  };
   openLink();
 })();

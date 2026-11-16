@@ -1894,6 +1894,7 @@ test('messages the game cannot show are left out and do not move the after numbe
     { ...annaSays(7, 'no nick'), nick: null },
     null,
     annaSays(8, 'y'.repeat(120)),
+    { ...annaSays(9, 'unknown kind'), kind: 'constructor' },
   ];
   const { lobby, server } = await joined({
     [JOIN]: [[200, room({ messages: hostile })]],
@@ -2088,6 +2089,56 @@ test('a re-join after the sweep keeps the shown messages, the after number and t
   assert.equal(count(server.calls, JOIN), 2);
   assert.deepEqual(numbersOf(lobby), [1, 3]);
   assert.deepEqual(lobby.state().hiddenMembers, [1]);
+});
+
+test('a nick is shared when two member numbers have it, among the members and the senders of kept messages', () => {
+  // given
+  const bill = (member) => ({ nick: 'Bill', member, isMine: false });
+  const anna = (member) => ({ nick: 'Anna', member, isMine: false });
+
+  // when
+  const twoMembers = KLAD_LOBBY.sharedNicks([bill(1), bill(3), anna(2)], []);
+  const senderWhoLeft = KLAD_LOBBY.sharedNicks([anna(4)], [anna(1)]);
+  const twoWhoLeft = KLAD_LOBBY.sharedNicks([], [bill(1), bill(2), bill(2)]);
+  const sameMember = KLAD_LOBBY.sharedNicks([anna(1), bill(3)], [anna(1), bill(3)]);
+
+  // then
+  assert.deepEqual(twoMembers, ['Bill']);
+  assert.deepEqual(senderWhoLeft, ['Anna']);
+  assert.deepEqual(twoWhoLeft, ['Bill']);
+  assert.deepEqual(sameMember, []);
+});
+
+test('the own entries count as one for a shared nick, since a re-join gives a new number; an entry without a number counts not at all', () => {
+  // given
+  const own = (member) => ({ nick: 'test', member, isMine: true });
+
+  // when
+  const afterRejoin = KLAD_LOBBY.sharedNicks([own(5)], [own(2)]);
+  const withAnother = KLAD_LOBBY.sharedNicks([own(5), { nick: 'test', member: 7, isMine: false }], [own(2)]);
+  const withoutNumber = KLAD_LOBBY.sharedNicks([{ nick: 'Anna', member: undefined, isMine: false }], [kept(annaSays(1, 'one'))]);
+
+  // then
+  assert.deepEqual(afterRejoin, []);
+  assert.deepEqual(withAnother, ['test']);
+  assert.deepEqual(withoutNumber, []);
+});
+
+test('the state lists the nicks two members share, also with a sender who has left', async () => {
+  // given
+  const twin = { ...ANNA, host: false, member: 3 };
+  const { lobby, clock } = await joined({
+    [JOIN]: [[200, room({ messages: [{ ...annaSays(1, 'one'), member: 5, nick: 'test' }] })]],
+    [pollAfter(1)]: [[200, room()], [200, room({ players: [ANNA, twin, MINE] })]],
+  });
+  const withSender = lobby.state().sharedNicks;
+
+  // when
+  await clock.advance(10 * 1000);
+
+  // then
+  assert.deepEqual(withSender, ['test']);
+  assert.deepEqual(lobby.state().sharedNicks, ['Anna', 'test']);
 });
 
 test('the chat keeps the last 30 messages', async () => {
@@ -2343,6 +2394,10 @@ test('lobby page: each other member has a скрыть в чате button that h
 
   // then
   assert.equal(annaButton.textContent, 'скрыть в чате');
+  assert.equal(annaButton.children.length, 1);
+  assert.equal(annaButton.children[0].className, 'visually-hidden');
+  assert.equal(annaButton.children[0].textContent, ': Anna');
+  assert.deepEqual(Object.keys(annaButton.attributes), ['aria-pressed']);
   assert.equal(annaButton.type, 'button');
   assert.equal(annaButton.attributes['aria-pressed'], 'false');
   assert.equal(ownButton, null);
@@ -2367,6 +2422,45 @@ test('lobby page: a render that changes no member keeps the focused скрыть
   assert.equal(isKept, true);
   assert.notEqual(hideButtonsOf(page)[0], button);
   assert.equal(page.registry.focused, hideButtonsOf(page)[0]);
+});
+
+test('lobby page: two members with one nick show their member numbers, in the list and in the button names; another nick shows none', async () => {
+  // given
+  const twin = { ...ANNA, host: false, member: 3 };
+  const page = loadLobbyPage({
+    ...PRESENCE, [JOIN]: [[200, room()]], [POLL]: [[200, room({ players: [ANNA, twin, MINE] })]],
+  }, { hash: ROOM_LINK_HASH });
+  const release = page.server.hold(POLL);
+  await settle();
+  const before = page.elements['lobby-players'].children.map((item) => item.textContent);
+
+  // when
+  release();
+  await settle();
+
+  // then
+  assert.deepEqual(before, ['Anna', 'test']);
+  assert.deepEqual(page.elements['lobby-players'].children.map((item) => item.textContent), ['Anna #1', 'Anna #3', 'test']);
+  assert.deepEqual(hideButtonsOf(page).map((button) => button && button.children[0].textContent), [': Anna #1', ': Anna #3', null]);
+});
+
+test('lobby page: a member entry gets the number when a sender who left had the same nick, though no member changed', async () => {
+  // given
+  const page = loadLobbyPage({
+    ...PRESENCE, [JOIN]: [[200, room()]], [POLL]: [[200, room({ messages: [{ ...annaSays(1, 'bye'), member: 5 }] })]],
+  }, { hash: ROOM_LINK_HASH });
+  const release = page.server.hold(POLL);
+  await settle();
+  const before = page.elements['lobby-players'].children.map((item) => item.textContent);
+
+  // when
+  release();
+  await settle();
+
+  // then
+  assert.deepEqual(before, ['Anna', 'test']);
+  assert.deepEqual(page.elements['lobby-players'].children.map((item) => item.textContent), ['Anna #1', 'test']);
+  assert.equal(hideButtonsOf(page)[0].children[0].textContent, ': Anna #1');
 });
 
 test('lobby page: every render hands the state to the chat with a klad:lobby event', async () => {
@@ -2416,6 +2510,31 @@ test('lobby and chat pages: a room link joins, the chat shows the messages as te
   assert.deepEqual(page.server.calls.slice(before), [SEND + ' ' + JSON.stringify({ text: typed })]);
   assert.equal(page.elements['lobby-chat-text'].value, '');
   assert.equal(page.registry.focused, page.elements['lobby-chat-text']);
+});
+
+test('lobby and chat pages: a member who wrote and left is hidden from the chat line, and a sender with a member\'s nick shows the number', async () => {
+  // given
+  const bill = { n: 1, member: 4, nick: 'Bill', kind: 'human', guest: true, you: false, text: 'bye' };
+  const page = loadLobbyPage({
+    ...PRESENCE,
+    [JOIN]: [[200, room({ messages: [bill, { ...annaSays(2, 'hi'), member: 5 }] })]],
+    [pollAfter(2)]: [[200, room()]],
+  }, { hash: ROOM_LINK_HASH, isChatLoaded: true });
+  await settle();
+  const lines = page.elements['lobby-chat-lines'].children;
+  const names = lines.map((line) => line.children[0].textContent);
+  const billButton = buttonsOf(lines[0])[0];
+
+  // when
+  billButton.listeners.click();
+
+  // then
+  assert.deepEqual(names, ['Bill', 'Anna #5']);
+  assert.deepEqual(page.elements['lobby-players'].children.map((item) => item.textContent), ['Anna #1', 'test']);
+  assert.deepEqual(plain(page.registry.events.at(-1).detail.hiddenMembers), [4]);
+  assert.equal(page.elements['lobby-chat-lines'].children.length, 1);
+  assert.ok(textsOf(page.elements['lobby-chat-lines'].children[0]).includes('hi'));
+  assert.deepEqual(hideButtonsOf(page).map((button) => button && button.attributes['aria-pressed']), ['false', null]);
 });
 
 test('lobby and chat pages: chat.js loaded after the room answered shows the kept messages at the next render', async () => {

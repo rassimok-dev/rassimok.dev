@@ -31,7 +31,8 @@ what a grep can check (see below), so the claims cannot quietly become false.
 
 **Room chat in memory only.** In a lobby room the members can write to each
 other. Only that room's members read a message, each only what was sent
-after they joined. The API keeps the last 30 messages of each room in
+after they joined, with the sender's nick, kind and guest or account, and
+the member number in the room when two members share a nick. The API keeps the last 30 messages of each room in
 memory, never in the database or a log line; they go with the room (10
 minutes after it empties, or when its host opens a new room) or a restart,
 and deleting a player removes their messages from every room. The chat

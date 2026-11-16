@@ -341,6 +341,23 @@ test('chat page: Скрыть чат hides the chat and stops its announcements'
   assert.equal(page.elements['lobby-chat-lines'].children.length, 0);
 });
 
+test('chat page: hiding a member empties the live region, and a later message is still announced', () => {
+  // given
+  const page = loadChatPage();
+  page.show(stateOf([anna(1, 'one'), twin(2, 'two')]));
+  const spokenBefore = spokenOf(page);
+
+  // when
+  page.show(stateOf([anna(1, 'one'), twin(2, 'two')], { hiddenMembers: [3] }));
+  const spokenAfterHide = spokenOf(page);
+  page.show(stateOf([anna(1, 'one'), twin(2, 'two'), anna(4, 'four')], { hiddenMembers: [3] }));
+
+  // then
+  assert.deepEqual(spokenBefore, ['Anna: one', 'Anna: two']);
+  assert.deepEqual(spokenAfterHide, []);
+  assert.deepEqual(spokenOf(page), ['Anna: four']);
+});
+
 test('chat page: the part shows only in a room that has answered, says when there is nothing yet, and starts clean in a new room', async () => {
   // given
   const page = loadChatPage([{ status: 429, data: null }]);
@@ -407,7 +424,7 @@ test('chat page: a nick that becomes shared gets the member number on the shown 
   assert.deepEqual(spokenOf(page), ['Anna #3: three']);
 });
 
-test('chat page: a focused скрыть keeps the focus on its line through a rebuild, then goes to the list, and to the field once no line is left', () => {
+test('chat page: a focused скрыть keeps the focus on its line through a rebuild, then goes to the list, and to Скрыть чат once no line is left', () => {
   // given
   const page = loadChatPage();
   const list = page.elements['lobby-chat-lines'];
@@ -428,5 +445,5 @@ test('chat page: a focused скрыть keeps the focus on its line through a re
   assert.equal(keptOn, rebuiltButton);
   assert.equal(keptOn.dataset.line, '1');
   assert.equal(afterHide, list);
-  assert.equal(page.registry.focused, page.elements['lobby-chat-text']);
+  assert.equal(page.registry.focused, page.elements['lobby-chat-hide']);
 });

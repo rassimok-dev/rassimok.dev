@@ -84,6 +84,7 @@ if (typeof document !== 'undefined') (() => {
   let lastState = null;
   let shownRoom = null;
   let shownLines = null;
+  let shownHidden = '';
 
   /* Nick, marks and text go in with textContent only, so a typed tag or web
      address stays text. Another member's line has its own hide button, so
@@ -129,8 +130,10 @@ if (typeof document !== 'undefined') (() => {
      several in one poll are all read and none twice. The list is rebuilt
      only when its lines change and follows the newest while it is
      scrolled to the end; a focused hide button keeps the focus on its line,
-     or on the list (the field once the list is empty) when the line went.
-     A draft does not follow the player into another room. */
+     or on the list when the line went, and on Скрыть чат once the list is
+     empty: a held Enter there toggles nothing and sends no draft. A draft
+     does not follow the player into another room, and a hidden member's
+     last announcement leaves the live region. */
   function render(state) {
     lastState = state;
     if (state.roomId !== shownRoom) {
@@ -138,6 +141,11 @@ if (typeof document !== 'undefined') (() => {
       problem.textContent = '';
       live.replaceChildren();
       field.value = '';
+    }
+    const hiddenKey = state.hiddenMembers.join(' ');
+    if (hiddenKey !== shownHidden) {
+      shownHidden = hiddenKey;
+      live.replaceChildren();
     }
     const fresh = chat.fresh(state);
     if (fresh.length > 0) live.replaceChildren(...fresh.map(spoken));
@@ -154,7 +162,7 @@ if (typeof document !== 'undefined') (() => {
       if (isAtEnd) list.scrollTop = list.scrollHeight;
       if (focusedLine) {
         const button = Array.from(list.querySelectorAll('button')).find((item) => item.dataset.line === focusedLine);
-        (button || (lines.length > 0 ? list : field)).focus();
+        (button || (lines.length > 0 ? list : hideBox)).focus();
       }
     }
     empty.textContent = state.messages.length === 0 ? KLAD_CHAT.TEXT.empty : '';

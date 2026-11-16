@@ -84,8 +84,11 @@ visit), which went live on 2026-11-15.
   list entry and on the chat line; every other nick has no number, so a
   normal room looks as before. Senders count too, so a member who wrote,
   left and came back (a new number) or a stranger who took a nick of
-  someone who left is told apart as well. The player's own entries count
-  as one, since a re-join after the sweep gives the player a new number and
+  someone who left is told apart as well, but only for the same spelling:
+  lookalike guest nicks (Latin "TOM" and Cyrillic "ТОМ") are grouped
+  apart and get no number (known limit, a follow-up). The privacy texts
+  say that a shared nick shows the member number. The player's own entries
+  count as one, since a re-join after the sweep gives the player a new number and
   the own lines would otherwise get numbers. The lobby computes the list
   once (`state().sharedNicks`) for both renderers.
 - **"скрыть" on a chat line** (review fix). A member who wrote and then
@@ -146,7 +149,9 @@ Every claim was checked against the API's CHANGELOG (2026-11-15 fourth,
 RAS-53; sixth, RAS-59) and contract section 7: only the room's members read
 a message, each only what was sent after their join (non-members get
 `messages` empty, a re-join reads only later ones); any player with a nick
-can join a listed room; members see nick, kind and guest or account; the
+can join a listed room; members see nick, kind and guest or account, and
+the member number after a nick two members share (a join counter of the
+room, not a player id; the API has sent it to members since RAS-53); the
 last 30 per room, in memory only, never in the database or a log line;
 gone with the room (10 minutes after it empties, or when its host opens a
 new room) and with a restart; leaving and logging out keep them; deleting
@@ -225,7 +230,7 @@ expired sessions daily.
 
 ### Tests
 
-339 pass (291 before). `klad/test/lobby.test.js` +27: messages kept by
+340 pass (291 before). `klad/test/lobby.test.js` +27: messages kept by
 `n` and `after` on the next polls; an action answer repeating them; a lost
 and a late poll answer; hostile messages (text not a string, 121 and 0
 characters, no `n`, 0, 1.5, 1e10, no member, a nick that is not a string,
@@ -242,13 +247,14 @@ numbers for two members with one nick and for a sender who left, the
 `klad:lobby` event, `lobby.js` with `chat.js` in one `vm` context from a
 room link (lines as text, one POST with the typed text, no `img` or `a`
 made; a sender who left hidden from the line), and `chat.js` loaded after
-the room answered. New `klad/test/chat.test.js` (20): marks, the name with
+the room answered. New `klad/test/chat.test.js` (21): marks, the name with
 the number, order, a hidden member next to a twin, announcements once and
 never the own, the own message first, "Скрыть чат", a new room, the send
 texts; the page half with a stub `KLAD_LOBBY.page`: `<img src=x>` and a
 web address as text, Enter and the focus, the text kept on each failure
 and while typing during a send, a blank field, announcements once,
-"Скрыть чат" (emptying the announcements), the part hidden until the room
+"Скрыть чат" (emptying the announcements), a hidden member's
+announcement emptied, the part hidden until the room
 answered and the field emptied in a new room, the line's "скрыть" (hidden
 name, no pressed state, none on the own line), a nick that becomes shared,
 and the focus after a hide. `klad/test/race.test.js` +1:

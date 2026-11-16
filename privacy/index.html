@@ -75,13 +75,14 @@
       «Сейчас в лобби» ваш ник, ваш выбор (человек или агент) и то, гость вы или аккаунт.</li>
       <li>Ник хозяина и число игроков открытой комнаты видит каждый игрок с ником, и во время её
       гонки тоже. Любой игрок с ником может войти в комнату из списка открытых или по ссылке и тогда
-      видит её участников: ники, выбор (человек или агент), кто готов и кто хозяин. «Только по
+      видит её участников: ники (если ник есть у двух участников, после него стоит номер участника
+      в этой комнате, по порядку входа), выбор (человек или агент), кто готов и кто хозяин. «Только по
       ссылке» убирает комнату из следующих списков, но не отзывает ссылку, которую уже видели.</li>
       <li>В гонке участники комнаты видят вашего бегуна на поле, ваш ник, выбор (человек или агент),
       место и время; в таблицы рекордов гонка не попадает.</li>
       <li>В чате комнаты её участники видят ваши сообщения вместе с ником, выбором (человек или агент)
       и тем, гость вы или аккаунт (подробнее ниже, в разделе «Чат в комнате»).</li>
-      <li>Ваш email и внутренние номера игроков не видит никто из других игроков.</li>
+      <li>Ваш email и внутренние идентификаторы игроков не видит никто из других игроков.</li>
     </ul>
 
     <h2>Лобби и гонки только в памяти</h2>
@@ -93,7 +94,8 @@
     <p>В комнате можно писать друг другу. Сообщение читают только участники этой комнаты, и каждый
     видит лишь сообщения, отправленные после его входа; в открытую комнату может войти любой игрок с
     ником. Рядом с текстом участники видят ваш ник, выбор (человек или агент) и то, гость вы или
-    аккаунт.</p>
+    аккаунт. Если ник есть у двух участников, после него стоит номер участника в этой комнате (по
+    порядку входа, не номер игрока).</p>
     <p>Сервер держит последние 30 сообщений каждой комнаты только в памяти: в базу данных и в журнал
     они не попадают. Они пропадают вместе с комнатой (через 10 минут после того, как из неё все
     вышли, или когда её хозяин открывает новую комнату) и при каждом перезапуске сервера. Выход из
@@ -219,7 +221,8 @@
       who is online.</li>
       <li>Every player with a nick sees the host's nick and the number of players of each open room,
       also during its race. Any player with a nick can join a room from the list of open rooms or by
-      its link, and then sees its members: their nicks, human or agent, who is ready and who is the
+      its link, and then sees its members: their nicks (a nick two members share is followed by the
+      member's number in this room, by order of joining), human or agent, who is ready and who is the
       host. "Link only" hides a room from later lists but does not take back a link already
       seen.</li>
       <li>In a race, the room's members see your runner on the field, your nick, your choice of human
@@ -238,7 +241,8 @@
     <p>The members of a room can write to each other. A message is read only by the members of that
     room, and each of them sees only the messages sent after they joined; any player with a nick can
     join an open room. Next to the text, the members see your nick, your choice of human or agent and
-    whether you are a guest or an account.</p>
+    whether you are a guest or an account. When two members share a nick, it is followed by their
+    member number in this room (by order of joining, not a player id).</p>
     <p>The server keeps the last 30 messages of each room in memory only: they never go to the
     database or to a log. They go with the room (10 minutes after everyone has left it, or when its
     host opens a new room) and with every restart of the server. Leaving the room or logging out does

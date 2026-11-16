@@ -303,7 +303,7 @@ dialog .chat {
 dialog .chat:empty { display: none; }
 dialog .chat li { padding: .1rem 0; overflow-wrap: anywhere; }
 dialog .chat .nick { font-weight: 600; }
-dialog #lobby-chat-text { width: 100%; margin: .2rem 0; }
+dialog #lobby-chat-text, dialog #race-chat-text { width: 100%; margin: .2rem 0; }
 /* Read by screen readers, not shown. */
 .visually-hidden {
   position: absolute;
@@ -327,3 +327,43 @@ dialog .count {
 dialog .winner td { color: var(--crt-hot); }
 dialog .won, dialog .mine { color: var(--crt-hot); font-size: .9em; }
 dialog .gone { color: var(--crt-dim); font-size: .9em; }
+
+/* Race chat pop-ups: inside the field, above the online notice, and never
+   in reach of a key, a touch or the focus. Each shows at most two lines.
+   The base style is the final state; only a player who accepts motion gets
+   the short fade-in. */
+.popups {
+  position: absolute;
+  left: 50%;
+  bottom: 2.6rem;
+  z-index: 2;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: .25rem;
+  width: max-content;
+  max-width: calc(100% - 1rem);
+  pointer-events: none;
+}
+.popups p {
+  margin: 0;
+  padding: .25rem .6rem;
+  max-width: 100%;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow-wrap: anywhere;
+  font-size: .72rem;
+  text-align: center;
+  background: var(--crt-bg);
+  border: 1px solid var(--crt-dim);
+  border-radius: .3rem;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .popups p { animation: popup-in .2s ease-out; }
+}
+@keyframes popup-in {
+  from { opacity: 0; }
+}

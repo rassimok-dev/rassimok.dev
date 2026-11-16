@@ -481,7 +481,7 @@ const KLAD_GAME = (() => {
       else if (S.phase === 'title' || S.phase === 'over' || S.phase === 'won') startGame(S.phase === 'title' ? S.level : 0);
       else if (S.phase === 'pause') { hide(); setPhase('play'); }
     } else if (action === 'pause' && (S.phase === 'play' || S.phase === 'pause')) {
-      if (S.phase === 'play') { show('ПАУЗА', 'P или ОГОНЬ — продолжить'); setPhase('pause'); }
+      if (S.phase === 'play') { show('ПАУЗА', 'P или ОГОНЬ — продолжить' + (race ? ' · чат: C или кнопка «Чат»' : '')); setPhase('pause'); }
       else { hide(); setPhase('play'); }
     } else if (action === 'restart' && S.phase === 'play') die();
   }

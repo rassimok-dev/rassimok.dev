@@ -154,6 +154,121 @@ test('the send answer picks the text: none for 201, the allowed characters for 4
   assert.match(TEXT.refused, /120 знаков.*латинские и русские буквы, цифры, пробел/);
 });
 
+test('each watcher reports a message once on its own, so the lobby, the race dialog and the pop-ups do not use each other\'s marks', () => {
+  // given
+  const chat = KLAD_CHAT.create();
+  const first = chat.watcher();
+  const second = chat.watcher();
+
+  // when
+  const firstSees = first(stateOf([anna(1, 'one')]));
+  const secondSees = second(stateOf([anna(1, 'one')]));
+  const firstAgain = first(stateOf([anna(1, 'one')]));
+
+  // then
+  assert.deepEqual(numbersOf(firstSees), [1]);
+  assert.deepEqual(numbersOf(secondSees), [1]);
+  assert.deepEqual(firstAgain, []);
+});
+
+/* ---- the pop-ups ---- */
+
+function popupsOf(clock) {
+  const changes = [];
+  const popups = KLAD_CHAT.createPopups(clock, () => changes.push(popups.shown().map((popup) => popup.n)));
+  return { popups, changes };
+}
+const linesFor = (...numbers) => numbers.map((n) => KLAD_CHAT.lineOf(anna(n, 'text ' + n), []));
+
+test('a pop-up shows the name and the text, and goes after 6 s', () => {
+  // given
+  const clock = fakeClock();
+  const { popups, changes } = popupsOf(clock);
+
+  // when
+  popups.add([KLAD_CHAT.lineOf(twin(7, 'hello'), ['Anna'])]);
+  clock.advance(KLAD_CHAT.POPUP_FOR - 1);
+  const justBefore = popups.shown();
+  clock.advance(1);
+
+  // then
+  assert.deepEqual(justBefore, [{ n: 7, name: 'Anna #3', text: 'hello' }]);
+  assert.deepEqual(popups.shown(), []);
+  assert.deepEqual(changes, [[7], []]);
+  assert.equal(clock.pending(), 0);
+});
+
+test('at most 3 pop-ups show at once, a fourth pushes out the oldest, and each has its own 6 s', () => {
+  // given
+  const clock = fakeClock();
+  const { popups } = popupsOf(clock);
+  popups.add(linesFor(1));
+  clock.advance(2000);
+  popups.add(linesFor(2, 3));
+
+  // when
+  popups.add(linesFor(4));
+  const afterFourth = popups.shown().map((popup) => popup.n);
+  clock.advance(4000);
+  const whenFirstWouldGo = popups.shown().map((popup) => popup.n);
+  clock.advance(2000);
+
+  // then
+  assert.deepEqual(afterFourth, [2, 3, 4]);
+  assert.deepEqual(whenFirstWouldGo, [2, 3, 4]);
+  assert.deepEqual(popups.shown(), []);
+  assert.equal(clock.pending(), 0);
+});
+
+test('five messages in one batch show the newest 3, and a repeated number shows once', () => {
+  // given
+  const clock = fakeClock();
+  const { popups } = popupsOf(clock);
+
+  // when
+  popups.add(linesFor(1, 2, 3, 4, 5));
+  popups.add(linesFor(5));
+
+  // then
+  assert.deepEqual(popups.shown().map((popup) => popup.n), [3, 4, 5]);
+  assert.equal(clock.pending(), 3);
+});
+
+test('clear removes every pop-up and its timer, and reports a change only when there was one', () => {
+  // given
+  const clock = fakeClock();
+  const { popups, changes } = popupsOf(clock);
+  popups.clear();
+  popups.add(linesFor(1, 2));
+
+  // when
+  popups.clear();
+  popups.clear();
+
+  // then
+  assert.deepEqual(popups.shown(), []);
+  assert.equal(clock.pending(), 0);
+  assert.deepEqual(changes, [[1, 2], []]);
+});
+
+test('no pop-up line for a hidden member or with the chat hidden: the watcher leaves them out, and they stay out when shown again', () => {
+  // given
+  const chat = KLAD_CHAT.create();
+  const watch = chat.watcher();
+
+  // when
+  const hiddenMember = watch(stateOf([anna(1, 'one'), twin(2, 'two')], { hiddenMembers: [1] }));
+  chat.setHidden(true);
+  const hiddenChat = watch(stateOf([anna(1, 'one'), twin(2, 'two'), anna(3, 'three')], { hiddenMembers: [1] }));
+  chat.setHidden(false);
+  const afterwards = watch(stateOf([anna(1, 'one'), twin(2, 'two'), anna(3, 'three')]));
+
+  // then
+  assert.deepEqual(numbersOf(hiddenMember), [2]);
+  assert.deepEqual(hiddenChat, []);
+  assert.deepEqual(afterwards, []);
+});
+
 /* ---- the page half, in a vm context with a stub page ---- */
 
 function stubNode(tag, registry) {
@@ -162,30 +277,69 @@ function stubNode(tag, registry) {
     children: [], listeners: {}, attributes: {}, dataset: {}, replaced: 0, scrollTop: 0, scrollHeight: 0, clientHeight: 0,
     addEventListener(type, listener) { this.listeners[type] = listener; },
     setAttribute(name, value) { this.attributes[name] = value; },
-    append(...items) { this.children.push(...items); },
+    append(...items) { for (const item of items) if (typeof item !== 'string') item.parent = this; this.children.push(...items); },
+    remove() { if (this.parent) this.parent.children = this.parent.children.filter((child) => child !== this); },
     replaceChildren(...items) { this.children = items; this.replaced++; },
     querySelectorAll(selector) {
       return this.children.flatMap((child) => (typeof child === 'string' ? [] : [...(child.tag === selector ? [child] : []), ...child.querySelectorAll(selector)]));
     },
     contains(other) { return other === this || this.children.some((child) => typeof child !== 'string' && child.contains(other)); },
     focus() { registry.focused = this; },
+    open: false,
+    showModal() { this.open = true; },
+    close() {
+      if (!this.open) return;
+      this.open = false;
+      if (this.listeners.close) registry.closeEvents.push(this.listeners.close);
+    },
+  };
+}
+
+function fakeClock() {
+  const timers = new Map();
+  let time = 0;
+  let nextId = 1;
+  return {
+    setTimeout(task, wait) {
+      const id = nextId++;
+      timers.set(id, { at: time + wait, task });
+      return id;
+    },
+    clearTimeout(id) { timers.delete(id); },
+    pending: () => timers.size,
+    advance(milliseconds) {
+      const end = time + milliseconds;
+      for (;;) {
+        let next = null;
+        for (const [id, timer] of timers) if (timer.at <= end && (next === null || timer.at < next.at)) next = { id, ...timer };
+        if (next === null) break;
+        timers.delete(next.id);
+        time = next.at;
+        next.task();
+      }
+      time = end;
+    },
   };
 }
 
 function loadChatPage(sendAnswers = []) {
-  const registry = { focused: null, created: [] };
+  const registry = { focused: null, created: [], closeEvents: [] };
   const elements = {};
   const listeners = {};
   const sent = [];
   const toggled = [];
+  const clock = fakeClock();
   const document = {
     get activeElement() { return registry.focused; },
+    querySelector: () => (Object.values(elements).some((element) => element.open) ? {} : null),
     getElementById: (id) => elements[id] || (elements[id] = stubNode('#' + id, registry)),
     createElement: (tag) => { registry.created.push(tag); return stubNode(tag, registry); },
     addEventListener: (type, listener) => { listeners[type] = listener; },
   };
   const sandbox = {
     document,
+    setTimeout: (task, wait) => clock.setTimeout(task, wait),
+    clearTimeout: (timer) => clock.clearTimeout(timer),
     KLAD_LOBBY: {
       page: {
         sendMessage: async (text) => { sent.push(text); return sendAnswers.shift(); },
@@ -195,13 +349,20 @@ function loadChatPage(sendAnswers = []) {
   };
   vm.createContext(sandbox);
   vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'chat.js'), 'utf8'), sandbox);
+  const chatPage = vm.runInContext('KLAD_CHAT.page', sandbox);
   const show = (state) => listeners['klad:lobby']({ detail: state });
+  const pressKey = (code, changes) => {
+    let isPrevented = false;
+    listeners.keydown({ code, repeat: false, target: { tagName: 'CANVAS' }, preventDefault() { isPrevented = true; }, ...changes });
+    return isPrevented;
+  };
+  const fireCloseEvents = () => { while (registry.closeEvents.length > 0) registry.closeEvents.shift()(); };
   const submit = async () => {
     let isPrevented = false;
     await elements['lobby-chat-form'].listeners.submit({ preventDefault() { isPrevented = true; } });
     return isPrevented;
   };
-  return { elements, registry, sent, toggled, show, submit };
+  return { elements, registry, sent, toggled, clock, chatPage, show, submit, pressKey, fireCloseEvents };
 }
 
 const textsOf = (node) => [node.textContent, ...node.children.flatMap((child) => (typeof child === 'string' ? [child] : textsOf(child)))];
@@ -446,4 +607,296 @@ test('chat page: a focused скрыть keeps the focus on its line through a re
   assert.equal(keptOn.dataset.line, '1');
   assert.equal(afterHide, list);
   assert.equal(page.registry.focused, page.elements['lobby-chat-hide']);
+});
+
+/* ---- the race: pop-ups, the chat dialog and its key ---- */
+
+const popupTexts = (page) => page.elements['chat-popups'].children.map((node) => node.textContent);
+const raceChatField = (page) => page.elements['race-chat-text'];
+
+test('chat page: in a race another member\'s message is a pop-up with the nick and the text as plain text, with no focus and no listener', () => {
+  // given
+  const page = loadChatPage();
+  page.chatPage.setRace(true);
+  const hostile = '<img src=x onerror=alert(1)>';
+  const address = 'www.example.test/klad?x=<b>1</b>';
+  page.registry.focused = page.elements.game;
+
+  // when
+  page.show(stateOf([{ ...anna(1, hostile), nick: hostile }, anna(2, address)]));
+
+  // then
+  assert.deepEqual(popupTexts(page), [hostile + ': ' + hostile, 'Anna: ' + address]);
+  assert.deepEqual(page.registry.created.filter((tag) => !['li', 'span', 'p', 'button'].includes(tag)), []);
+  assert.equal(page.registry.focused, page.elements.game);
+  assert.deepEqual(page.elements['chat-popups'].children.map((node) => Object.keys(node.listeners)), [[], []]);
+});
+
+test('chat page: pop-ups show 3 at most, the newest, and each goes after 6 s', () => {
+  // given
+  const page = loadChatPage();
+  page.chatPage.setRace(true);
+
+  // when
+  page.show(stateOf([anna(1, 'one'), anna(2, 'two')]));
+  page.clock.advance(3000);
+  page.show(stateOf([anna(1, 'one'), anna(2, 'two'), anna(3, 'three'), anna(4, 'four')]));
+  const four = popupTexts(page);
+  page.clock.advance(3000);
+  const afterFirstSix = popupTexts(page);
+  page.clock.advance(3000);
+
+  // then
+  assert.deepEqual(four, ['Anna: two', 'Anna: three', 'Anna: four']);
+  assert.deepEqual(afterFirstSix, ['Anna: three', 'Anna: four']);
+  assert.deepEqual(popupTexts(page), []);
+});
+
+test('chat page: no pop-up outside a race, for the own message, or for a message that came while the race was over', () => {
+  // given
+  const page = loadChatPage();
+
+  // when
+  page.show(stateOf([anna(1, 'before the race')]));
+  page.chatPage.setRace(true);
+  page.show(stateOf([anna(1, 'before the race'), mine(2, 'mine')]));
+  const duringRace = popupTexts(page);
+  page.chatPage.setRace(false);
+  page.show(stateOf([anna(1, 'before the race'), mine(2, 'mine'), anna(3, 'after the race')]));
+  page.chatPage.setRace(true);
+  page.show(stateOf([anna(1, 'before the race'), mine(2, 'mine'), anna(3, 'after the race')]));
+
+  // then
+  assert.deepEqual(duringRace, []);
+  assert.deepEqual(popupTexts(page), []);
+});
+
+test('chat page: no pop-up while a dialog is open, and none appears later for a message that came meanwhile', () => {
+  // given
+  const page = loadChatPage();
+  page.chatPage.setRace(true);
+  page.elements.board = { open: true };
+
+  // when
+  page.show(stateOf([anna(1, 'one')]));
+  page.elements.board.open = false;
+  page.show(stateOf([anna(1, 'one')]));
+  page.show(stateOf([anna(1, 'one'), anna(2, 'two')]));
+
+  // then
+  assert.deepEqual(popupTexts(page), ['Anna: two']);
+});
+
+test('chat page: no pop-up for a hidden member or with Скрыть чат on, and hiding the chat takes the showing ones away', () => {
+  // given
+  const page = loadChatPage();
+  page.chatPage.setRace(true);
+  page.show(stateOf([anna(1, 'one')]));
+  const shownBefore = popupTexts(page);
+
+  // when
+  page.show(stateOf([anna(1, 'one'), twin(2, 'two')], { hiddenMembers: [3] }));
+  const hiddenMember = popupTexts(page);
+  const box = page.elements['race-chat-hide'];
+  box.checked = true;
+  box.listeners.change();
+  const afterHide = popupTexts(page);
+  page.show(stateOf([anna(1, 'one'), twin(2, 'two'), anna(3, 'three')], { hiddenMembers: [3] }));
+
+  // then
+  assert.deepEqual(shownBefore, ['Anna: one']);
+  assert.deepEqual(hiddenMember, ['Anna: one']);
+  assert.deepEqual(afterHide, []);
+  assert.deepEqual(popupTexts(page), []);
+  assert.equal(page.elements['lobby-chat-hide'].checked, true);
+  assert.equal(page.elements['race-chat-body'].hidden, true);
+  assert.equal(page.elements['lobby-chat-body'].hidden, true);
+});
+
+test('chat page: a nick two members share has its member number in the pop-up, as in the lobby', () => {
+  // given
+  const page = loadChatPage();
+  page.chatPage.setRace(true);
+
+  // when
+  page.show(stateOf([twin(2, 'two')], { sharedNicks: ['Anna'] }));
+
+  // then
+  assert.deepEqual(popupTexts(page), ['Anna #3: two']);
+});
+
+test('chat page: the button and the key C open the chat dialog only in a race, and outside one the key is left alone', () => {
+  // given
+  const page = loadChatPage();
+  const dialog = page.elements['race-chat'];
+
+  // when
+  const preventedOutside = page.pressKey('KeyC');
+  page.elements['h-chat'].listeners.click();
+  const openOutside = dialog.open;
+  page.chatPage.setRace(true);
+  const preventedInRace = page.pressKey('KeyC');
+
+  // then
+  assert.equal(preventedOutside, false);
+  assert.equal(openOutside, false);
+  assert.equal(preventedInRace, true);
+  assert.equal(dialog.open, true);
+  assert.equal(page.registry.focused, raceChatField(page));
+  assert.equal(page.elements['h-chat'].hidden, false);
+});
+
+test('chat page: the button Чат is hidden outside a race', () => {
+  // given
+  const page = loadChatPage();
+  page.chatPage.setRace(true);
+  const shownInRace = page.elements['h-chat'].hidden;
+
+  // when
+  page.chatPage.setRace(false);
+
+  // then
+  assert.equal(shownInRace, false);
+  assert.equal(page.elements['h-chat'].hidden, true);
+});
+
+test('chat page: the key C is ignored while typing, with a modifier, held down, or with a dialog already open', () => {
+  // given
+  const page = loadChatPage();
+  page.chatPage.setRace(true);
+  const dialog = page.elements['race-chat'];
+  const attempts = [
+    { target: { tagName: 'INPUT' } }, { ctrlKey: true }, { metaKey: true }, { altKey: true }, { repeat: true },
+  ];
+
+  // when
+  const prevented = attempts.map((changes) => page.pressKey('KeyC', changes));
+  const openAfterAttempts = dialog.open;
+  page.elements.board = { open: true };
+  const preventedOverDialog = page.pressKey('KeyC');
+
+  // then
+  assert.deepEqual(prevented, [false, false, false, false, false]);
+  assert.equal(openAfterAttempts, false);
+  assert.equal(preventedOverDialog, true);
+  assert.equal(dialog.open, false);
+  assert.equal(page.pressKey('KeyP'), false);
+});
+
+test('chat page: opening the chat dialog takes the pop-ups away, and the dialog lists the room\'s messages', () => {
+  // given
+  const page = loadChatPage();
+  page.chatPage.setRace(true);
+  page.show(stateOf([anna(1, 'one')]));
+
+  // when
+  page.pressKey('KeyC');
+
+  // then
+  assert.deepEqual(popupTexts(page), []);
+  assert.equal(page.clock.pending(), 0);
+  assert.equal(page.elements['race-chat-lines'].children.length, 1);
+});
+
+test('chat page: a message that arrives with the chat dialog open is announced in the dialog, not as a pop-up', () => {
+  // given
+  const page = loadChatPage();
+  page.chatPage.setRace(true);
+  page.pressKey('KeyC');
+
+  // when
+  page.show(stateOf([anna(1, 'one')]));
+
+  // then
+  assert.deepEqual(popupTexts(page), []);
+  assert.deepEqual(page.elements['race-chat-live'].children.map((item) => item.textContent), ['Anna: one']);
+});
+
+test('chat page: the chat dialog sends like the lobby chat, keeps the text on a failure, and Enter only submits the form', async () => {
+  // given
+  const page = loadChatPage([{ status: 429, data: null }, { status: 201, data: {} }]);
+  page.chatPage.setRace(true);
+  page.show(stateOf([]));
+  page.pressKey('KeyC');
+  raceChatField(page).value = 'hi';
+  const submit = async () => {
+    let isPrevented = false;
+    await page.elements['race-chat-form'].listeners.submit({ preventDefault() { isPrevented = true; } });
+    return isPrevented;
+  };
+
+  // when
+  const isPrevented = await submit();
+  const keptText = raceChatField(page).value;
+  const problem = page.elements['race-chat-problem'].textContent;
+  await submit();
+
+  // then
+  assert.equal(isPrevented, true);
+  assert.equal(keptText, 'hi');
+  assert.equal(problem, TEXT.tooFast);
+  assert.deepEqual(page.sent, ['hi', 'hi']);
+  assert.equal(raceChatField(page).value, '');
+  assert.equal(page.elements['race-chat-problem'].textContent, '');
+  assert.equal(page.registry.focused, raceChatField(page));
+});
+
+test('chat page: closing the chat dialog puts the focus back on the field, unless another dialog is open', () => {
+  // given
+  const page = loadChatPage();
+  page.chatPage.setRace(true);
+  page.pressKey('KeyC');
+
+  // when
+  page.elements['race-chat-close'].listeners.click();
+  page.fireCloseEvents();
+  const afterClose = page.registry.focused;
+  page.pressKey('KeyC');
+  page.elements.race = { open: true };
+  page.elements['race-chat'].close();
+  page.registry.focused = page.elements['race-room'] = { tag: 'button' };
+  page.fireCloseEvents();
+
+  // then
+  assert.equal(afterClose, page.elements.game);
+  assert.equal(page.registry.focused, page.elements['race-room']);
+});
+
+test('chat page: when the race ends the chat dialog closes, the pop-ups and the button go, and the focus is left to the results screen', () => {
+  // given
+  const page = loadChatPage();
+  page.chatPage.setRace(true);
+  page.show(stateOf([anna(1, 'one')]));
+  page.pressKey('KeyC');
+
+  // when
+  page.chatPage.setRace(false);
+  page.elements.race = { open: true };
+  page.registry.focused = null;
+  page.fireCloseEvents();
+
+  // then
+  assert.equal(page.elements['race-chat'].open, false);
+  assert.equal(page.elements['h-chat'].hidden, true);
+  assert.deepEqual(popupTexts(page), []);
+  assert.equal(page.registry.focused, null);
+});
+
+test('chat page: the pop-ups have their own polite live region inside the stage, apart from the race notice, and never take a touch or a key', () => {
+  // given
+  const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+  const css = fs.readFileSync(path.join(__dirname, '..', 'klad.css'), 'utf8');
+
+  // when
+  const stage = html.slice(html.indexOf('<main id="stage"'), html.indexOf('</main>'));
+  const rule = css.slice(css.indexOf('.popups {'), css.indexOf('}', css.indexOf('.popups {')));
+  const motion = css.slice(css.indexOf('@media (prefers-reduced-motion: no-preference)'));
+
+  // then
+  assert.match(stage, /<div id="chat-popups" class="popups" aria-live="polite"><\/div>/);
+  assert.match(stage, /<p id="race-notice" class="notice race-notice" role="status"><\/p>/);
+  assert.doesNotMatch(stage.match(/<div id="chat-popups"[^>]*>/)[0], /tabindex|role=/);
+  assert.match(rule, /pointer-events: none/);
+  assert.match(motion, /\.popups p \{ animation/);
+  assert.doesNotMatch(rule, /animation/);
 });

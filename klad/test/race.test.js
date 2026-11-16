@@ -748,6 +748,7 @@ function loadGame(options = {}) {
   const elements = {};
   let frame = null;
   let time = 0;
+  let isDialogOpen = false;
   const canvasContext = {
     fillRect() {},
     drawImage() {},
@@ -763,7 +764,7 @@ function loadGame(options = {}) {
     documentElement: {},
     getElementById: (id) => elements[id] || (elements[id] = element()),
     createElement: () => ({ getContext: () => ({ fillRect() {} }) }),
-    querySelector: () => null,
+    querySelector: () => (isDialogOpen ? {} : null),
     querySelectorAll: () => [],
     addEventListener() {},
     dispatchEvent: (event) => events.push(event.type),
@@ -799,7 +800,9 @@ function loadGame(options = {}) {
   const key = (code) => hold(code, 0);
   const typeIn = (code) => windowListeners.keydown({ code, repeat: false, target: { tagName: 'INPUT', dataset: {} }, preventDefault() {} });
   const title = () => elements['msg-title'].textContent;
-  return { game, events, texts, hashes, elements, run, key, hold, typeIn, title };
+  const setDialogOpen = (isOpen) => { isDialogOpen = isOpen; };
+  const body = () => elements['msg-body'].textContent;
+  return { game, events, texts, hashes, elements, run, key, hold, typeIn, title, body, setDialogOpen };
 }
 
 function raceHooks() {
@@ -950,12 +953,61 @@ test('klad.js: no ghosts are drawn outside a race', () => {
   assert.deepEqual(texts, []);
 });
 
+test('klad.js: with a dialog open, such as the chat in a race, the engine is held and keys move nothing, and after the close it is paused, not running', () => {
+  // given
+  const { game, run, hold, key, title, body, setDialogOpen } = loadGame();
+  game.startRace(1, 'landscape', raceHooks());
+  run(0.1);
+  const start = game.racePosition();
+
+  // when
+  setDialogOpen(true);
+  hold('ArrowRight', 1);
+  key('Space');
+  run(1);
+  const whileOpen = game.racePosition();
+  setDialogOpen(false);
+  run(1);
+  const afterClose = game.racePosition();
+  const pauseTitle = title();
+  const pauseBody = body();
+  key('KeyP');
+  const afterContinue = game.racePosition();
+
+  // then
+  assert.notEqual(start, null);
+  assert.equal(whileOpen, null);
+  assert.equal(afterClose, null);
+  assert.equal(pauseTitle, 'ПАУЗА');
+  assert.match(pauseBody, /C или кнопка «Чат»/);
+  assert.deepEqual([afterContinue.x, afterContinue.y], [start.x, start.y]);
+});
+
+test('klad.js: the pause screen names the chat key only in a race', () => {
+  // given
+  const { game, run, key, body } = loadGame();
+  key('Enter');
+  run(2);
+
+  // when
+  key('KeyP');
+  const soloPause = body();
+  key('KeyP');
+  game.startRace(1, 'landscape', raceHooks());
+  key('KeyP');
+
+  // then
+  assert.equal(soloPause, 'P или ОГОНЬ — продолжить');
+  assert.match(body(), /^P или ОГОНЬ — продолжить · чат: C или кнопка «Чат»$/);
+});
+
 /* ---- race.js's page half, in a vm context with stub dialogs ---- */
 
 function loadRacePage() {
   const documentListeners = {};
   const elements = {};
   const lobbyCalls = [];
+  const raceCalls = [];
   const closeEvents = [];
   const node = () => ({
     textContent: '', className: '', hidden: false, open: false, listeners: {},
@@ -984,6 +1036,7 @@ function loadRacePage() {
     KLAD_TICKS,
     KLAD_GAME: { startRace: () => true, stopRace() {}, racePosition: () => null },
     KLAD_LOBBY: { page: { open: () => lobbyCalls.push('open'), leave: () => lobbyCalls.push('leave') } },
+    KLAD_CHAT: { page: { setRace: (isRacing) => raceCalls.push(isRacing) } },
     Date,
     setTimeout: () => 0,
     clearTimeout: () => {},
@@ -1000,7 +1053,7 @@ function loadRacePage() {
   documentListeners['klad:race']({ detail: { room: ROOM, socket } });
   const say = (message) => { for (const listener of messageListeners) listener(message); };
   const fireCloseEvents = () => { while (closeEvents.length > 0) closeEvents.shift()(); };
-  return { elements, lobbyCalls, say, fireCloseEvents, dialog: elements.race };
+  return { elements, lobbyCalls, raceCalls, say, fireCloseEvents, dialog: elements.race };
 }
 
 test('race.js: closing the finish screen with Escape leaves the room', () => {
@@ -1054,6 +1107,52 @@ test('race.js: a reload after the own finish closes the lobby and shows the wait
   assert.equal(elements['race-notice'].textContent, TEXT.finishedWaiting);
   assert.equal(elements['race-status'].textContent, '');
   assert.deepEqual(lobbyCalls, []);
+});
+
+test('race.js: the chat is told the race is on only while racing or waiting after the own finish, and off at the countdown, the results and the end', () => {
+  // given
+  const { elements, raceCalls, say } = loadRacePage();
+
+  // when
+  say({ type: 'countdown', seconds: 3 });
+  const afterCountdown = raceCalls.slice();
+  say({ type: 'go', at: 1763000000000 });
+  const afterGo = raceCalls.slice();
+  say({ type: 'results', places: [] });
+
+  // then
+  assert.deepEqual(afterCountdown, [false, false]);
+  assert.deepEqual(afterGo, [false, false, true]);
+  assert.deepEqual(raceCalls, [false, false, true, false]);
+  assert.equal(elements.race.open, true);
+});
+
+test('race.js: a reload after the own finish tells the chat the race is on', () => {
+  // given
+  const { raceCalls, say } = loadRacePage();
+
+  // when
+  say({ ...STATE, state: 'racing', players: [{ ...ME, finished: true }, ANNA] });
+
+  // then
+  assert.deepEqual(raceCalls, [false, true]);
+});
+
+test('race.js: the chat is told before the results screen opens, so the dialog closes first', () => {
+  // given
+  const { elements, raceCalls, say } = loadRacePage();
+  say({ type: 'go', at: 1763000000000 });
+  const openAtCall = [];
+  const setRace = (isRacing) => openAtCall.push([isRacing, elements.race.open]);
+  const original = raceCalls.push.bind(raceCalls);
+  raceCalls.push = (isRacing) => { setRace(isRacing); return original(isRacing); };
+
+  // when
+  say({ type: 'results', places: [] });
+
+  // then
+  assert.deepEqual(openAtCall, [[false, false]]);
+  assert.equal(elements.race.open, true);
 });
 
 /* ---- hostile and failing input ---- */

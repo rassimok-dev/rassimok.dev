@@ -3,6 +3,94 @@
 Dated entries, newest first. Written for a reader picking this up cold —
 or a future session needing to know what already exists and why.
 
+## 2026-11-16 - Race: chat pop-ups and a chat dialog (RAS-56)
+
+During a race another member's chat message shows as a pop-up, and the
+player can write: the HUD button "Чат" and the key C open a chat dialog.
+The API side is RAS-55 (live): a message accepted by
+`POST /rooms/<id>/messages` while the room is `starting` or `racing` goes
+to every other connected racer's socket as a `chat` frame (contract
+section 8); there is no replay and the sender gets only its 201. The user
+decided Q13 a on 2026-11-15 (a button and a key that open a dialog, which
+pauses the own game like every dialog), with at most 3 pop-ups, about 6 s
+each, at the lower edge of the field, no sound and no pop-up while a dialog
+is open. Pop-ups: a line "nick: text" in `#chat-popups` inside `#stage`.
+The dialog: the room's messages, "Скрыть чат", a labelled 16 px field,
+"Отправить" and "Закрыть". The privacy texts need no change: the chat is
+still read only by the room's members, kept in memory only, and the
+notes say "in the room", not "in the lobby".
+
+### Decisions worth not relitigating
+
+- **Frames go into `lobby.js`'s message list at once; `after` does not
+  move.** `lobby.js` listens on the race socket it opened and keeps a
+  valid `chat` frame by `n` (the validation of a poll message, shared;
+  `you` is never read from a frame). Because the list is the one place
+  messages live, the dialog needs no second list, twin nicks get their
+  numbers and the member hides work in the race as in the lobby, and
+  "Назад в комнату" shows each message once: the room poll after the race
+  asks from the last room answer, lists the race's messages again and
+  anything the socket missed (a reconnect has no replay), and they dedupe
+  by `n`. A frame is not a room answer, for the reason the 201 of a send
+  is not: its `n` can be above messages of others that have not arrived.
+  The alternative (the pop-up queue listening to the socket on its own and
+  the lobby learning of race messages only from the poll) would have kept
+  `lobby.js` unchanged but needed a second list, a second dedupe and a
+  second validation for the dialog.
+- **Opening the chat is the pause; no new pause path.** A dialog already
+  holds `klad.js` (`isHeld`), so the chat dialog pauses the own game, and
+  keys typed in its field are ignored by the same rule that covers the
+  lobby chat. After the close the game is on its pause screen (P or ОГОНЬ),
+  as after every dialog; only the pause text in a race changed ("чат: C или
+  кнопка «Чат»"). The key is handled in `chat.js` on `document`, not in
+  `klad.js`, so the engine knows nothing of chat; it calls
+  `preventDefault` (else the typed "c" lands in the field that just got the
+  focus) and is ignored while typing, with Ctrl, Meta or Alt (copy), held
+  down, outside a race and over another dialog.
+- **`race.js` tells the chat whether the race is on.** One call,
+  `KLAD_CHAT.page.setRace(isOn)`, on each change of phase, made before the
+  countdown or results dialog opens: so a chat dialog still open closes
+  first and the focus goes to the results screen, not to the canvas. On
+  means racing, or finished and waiting for the others (Q11: the chat works
+  after the own finish); off at the countdown (a dialog covers the field
+  anyway), the results and every end.
+- **A pop-up only while no dialog is open, and a message that came while
+  one was open is not shown later.** The same watcher mark as the lobby's
+  live region, one mark per consumer (`create().watcher()`), so each
+  region and the pop-ups see a message once and a hidden member or "Скрыть
+  чат" is dropped for good, as in the lobby. A message that came over a
+  dialog is in the chat dialog's list and live region, so nothing is lost,
+  only not repeated on the field. Opening the chat dialog clears the
+  pop-ups.
+- **The race dialog has its own "Скрыть чат", one switch with the
+  lobby's.** The lobby is out of reach mid-race, and "Скрыть чат" must
+  stop the pop-ups; the two boxes follow one flag and hiding clears the
+  pop-ups and both live regions.
+- **The chat dialog lists the whole room chat, not only the race's.** The
+  list is the room's last 30 as the member may read them; a player who
+  opens it mid-race sees the conversation, and the pre-race messages are
+  context, not noise. It costs no extra request.
+- **Pop-ups: base style is the final state, at most two lines each.**
+  The fade-in (0.2 s) is under `prefers-reduced-motion: no-preference`
+  only, so the reduced case is the plain style, and removal has no
+  animation. A line shows at most two lines of text (an ellipsis cut):
+  three 120-character messages wrapped fully would cover much of a short
+  landscape phone field. The region sits at `bottom: 2.6rem`, above
+  `#online-notice` (which keeps `bottom: .6rem`), and inside `#stage`, so
+  the touch pad (a separate grid row) is never covered, on a 360 px phone
+  too. Nodes are added once and removed on expiry, so the polite live
+  region reads each message once and `#race-notice` is untouched.
+- **A dialog's close handler guards the focus.** The canvas gets the focus
+  after the chat dialog closes only when no other dialog is open, as in
+  the lobby and the race dialog; otherwise the end of a race with the chat
+  open would take the focus from "Назад в комнату".
+- **No new script file, no change to the CSP.** `chat.js` carries all of
+  it; the only HTML additions are the button, the pop-up region and one
+  dialog, with the contact address inside the email_off markers.
+
+Not verified here: a race on the live API with two browsers (a Pages
+preview cannot run one); the phone layout on a real 360 px screen.
+
 ## 2026-11-16 - Lobby: chat in the room (RAS-54)
 
 The members of a lobby room can write to each other before a race. The room

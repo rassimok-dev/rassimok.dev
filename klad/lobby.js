@@ -347,9 +347,22 @@ const KLAD_LOBBY = (() => {
     /* The lobby closes the socket once the room is back in the lobby, so it
        never keeps reconnecting after a race. */
     function startRace() {
-      socket = environment.openSocket(roomId);
-      socket.on('status', () => page.render());
-      page.race(room, socket);
+      const current = environment.openSocket(roomId);
+      socket = current;
+      current.on('status', () => page.render());
+      current.on('message', (data) => { if (current === socket) takeChat(data); });
+      page.race(room, current);
+    }
+
+    /* A chat frame of the race socket (contract section 8) is kept at once,
+       checked like a poll message. It is not a room answer, so `after` stays
+       where it was and the poll after the race lists the same message again
+       by its `n`, together with any the socket missed. A frame is never the
+       player's own, whatever it says. */
+    function takeChat(data) {
+      if (!data || data.type !== 'chat' || !isMessage(data)) return;
+      keepMessages([{ ...data, you: false }], false);
+      page.render();
     }
 
     /* The API drops a member whose socket has not connected 15 s after

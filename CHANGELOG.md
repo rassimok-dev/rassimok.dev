@@ -37,9 +37,11 @@ rewritten levels or alone, RAS-60 Q2) and has approved the deletion below.
   `ticks.js` and `klad.js`, so `klad/test/chase.test.js` checks each case on
   a small map without a page. `decideGuard` asks it for the next tile;
   falling, holes, walling in, drowning, the respawn and the guard speed per
-  level are unchanged. `klad.js` reads the global only inside `decideGuard`,
-  so the race tests, which load `klad.js` alone on guard-free levels, did not
-  change.
+  level are unchanged. The race tests now load `chase.js` before `klad.js`,
+  as the page does, and one of them puts a guard on the player's row and
+  sees it catch the player, so a wrong call from `decideGuard` fails there.
+  That test loads `chase.js` itself, so it does not see a script tag
+  missing from `index.html`.
 - **A guard's ladder step is the player's:** up from a ladder tile; down
   onto a ladder tile or from one, so a guard standing on a ladder set into
   the floor climbs down it. "A ladder that leads to the player's row" is
@@ -47,8 +49,11 @@ rewritten levels or alone, RAS-60 Q2) and has approved the deletion below.
   where the ladder ends. The step is checked for walls only (bricks, stone,
   a locked door), never for a floor, a plank or water. The target is the
   player's rounded tile, as before.
-- **The ghost race is unaffected:** guards exist only in each player's own
-  copy of the level, and ghosts touch nothing.
+- **The ghost race mechanics are unaffected:** guards exist only in each
+  player's own copy of the level, and ghosts touch nothing. A race on a
+  shape that cannot be cleared is another matter: every player gets the
+  host's shape, so a level 2 race with a portrait host (probably
+  unclearable, below) has no finisher and ends at the 4 minute cap.
 
 ### What the new chase does to the five levels
 

@@ -75,6 +75,20 @@ test('chase: on a ladder that leads toward the player\'s row, the guard climbs f
   assert.deepEqual(step, { x: 0, y: 1 });
 });
 
+test('chase: on a ladder under a brick, the guard cannot climb up, so it runs toward the player\'s column', () => {
+  // given
+  const rows = [
+    '....P',
+    '..#==',
+    '..g..',
+    '=====',
+  ];
+  // when
+  const step = stepOn(rows);
+  // then
+  assert.deepEqual(step, { x: 3, y: 2 });
+});
+
 test('chase: on top of a ladder set into the floor, the guard climbs down toward the player below', () => {
   // given
   const rows = [
@@ -88,6 +102,34 @@ test('chase: on top of a ladder set into the floor, the guard climbs down toward
   const step = stepOn(rows);
   // then
   assert.deepEqual(step, { x: 0, y: 1 });
+});
+
+test('chase: on the bottom tile of a ladder that hangs over air, the guard steps down off it toward the player below', () => {
+  // given
+  const rows = [
+    'g....',
+    '.....',
+    'P....',
+    '=====',
+  ];
+  // when
+  const step = stepOn(rows);
+  // then
+  assert.deepEqual(step, { x: 0, y: 1 });
+});
+
+test('chase: on the bottom tile of a ladder that stands on stone, the guard does not climb into the floor, so it runs toward the player\'s column', () => {
+  // given
+  const rows = [
+    'g....',
+    '==.==',
+    '....P',
+    '=====',
+  ];
+  // when
+  const step = stepOn(rows);
+  // then
+  assert.deepEqual(step, { x: 1, y: 0 });
 });
 
 test('chase: with no ladder at its tile, the guard runs toward the player\'s column, not to a ladder behind it', () => {
@@ -138,6 +180,21 @@ test('chase: directly below the player with no ladder at its tile, the guard sta
     '..P..',
     'H====',
     'H.G..',
+    '=====',
+  ];
+  // when
+  const step = stepOn(rows);
+  // then
+  assert.equal(step, null);
+});
+
+test('chase: directly below the player with open air above and no ladder at its tile, the guard does not climb into the air', () => {
+  // given
+  const rows = [
+    '..P..',
+    '..=..',
+    '.....',
+    '..G..',
     '=====',
   ];
   // when

@@ -3,6 +3,26 @@
 Dated entries, newest first. Written for a reader picking this up cold —
 or a future session needing to know what already exists and why.
 
+## 2026-11-17 - Boards: a line says what a board lists (RAS-49)
+
+The boards dialog (`#board`) now carries one line in the dialog's note
+style: "В каждой таблице первые 20 мест. У игрока одна строка: его лучший
+результат." Nothing was cut off: the API already returns the first 20
+places of every board, one row per player (the plan's rule, so that one
+player cannot fill a board), and the game draws every row it gets. A player
+who saw one row could not tell a short board from a cut one. The user
+decided Q1 b (the line on the boards screen) and Q2 a (the size stays 20).
+
+### Decisions worth not relitigating
+
+- **Fixed markup, no script change.** The line is a `p.note` in
+  `klad/index.html` between the switches and `#board-status`, so it shows
+  for every board and both kinds of player, and `.note` already meets
+  WCAG AA contrast. No unit test is needed.
+- **The line names 20, which mirrors `Rules.BOARD_SIZE` in the API.** If
+  that size changes, the line changes with it.
+- The wording is the ticket's example, unchanged.
+
 ## 2026-11-16 (later) - Race: chat pop-ups and a chat dialog (RAS-56)
 
 During a race another member's chat message shows as a pop-up, and the

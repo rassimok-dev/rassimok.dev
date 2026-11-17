@@ -23,14 +23,18 @@ its tries) stands beside it. RAS-46: the busy-join test passed without the
 the refocus after a changed list, `forgetRooms()` in create and in
 `lostPlayer`, one list after a failed re-join and the list after a leave
 are pinned. Every new test was checked against a mutation of the line it
-guards (22 mutations, each caught).
+guards (22 mutations, each caught). Review round 1 added one more: a 404 on
+Ready, Level or Start fetches the open rooms once more, so the list at the
+end of the action cannot be dropped unseen; and the Ready test now holds a
+re-join with the room shown, which fails without the fix.
 
 ### Decisions worth not relitigating
 
 - **Ready is disabled while an earlier lobby action is out.** A tap made
-  while the join's poll or another action was out was dropped by the logic
-  half without a sign. A queued tap was the other option; it would send an
-  action the player may no longer mean. A disabled button loses the
+  while another own action (a level change, the previous tap) or a re-join
+  was out was dropped by the logic half without a sign. A queued tap was
+  the other option; it would send an action the player may no longer mean.
+  A disabled button loses the
   keyboard focus in some browsers, and the button just pressed is always the
   one that goes busy, so the page remembers that Ready had the focus and
   gives it back when the button is enabled again, only if the focus is
@@ -70,7 +74,8 @@ guards (22 mutations, each caught).
   normal game started from the title replaces `#room=` in the URL (the write
   is `intro()` in `klad.js`, which knows nothing of the race; a fix needs a
   race flag there, and `klad.js` is held by other tickets). It now also
-  holds for a host. The lobby still keeps the room, so "Назад в комнату"
+  holds for a host, and the level in the URL goes with it until the next
+  level starts. The lobby still keeps the room, so "Назад в комнату"
   works; only a second reload loses the link.
 - `isFull` of a room line is not read anywhere. It stays until the user
   approves its removal.

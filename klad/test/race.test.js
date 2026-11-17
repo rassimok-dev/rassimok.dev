@@ -841,15 +841,15 @@ test('klad.js: startRace returns true for a level and shape it can play, and fal
   const { game } = loadGame();
 
   // when
-  const forValidLevel = game.startRace(1, 'landscape', raceHooks());
+  const isStartedForValidLevel = game.startRace(1, 'landscape', raceHooks());
   game.stopRace();
-  const forLevel99 = game.startRace(99, 'landscape', raceHooks());
-  const forUnknownShape = game.startRace(1, 'square', raceHooks());
+  const isStartedForLevel99 = game.startRace(99, 'landscape', raceHooks());
+  const isStartedForUnknownShape = game.startRace(1, 'square', raceHooks());
 
   // then
-  assert.equal(forValidLevel, true);
-  assert.equal(forLevel99, false);
-  assert.equal(forUnknownShape, false);
+  assert.equal(isStartedForValidLevel, true);
+  assert.equal(isStartedForLevel99, false);
+  assert.equal(isStartedForUnknownShape, false);
   assert.equal(game.racePosition(), null);
 });
 

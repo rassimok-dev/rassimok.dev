@@ -661,8 +661,7 @@ const KLAD_LOBBY = (() => {
 
     /* A live race socket keeps the room, and so does one that another tab
        took over: leaving here would end the race in that tab. The race
-       closes this dialog with isKeepingRoom when it needs the screen. A
-       join still out leaves in enter(). */
+       passes isKeepingRoom when it needs the screen. */
     function close(isKeepingRoom) {
       isOpen = false;
       phase = 'closed';
@@ -901,10 +900,9 @@ if (typeof document !== 'undefined') (() => {
     }
   }
 
-  /* A tap on Ready while an earlier action is out would be dropped, so the
-     button waits. A disabled button can lose the keyboard focus, so the
-     focus it had is given back when it is enabled again, unless it went
-     somewhere else meanwhile. */
+  /* Ready waits while an action is out, or its tap would be dropped. A
+     disabled button can lose the focus, so it is given back afterwards
+     unless it went somewhere else. */
   let wasReadyFocused = false;
 
   function renderReady(state, isLobby) {
@@ -953,6 +951,7 @@ if (typeof document !== 'undefined') (() => {
     main.hidden = !isReady;
     out.hidden = !isReady || state.roomId !== null;
     roomPart.hidden = !isReady || state.roomId === null;
+    if (roomPart.hidden) wasReadyFocused = false;
     if (isReady) renderOnline(state);
     if (isReady && state.roomId === null) renderRooms(state);
     if (isReady && state.roomId !== null) renderRoom(state);
@@ -1021,10 +1020,8 @@ if (typeof document !== 'undefined') (() => {
 
   document.addEventListener('visibilitychange', () => lobby.onVisibility());
   addEventListener('hashchange', openLink);
-  /* race.js opens the lobby again, closes it and leaves the room from its
-     finish screen; chat.js sends and hides members through it and reads the
-     state from klad:lobby. The flag is set only for an open dialog, whose
-     close event resets it. */
+  /* race.js and chat.js reach the lobby through this object. The flag is
+     set only for an open dialog, whose close event resets it. */
   function closeKeepingRoom() {
     if (!dialog.open) return;
     isKeepingRoom = true;

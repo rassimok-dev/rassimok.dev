@@ -121,9 +121,11 @@ closed or the tab is hidden:
 - In a room: `GET /rooms/<id>` every 10 s, plus once right after each own
   action (join, ready, level, start, and the host's listed switch), about
   360 an hour more. "Готов" is disabled while such an action is out, so a
-  tap is never dropped. Leaving is `POST /rooms/<id>/leave`, sent after the
-  open rooms are asked again, not in the same tick; closing the dialog
-  leaves too unless a race socket is live. After "Создать комнату" the page
+  tap is never dropped. Leaving is `POST /rooms/<id>/leave`; the open rooms are
+  asked again once it has answered, not in the same tick. Closing the dialog
+  leaves too, except when it keeps the room (a race socket is live, or a
+  replaced tab, or the race calls `closeKeepingRoom`; see the socket
+  paragraph below). After "Создать комнату" the page
   writes `#room=<id>` into the host's URL (`history.replaceState`, no
   `hashchange`), so a reload returns to the room.
 - A room id is checked against `^[A-Za-z0-9_-]{10}$` before any request;

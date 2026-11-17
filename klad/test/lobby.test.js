@@ -930,6 +930,7 @@ test('a failed re-join after a drop fetches the open rooms once, not twice', asy
   lobby.onVisibility();
   await clock.advance(90 * 1000);
   const before = count(server.calls, ROOM_LIST);
+  const release = server.hold(ONLINE_LIST);
 
   // when
   world.isVisible = true;
@@ -939,6 +940,7 @@ test('a failed re-join after a drop fetches the open rooms once, not twice', asy
   // then
   assert.equal(lobby.state().roomId, null);
   assert.equal(count(server.calls, ROOM_LIST) - before, 1);
+  release();
 });
 
 test('a re-join is tried once: a poll right after it that still misses this player ends the room view', async () => {
@@ -1067,6 +1069,27 @@ test('a 404 on an action shortly after the last sight of the room still says roo
   // then
   assert.equal(lobby.state().roomId, null);
   assert.equal(lobby.state().message, TEXT.roomNotFound);
+});
+
+test('a 404 on Ready, Level or Start shortly after the last sight of the room fetches the open rooms once more', async () => {
+  const actions = [
+    [READY, (lobby) => lobby.toggleReady()],
+    ['POST /klad/api/rooms/' + ID + '/level', (lobby) => lobby.chooseLevel(2)],
+    ['POST /klad/api/rooms/' + ID + '/start', (lobby) => lobby.start()],
+  ];
+  for (const [request, act] of actions) {
+    // given
+    const { lobby, server } = await joined({ [request]: [[404, { error: 'not_found' }]] });
+    const before = count(server.calls, ROOM_LIST);
+
+    // when
+    await act(lobby);
+    await settle();
+
+    // then
+    assert.equal(lobby.state().roomId, null, request);
+    assert.equal(count(server.calls, ROOM_LIST) - before, 1, request);
+  }
 });
 
 test('opening another room link leaves the room, so a failed join leaves no ghost member', async () => {
@@ -2421,7 +2444,7 @@ function loadLobbyPage(answers, { hash = '', isChatLoaded = false, isTimed = fal
   }
   const loadChat = () => vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'chat.js'), 'utf8'), sandbox);
   if (isChatLoaded) loadChat();
-  return { elements, registry, server, loadChat, advance, lobbyPage: () => vm.runInContext('KLAD_LOBBY.page', sandbox) };
+  return { elements, registry, server, document, listeners, loadChat, advance, lobbyPage: () => vm.runInContext('KLAD_LOBBY.page', sandbox) };
 }
 
 const textsOf = (node) => [node.textContent, ...node.children.flatMap((child) => (typeof child === 'string' ? [child] : textsOf(child)))];
@@ -3223,20 +3246,32 @@ test('lobby page: Ready does not take the focus back from another control', asyn
   assert.equal(page.registry.focused, page.elements['lobby-copy']);
 });
 
-test('lobby page: Ready is disabled during the first join and enabled once the room is shown', async () => {
+test('lobby page: Ready is disabled while a re-join after the sweep is out, with the room still shown', async () => {
   // given
-  const page = loadLobbyPage(JOINED_PAGE, { hash: '#room=' + ID });
-  const release = page.server.hold(JOIN);
+  const page = loadLobbyPage(JOINED_PAGE, { hash: '#room=' + ID, isTimed: true });
   await settle();
   const ready = page.elements['lobby-ready'];
-  const isDisabledDuringJoin = ready.disabled;
+  assert.equal(ready.disabled, false);
+  page.document.visibilityState = 'hidden';
+  page.listeners.visibilitychange[0]();
+  await page.advance(90 * 1000);
+  page.server.answers[POLL] = [[200, room({ players: [ANNA] })]];
+  const release = page.server.hold(JOIN);
+
+  // when
+  page.document.visibilityState = 'visible';
+  page.listeners.visibilitychange[0]();
+  await settle();
+
+  // then
+  assert.equal(page.elements['lobby-room'].hidden, false);
+  assert.equal(ready.disabled, true);
 
   // when
   release();
   await settle();
 
   // then
-  assert.equal(isDisabledDuringJoin, true);
   assert.equal(ready.disabled, false);
 });
 

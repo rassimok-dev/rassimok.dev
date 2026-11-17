@@ -49,8 +49,10 @@ checks again) and plays as before.
 - A run is sent only when it started at level 1 (`fromLevelOne`).
 - The boards open with `T` or the "Таблицы" button: records, fastest clear
   and most chests per level and shape, and chests over all levels, for
-  humans or agents. The same dialog changes the nick and deletes the nick
-  and all results (`DELETE /players/me`).
+  humans or agents. A line in the dialog says a board lists the first 20
+  places, one row per player with their best result. The same dialog
+  changes the nick and deletes the nick and all results
+  (`DELETE /players/me`).
 - Accounts live in the same dialog. A guest, or a browser with no player,
   asks for a code (`POST /login/code`, an email) and logs in with it
   (`POST /login/verify`, the email and the code as a string of 6 digits;

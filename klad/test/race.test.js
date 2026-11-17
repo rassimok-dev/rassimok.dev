@@ -789,7 +789,7 @@ function loadGame(options = {}) {
     getElementById: (id) => elements[id] || (elements[id] = element()),
     createElement: () => ({ getContext: () => ({ fillRect() {} }) }),
     querySelector: () => (isDialogOpen ? {} : null),
-    querySelectorAll: () => [],
+    querySelectorAll: () => options.pad || [],
     addEventListener() {},
     dispatchEvent: (event) => events.push(event.type),
   };
@@ -798,7 +798,10 @@ function loadGame(options = {}) {
     document,
     location: { hash: options.hash || '' },
     history: { replaceState: (state, title, hash) => hashes.push(hash) },
-    matchMedia: (query) => ({ matches: query === '(orientation: portrait)' && options.isPortrait === true }),
+    matchMedia: (query) => ({
+      matches: (query === '(orientation: portrait)' && options.isPortrait === true) ||
+        (query === '(hover: none) and (pointer: coarse)' && options.isTouch === true),
+    }),
     getComputedStyle: () => ({ getPropertyValue: () => '' }),
     addEventListener: (type, listener) => { windowListeners[type] = listener; },
     performance: { now: () => 0 },
@@ -856,6 +859,37 @@ test('klad.js: with six levels the title screen picks level 6 by the key 6 and b
   byStepping.key('Enter');
   byStepping.run(3);
   assert.equal(byStepping.hashes.at(-1), '#6');
+  byStepping.run(2);
+  byStepping.hold('ArrowRight', 1);
+  byStepping.run(3);
+  assert.equal(byStepping.title(), 'ТЫ ВЫБРАЛСЯ');
+  assert.match(byStepping.body(), /все этапы пройдены/);
+  assert.deepEqual(byStepping.events, ['klad:clear', 'klad:run']);
+});
+
+test('klad.js: the touch pad steps through the levels on the title screen and moves the runner in play', () => {
+  // given
+  const handlers = {};
+  const pad = ['left', 'right', 'fire'].map((name) => ({
+    dataset: { k: name },
+    setPointerCapture() {},
+    addEventListener(type, handler) { if (type === 'pointerdown') handlers[name] = handler; },
+  }));
+  const { body, run } = loadGame({ levels: SIX_LEVELS, pad, isTouch: true });
+  const press = (name) => handlers[name]({ preventDefault() {}, pointerId: 1 });
+
+  // when
+  press('left');
+  const afterLeft = body();
+  press('right');
+  press('right');
+  const afterRights = body();
+  press('fire');
+  run(3);
+
+  // then
+  assert.match(afterLeft, /этап 6 из 6/);
+  assert.match(afterRights, /этап 2 из 6/);
 });
 
 test('klad.js: a hash above the last level starts level 1 and a hash of 6 starts level 6', () => {

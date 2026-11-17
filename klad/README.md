@@ -12,7 +12,7 @@ proxy (below), it is self-contained on purpose so it can be removed in one go.
 | `index.html` | page: HUD, canvas, touch pad, footer, the nick prompt, boards, lobby (with the room chat), race and race chat dialogs, the HUD button Чат and the pop-up region |
 | `klad.css` | styles; defines the palette the game reads |
 | `klad.js` | engine: movement, guards (BFS chase), shots, holes, phases, render, input; holds while a dialog is open; the race hook `KLAD_GAME` |
-| `levels.js` | five levels, each in two shapes (landscape 24×16, portrait 16×24), with a `revision` |
+| `levels.js` | levels, each in two shapes (landscape 24×16, portrait 16×24), with a `revision` |
 | `ticks.js` | tick constants and the time formatter (`m:ss.cc`), also loaded by the node tests |
 | `online.js` | online part: nick prompt, sending clears and runs, the boards, accounts (login by emailed code, logout); its logic half is also loaded by the node tests |
 | `lobby.js` | the lobby: who is in it, rooms by invite link, ready marks, the host's level and Start, the room chat's messages (also the `chat` frames of the race socket), `after` number, send, member hides and the nicks two members share, and the one socket module (`KLAD_LOBBY.connect`) the race reuses; its logic half is also loaded by the node tests |

@@ -3,6 +3,83 @@
 Dated entries, newest first. Written for a reader picking this up cold —
 or a future session needing to know what already exists and why.
 
+## 2026-11-17 (later) - Lobby and race: test gaps, edge cases and a Ready that waits (RAS-38)
+
+The joint review of the lobby and the race (RAS-33 and RAS-34, round 2)
+and the round 2 review of the open rooms list (RAS-46) left test gaps and
+small edge cases. All of them are closed here, the user decided each one
+on 2026-11-17 (the recommendations on the ticket). Nothing on the API side
+changes.
+
+**Tests that now exist.** A reconnect during the countdown (state
+`starting`, then `go`) gives one engine start and the phase `racing`. The
+leave button during a held join that answers 0 or 503, with a new room link
+opened meanwhile, sends the leave and then joins the new room. The real
+`KLAD_GAME.startRace` returns true for a valid level and false for level 99
+or an unknown shape. The test called "went offline" drove a 1000 close, so
+it is renamed (race_over) and a real offline case (the socket gave up after
+its tries) stands beside it. RAS-46: the busy-join test passed without the
+`isBusy` guard, so a new one holds `POST /rooms` and then clicks a room;
+the refocus after a changed list, `forgetRooms()` in create and in
+`lostPlayer`, one list after a failed re-join and the list after a leave
+are pinned. Every new test was checked against a mutation of the line it
+guards (22 mutations, each caught). Review round 1 added one more: a 404 on
+Ready, Level or Start fetches the open rooms once more, so the list at the
+end of the action cannot be dropped unseen; and the Ready test now holds a
+re-join with the room shown, which fails without the fix.
+
+### Decisions worth not relitigating
+
+- **Ready is disabled while an earlier lobby action is out.** A tap made
+  while another own action (a level change, the previous tap) or a re-join
+  was out was dropped by the logic half without a sign. A queued tap was
+  the other option; it would send an action the player may no longer mean.
+  A disabled button loses the
+  keyboard focus in some browsers, and the button just pressed is always the
+  one that goes busy, so the page remembers that Ready had the focus and
+  gives it back when the button is enabled again, only if the focus is
+  nowhere (the body). Level, Start and link only are unchanged: they read
+  `isBusy` themselves or stay as before.
+- **The host's URL gets `#room=<id>` after a create**, with
+  `history.replaceState` (a `location.hash` write would fire `hashchange`
+  and open the room again). A host who reloads now joins by the link, like
+  everyone else. The URL keeps the link after the host leaves, as it does
+  for a joiner who leaves; a reload then joins that room again if it
+  still exists. Accepted.
+- **A tab whose race socket another tab replaced no longer leaves the room
+  when its lobby closes.** The socket module remembers a 1000 close with
+  the reason `replaced` (`wasReplaced()`), and `close()` counts it as live.
+  The reason is the contract's (section 8). Any other 1000 (`race_over`,
+  `idle`) still leaves, as the renamed test pins. Not verified here: that
+  the reason survives the Pages proxy into the browser; only production
+  shows it. If it does not, the tab behaves as before.
+- **Results while the lobby dialog is open keep the room.** `race.js`
+  closes the lobby through `KLAD_LOBBY.page.closeKeepingRoom()`, which sets
+  a one-shot flag only when the dialog is open, and the dialog's close event
+  passes it to `lobby.close(isKeepingRoom)`. The result no longer depends on
+  whether the socket's close event or the dialog's runs first. "Назад в
+  комнату" and the finish screen's other buttons decide the leave as before.
+- **A re-join that fails lists the open rooms once.** `poll()` lists only
+  after a plain room answer; `enter()` already lists after the failed join.
+- **The own leave asks for the open rooms after the leave has answered**,
+  not in the same tick, so the API cannot answer the list first and show
+  the room just left. A leave deferred behind a held join still lists at
+  once, as before: it has not been sent yet either way.
+- **`MAX_TICKS` is gone from `race.js`.** The cap is 250 s times the
+  `ticksPerSecond` the page gives (`KLAD_TICKS.PER_SECOND`), so the rate is
+  written once. A test with a rate of 60 pins it.
+- **Room list items have spaces between host, details and button**, so a
+  screen reader without CSS does not run the words together.
+- **Accepted, not fixed:** after a reload past the player's own finish, a
+  normal game started from the title replaces `#room=` in the URL (the write
+  is `intro()` in `klad.js`, which knows nothing of the race; a fix needs a
+  race flag there, and `klad.js` is held by other tickets). It now also
+  holds for a host, and the level in the URL goes with it until the next
+  level starts. The lobby still keeps the room, so "Назад в комнату"
+  works; only a second reload loses the link.
+- `isFull` of a room line is not read anywhere. It stays until the user
+  approves its removal.
+
 ## 2026-11-17 - Boards: a line says what a board lists (RAS-49)
 
 The boards dialog (`#board`) now carries one line in the dialog's note

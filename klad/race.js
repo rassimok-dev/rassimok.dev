@@ -16,7 +16,7 @@ const KLAD_RACE = (() => {
   const NOTICE_FOR = 8 * 1000;
   const SLOTS = 10;
   const LAST_CELL = 24;
-  const MAX_TICKS = (4 * 60 + 10) * 120;
+  const MAX_SECONDS = 4 * 60 + 10;
   const SHAPES = ['landscape', 'portrait'];
   const ACTIVE = ['starting', 'countdown', 'racing', 'finished'];
   const TEXT = {
@@ -36,6 +36,7 @@ const KLAD_RACE = (() => {
   /* environment and page are described in klad/README.md (Race). */
   function create(environment, page) {
     const { clock, engine, ticksPerSecond } = environment;
+    const maxTicks = MAX_SECONDS * ticksPerSecond;
     const ghosts = new Map();
     let socket = null;
     let phase = 'idle';
@@ -280,7 +281,7 @@ const KLAD_RACE = (() => {
        member cannot stretch the table. */
     function timeOf(ticks) {
       let time = null;
-      if (Number.isInteger(ticks)) time = ticks >= 0 && ticks <= MAX_TICKS ? environment.format(ticks) : '-';
+      if (Number.isInteger(ticks)) time = ticks >= 0 && ticks <= maxTicks ? environment.format(ticks) : '-';
       return time;
     }
 
@@ -321,7 +322,7 @@ if (typeof document !== 'undefined') (() => {
   const $ = (id) => document.getElementById(id);
   const canvas = $('game'), dialog = $('race'), heading = $('race-title'), levelLine = $('race-level'),
         countLine = $('race-count'), status = $('race-status'), results = $('race-results'), placesPart = $('race-places'),
-        notice = $('race-notice'), roomButton = $('race-room'), lobbyDialog = $('lobby');
+        notice = $('race-notice'), roomButton = $('race-room');
   const SHAPE = { landscape: 'широкое поле', portrait: 'высокое поле' };
   const clock = {
     now: () => Date.now(),
@@ -385,7 +386,7 @@ if (typeof document !== 'undefined') (() => {
      Only a change of phase opens or closes the dialog, so Escape stays closed. */
   function showDialogFor(phase) {
     const isDialogPhase = phase === 'countdown' || phase === 'results';
-    if ((isDialogPhase || phase === 'racing' || phase === 'finished') && lobbyDialog.open) lobbyDialog.close();
+    if (isDialogPhase || phase === 'racing' || phase === 'finished') KLAD_LOBBY.page.closeKeepingRoom();
     if (isDialogPhase && !dialog.open) dialog.showModal();
     else if (!isDialogPhase && dialog.open) dialog.close();
     if (phase === 'results') roomButton.focus();

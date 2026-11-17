@@ -743,16 +743,78 @@ test('a deferred leave is sent also when the held join fails with 5xx', async ()
   assert.equal(lobby.state().roomId, null);
 });
 
-test('closing the lobby after the race socket went offline leaves the room', async () => {
+test('closing the lobby after the server closed the race socket with 1000 race_over leaves the room', async () => {
   // given
   const { lobby, server, clock, sockets } = await joined({ [LEAVE]: [[204]] });
   server.answers[POLL] = [[200, room({ state: 'racing' })]];
   await clock.advance(KLAD_LOBBY.ROOM_EVERY);
-  sockets.made[0].onclose({ code: 1000 });
+  sockets.made[0].onclose({ code: 1000, reason: 'race_over' });
 
   // when
   lobby.close();
   await clock.advance(0);
+
+  // then
+  assert.equal(server.calls.includes(LEAVE), true);
+  assert.equal(lobby.state().roomId, null);
+});
+
+test('closing the lobby after the race socket gave up (offline) leaves the room', async () => {
+  // given
+  const { lobby, server, clock, sockets } = await joined({ [LEAVE]: [[204]] });
+  server.answers[POLL] = [[200, room({ state: 'racing' })]];
+  await clock.advance(KLAD_LOBBY.ROOM_EVERY);
+  for (let i = 0; i <= KLAD_LOBBY.SOCKET_TRIES; i++) {
+    sockets.made[i].onclose({ code: 1006 });
+    await clock.advance(KLAD_LOBBY.SOCKET_FIRST_WAIT * 2 ** i);
+  }
+  assert.equal(lobby.state().race, TEXT.raceUnavailable);
+
+  // when
+  lobby.close();
+  await clock.advance(0);
+
+  // then
+  assert.equal(server.calls.includes(LEAVE), true);
+  assert.equal(lobby.state().roomId, null);
+});
+
+test('closing the lobby in a tab whose race socket another tab replaced (1000 replaced) keeps the room and opens no second socket', async () => {
+  // given
+  const { lobby, server, clock, sockets } = await joined({ [LEAVE]: [[204]] });
+  server.answers[POLL] = [[200, room({ state: 'racing' })]];
+  await clock.advance(KLAD_LOBBY.ROOM_EVERY);
+  sockets.made[0].onopen();
+  sockets.made[0].onclose({ code: 1000, reason: 'replaced' });
+  await clock.advance(KLAD_LOBBY.ROOM_EVERY);
+  assert.equal(sockets.made.length, 1);
+
+  // when
+  lobby.close();
+  await clock.advance(0);
+
+  // then
+  assert.equal(server.calls.includes(LEAVE), false);
+  assert.equal(lobby.state().roomId, ID);
+});
+
+test('closing the lobby with isKeepingRoom keeps the room even after race_over closed the socket, and a later leave still works', async () => {
+  // given
+  const { lobby, server, clock, sockets } = await joined({ [LEAVE]: [[204]] });
+  server.answers[POLL] = [[200, room({ state: 'racing' })]];
+  await clock.advance(KLAD_LOBBY.ROOM_EVERY);
+  sockets.made[0].onclose({ code: 1000, reason: 'race_over' });
+
+  // when
+  lobby.close(true);
+  await clock.advance(0);
+
+  // then
+  assert.equal(server.calls.includes(LEAVE), false);
+  assert.equal(lobby.state().roomId, ID);
+
+  // when
+  await lobby.leave();
 
   // then
   assert.equal(server.calls.includes(LEAVE), true);
@@ -857,6 +919,28 @@ test('a re-join answered with room_full says room is full and polls no more', as
   assert.deepEqual(roomCalls(server.calls), [CREATE, POLL, POLL, JOIN]);
   assert.equal(lobby.state().roomId, null);
   assert.equal(lobby.state().message, TEXT.roomFull);
+});
+
+test('a failed re-join after a drop fetches the open rooms once, not twice', async () => {
+  // given
+  const full = room({ players: [ANNA, { ...ANNA, host: false }, { ...ANNA, host: false }, { ...ANNA, host: false }] });
+  const { lobby, server, clock, world } = await hosting({ [JOIN]: [[409, { error: 'room_full' }]] });
+  server.answers[POLL] = [[200, full]];
+  world.isVisible = false;
+  lobby.onVisibility();
+  await clock.advance(90 * 1000);
+  const before = count(server.calls, ROOM_LIST);
+  const release = server.hold(ONLINE_LIST);
+
+  // when
+  world.isVisible = true;
+  lobby.onVisibility();
+  await settle();
+
+  // then
+  assert.equal(lobby.state().roomId, null);
+  assert.equal(count(server.calls, ROOM_LIST) - before, 1);
+  release();
 });
 
 test('a re-join is tried once: a poll right after it that still misses this player ends the room view', async () => {
@@ -987,6 +1071,27 @@ test('a 404 on an action shortly after the last sight of the room still says roo
   assert.equal(lobby.state().message, TEXT.roomNotFound);
 });
 
+test('a 404 on Ready, Level or Start shortly after the last sight of the room fetches the open rooms once more', async () => {
+  const actions = [
+    [READY, (lobby) => lobby.toggleReady()],
+    ['POST /klad/api/rooms/' + ID + '/level', (lobby) => lobby.chooseLevel(2)],
+    ['POST /klad/api/rooms/' + ID + '/start', (lobby) => lobby.start()],
+  ];
+  for (const [request, act] of actions) {
+    // given
+    const { lobby, server } = await joined({ [request]: [[404, { error: 'not_found' }]] });
+    const before = count(server.calls, ROOM_LIST);
+
+    // when
+    await act(lobby);
+    await settle();
+
+    // then
+    assert.equal(lobby.state().roomId, null, request);
+    assert.equal(count(server.calls, ROOM_LIST) - before, 1, request);
+  }
+});
+
 test('opening another room link leaves the room, so a failed join leaves no ghost member', async () => {
   // given
   const { lobby, server } = await joined({ [OTHER_JOIN]: [[409, { error: 'room_full' }]], [LEAVE]: [[204]] });
@@ -1026,6 +1131,37 @@ test('the leave button while a join is out sends the leave only after the join a
   assert.equal(lobby.state().roomId, null);
   assert.equal(lobby.state().isBusy, false);
 });
+
+for (const [name, answer] of [['0 (offline)', [OFFLINE]], ['503', [503]]]) {
+  test('the leave button while a join is out that answers ' + name + ', with a new room link opened meanwhile, leaves and then joins the new room', async () => {
+    // given
+    const otherRoom = room({ id: OTHER });
+    const { lobby, server, clock } = setup({
+      ...PRESENCE, [JOIN]: [answer], [LEAVE]: [[204]],
+      [OTHER_JOIN]: [[200, otherRoom]], ['GET /klad/api/rooms/' + OTHER]: [[200, otherRoom]],
+    });
+    const release = server.hold(JOIN);
+    await lobby.open(ID);
+    await settle();
+
+    // when
+    lobby.leave();
+    await lobby.open(OTHER);
+    await settle();
+
+    // then
+    assert.deepEqual(roomCalls(server.calls), [JOIN]);
+
+    // when
+    release();
+    await clock.advance(0);
+
+    // then
+    assert.deepEqual(roomCalls(server.calls).slice(0, 3), [JOIN, LEAVE, OTHER_JOIN]);
+    assert.equal(lobby.state().roomId, OTHER);
+    assert.equal(lobby.state().isBusy, false);
+  });
+}
 
 test('a re-join that meets a network failure keeps the room, and the next poll tries once more', async () => {
   // given
@@ -1619,6 +1755,70 @@ test('the list is not asked while in a room, and once more after leaving it', as
   assert.equal(lobby.state().rooms.length, 4);
 });
 
+test('the list after leaving goes out only once the leave has answered', async () => {
+  // given
+  const { lobby, server } = await hosting({ ...LIST_OF(LISTED), [LEAVE]: [[204]] });
+  const before = count(server.calls, ROOM_LIST);
+  const release = server.hold(LEAVE);
+
+  // when
+  const leaving = lobby.leave();
+  await settle();
+
+  // then
+  assert.equal(count(server.calls, LEAVE), 1);
+  assert.equal(count(server.calls, ROOM_LIST), before);
+
+  // when
+  release();
+  await leaving;
+  await settle();
+
+  // then
+  assert.equal(count(server.calls, ROOM_LIST), before + 1);
+});
+
+test('the open rooms are forgotten when the player creates a room, and when the session is lost', async () => {
+  // given
+  const created = await hosting(LIST_OF(LISTED));
+
+  // then
+  assert.equal(created.lobby.state().rooms, null);
+
+  // given
+  const { lobby, server, clock } = setup(LIST_OF(LISTED));
+  await lobby.open();
+  await settle();
+  assert.equal(lobby.state().rooms.length, 4);
+  server.answers[HEARTBEAT] = [[401, { error: 'no_session' }]];
+
+  // when
+  await clock.advance(KLAD_LOBBY.PRESENCE_EVERY);
+
+  // then
+  assert.equal(lobby.state().phase, 'no-nick');
+  assert.equal(lobby.state().rooms, null);
+});
+
+test('joinFromList sends no join while a create is out', async () => {
+  // given
+  const { lobby, server } = setup({ ...LIST_OF(LISTED), [CREATE]: [[201, { id: ID }]], [JOIN]: [[200, room()]], [POLL]: [[200, room()]] });
+  await lobby.open();
+  await settle();
+  const release = server.hold(CREATE);
+  const creating = lobby.createRoom();
+  await settle();
+
+  // when
+  await lobby.joinFromList(ID);
+
+  // then
+  assert.equal(count(server.calls, JOIN), 0);
+  assert.equal(lobby.state().isBusy, true);
+  release();
+  await creating;
+});
+
 test('a list answer that arrives after joining a room is dropped', async () => {
   // given
   const { lobby, server } = setup({ ...LIST_OF(LISTED), [JOIN]: [[200, room()]], [POLL]: [[200, room()]] });
@@ -2182,9 +2382,11 @@ function stubNode(tag, registry) {
 }
 
 /* With isChatLoaded, chat.js runs after lobby.js in the same context, as
-   the page loads them. */
-function loadLobbyPage(answers, { hash = '', isChatLoaded = false } = {}) {
-  const registry = { focused: null, created: [], events: [] };
+   the page loads them. With isTimed, timers and Date.now follow advance()
+   instead of running at once. */
+function loadLobbyPage(answers, { hash = '', isChatLoaded = false, isTimed = false } = {}) {
+  const registry = { focused: null, created: [], events: [], urls: [] };
+  const clock = { time: 0, timers: new Map(), nextId: 1 };
   const elements = {};
   const listeners = {};
   const server = fakeServer(answers);
@@ -2212,14 +2414,37 @@ function loadLobbyPage(answers, { hash = '', isChatLoaded = false } = {}) {
     Option: function Option(text, value) { this.text = text; this.value = value; },
     CustomEvent: function CustomEvent(type, init) { this.type = type; this.detail = init && init.detail; },
     location: { protocol: 'https:', host: 'rassimok.dev', origin: 'test://rassimok.dev', hash },
+    history: { replaceState: (state, title, url) => registry.urls.push(url) },
     addEventListener() {},
     Date, setTimeout: () => 0, clearTimeout: () => {},
   };
+  if (isTimed) {
+    sandbox.Date = { now: () => clock.time };
+    sandbox.setTimeout = (task, wait) => {
+      clock.timers.set(clock.nextId, { at: clock.time + wait, task });
+      return clock.nextId++;
+    };
+    sandbox.clearTimeout = (id) => clock.timers.delete(id);
+  }
   vm.createContext(sandbox);
   vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'lobby.js'), 'utf8'), sandbox);
+  async function advance(milliseconds) {
+    const end = clock.time + milliseconds;
+    for (;;) {
+      let next = null;
+      for (const [id, timer] of clock.timers) if (timer.at <= end && (next === null || timer.at < next.at)) next = { id, ...timer };
+      if (next === null) break;
+      clock.timers.delete(next.id);
+      clock.time = next.at;
+      next.task();
+      await settle();
+    }
+    clock.time = end;
+    await settle();
+  }
   const loadChat = () => vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'chat.js'), 'utf8'), sandbox);
   if (isChatLoaded) loadChat();
-  return { elements, registry, server, loadChat };
+  return { elements, registry, server, document, listeners, loadChat, advance, lobbyPage: () => vm.runInContext('KLAD_LOBBY.page', sandbox) };
 }
 
 const textsOf = (node) => [node.textContent, ...node.children.flatMap((child) => (typeof child === 'string' ? [child] : textsOf(child)))];
@@ -2894,4 +3119,187 @@ test('a chat frame after the race is over, with the room back in the lobby, show
 
   // then
   assert.deepEqual(lobby.state().messages, []);
+});
+
+/* ---- page half: the room list, the host's URL, Ready and the close ---- */
+
+const spokenOf = (node) => (typeof node === 'string' ? node : node.textContent + node.children.map(spokenOf).join(''));
+const SECOND_LIST = (changes) => LIST_OF([{ ...LISTED[0], ...changes }, ...LISTED.slice(1)]);
+
+test('lobby page: the parts of a room item have spaces between them, so a screen reader without CSS reads words', async () => {
+  // given
+  const page = loadLobbyPage(LIST_OF(LISTED));
+
+  // when
+  page.elements['h-lobby'].listeners.click();
+  await settle();
+
+  // then
+  const items = page.elements['lobby-rooms'].children;
+  assert.equal(spokenOf(items[0]), 'Anna игроков 2 из 4, Этап 3: три, высокое поле Войти');
+  assert.equal(spokenOf(items[1]), 'Boris игроков 4 из 4, Этап 1: один, широкое поле заполнена');
+});
+
+test('lobby page: a changed list moves the focus to the new Войти button of the same room', async () => {
+  // given
+  const page = loadLobbyPage(LIST_OF(LISTED), { isTimed: true });
+  page.elements['h-lobby'].listeners.click();
+  await settle();
+  const before = buttonsOf(page.elements['lobby-rooms'])[0];
+  before.focus();
+  page.server.answers[ROOM_LIST] = SECOND_LIST({ players: 3 })[ROOM_LIST];
+
+  // when
+  await page.advance(KLAD_LOBBY.PRESENCE_EVERY);
+
+  // then
+  const after = buttonsOf(page.elements['lobby-rooms'])[0];
+  assert.notEqual(after, before);
+  assert.equal(page.registry.focused, after);
+  assert.equal(after.dataset.roomId, ID);
+});
+
+test('lobby page: when the focused room is full in the next list, the focus goes to Создать комнату', async () => {
+  // given
+  const page = loadLobbyPage(LIST_OF(LISTED), { isTimed: true });
+  page.elements['h-lobby'].listeners.click();
+  await settle();
+  buttonsOf(page.elements['lobby-rooms'])[0].focus();
+  page.server.answers[ROOM_LIST] = SECOND_LIST({ players: 4 })[ROOM_LIST];
+
+  // when
+  await page.advance(KLAD_LOBBY.PRESENCE_EVERY);
+
+  // then
+  assert.equal(buttonsOf(page.elements['lobby-rooms']).length, 0);
+  assert.equal(page.registry.focused, page.elements['lobby-create']);
+});
+
+test('lobby page: after Создать комнату the host\'s URL holds the room link, and a refused create writes nothing', async () => {
+  // given
+  const page = loadLobbyPage({ ...PRESENCE, [CREATE]: [[429, { error: 'too_many_rooms' }], [201, { id: ID }]], [POLL]: [[200, HOSTED]] });
+  page.elements['h-lobby'].listeners.click();
+  await settle();
+
+  // when
+  await page.elements['lobby-create'].listeners.click();
+  await settle();
+
+  // then
+  assert.deepEqual(page.registry.urls, []);
+
+  // when
+  await page.elements['lobby-create'].listeners.click();
+  await settle();
+
+  // then
+  assert.deepEqual(page.registry.urls, ['#room=' + ID]);
+});
+
+const JOINED_PAGE = { ...PRESENCE, [JOIN]: [[200, room()]], [POLL]: [[200, room()]], [LEAVE]: [[204]] };
+
+test('lobby page: Ready is disabled while an earlier action is out, and gets the keyboard focus back when it is enabled again', async () => {
+  // given
+  const page = loadLobbyPage({ ...JOINED_PAGE, [READY]: [[200, room({ players: [ANNA, { ...MINE, ready: true }] })]] }, { hash: '#room=' + ID });
+  await settle();
+  const ready = page.elements['lobby-ready'];
+  ready.focus();
+  assert.equal(ready.disabled, false);
+  const release = page.server.hold(READY);
+
+  // when
+  const tapped = ready.listeners.click();
+  await settle();
+  page.registry.focused = null;
+
+  // then
+  assert.equal(ready.disabled, true);
+
+  // when
+  release();
+  await tapped;
+  await settle();
+
+  // then
+  assert.equal(ready.disabled, false);
+  assert.equal(page.registry.focused, ready);
+});
+
+test('lobby page: Ready does not take the focus back from another control', async () => {
+  // given
+  const page = loadLobbyPage({ ...JOINED_PAGE, [READY]: [[200, room()]] }, { hash: '#room=' + ID });
+  await settle();
+  const ready = page.elements['lobby-ready'];
+  ready.focus();
+  const release = page.server.hold(READY);
+  const tapped = ready.listeners.click();
+  await settle();
+
+  // when
+  page.elements['lobby-copy'].focus();
+  release();
+  await tapped;
+  await settle();
+
+  // then
+  assert.equal(ready.disabled, false);
+  assert.equal(page.registry.focused, page.elements['lobby-copy']);
+});
+
+test('lobby page: Ready is disabled while a re-join after the sweep is out, with the room still shown', async () => {
+  // given
+  const page = loadLobbyPage(JOINED_PAGE, { hash: '#room=' + ID, isTimed: true });
+  await settle();
+  const ready = page.elements['lobby-ready'];
+  assert.equal(ready.disabled, false);
+  page.document.visibilityState = 'hidden';
+  page.listeners.visibilitychange[0]();
+  await page.advance(90 * 1000);
+  page.server.answers[POLL] = [[200, room({ players: [ANNA] })]];
+  const release = page.server.hold(JOIN);
+
+  // when
+  page.document.visibilityState = 'visible';
+  page.listeners.visibilitychange[0]();
+  await settle();
+
+  // then
+  assert.equal(page.elements['lobby-room'].hidden, false);
+  assert.equal(ready.disabled, true);
+
+  // when
+  release();
+  await settle();
+
+  // then
+  assert.equal(ready.disabled, false);
+});
+
+test('lobby page: closing the lobby for the race keeps the room, and the flag does not outlive an unopened dialog', async () => {
+  // given
+  const page = loadLobbyPage({ ...PRESENCE, [CREATE]: [[201, { id: ID }]], [POLL]: [[200, HOSTED]], [LEAVE]: [[204]] });
+  const dialog = page.elements.lobby;
+  page.elements['h-lobby'].listeners.click();
+  await settle();
+  await page.elements['lobby-create'].listeners.click();
+  await settle();
+
+  // when
+  page.lobbyPage().closeKeepingRoom();
+  dialog.listeners.close();
+  await settle();
+
+  // then
+  assert.equal(count(page.server.calls, LEAVE), 0);
+
+  // when the dialog is closed, closeKeepingRoom does nothing, so the next ordinary close leaves
+  page.lobbyPage().closeKeepingRoom();
+  page.elements['h-lobby'].listeners.click();
+  await settle();
+  dialog.close();
+  dialog.listeners.close();
+  await settle();
+
+  // then
+  assert.equal(count(page.server.calls, LEAVE), 1);
 });

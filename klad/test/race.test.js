@@ -77,7 +77,7 @@ function fakeEngine() {
   };
 }
 
-function setup(room = ROOM) {
+function setup(room = ROOM, ticksPerSecond = KLAD_TICKS.PER_SECOND) {
   const clock = fakeClock();
   const sockets = fakeSockets();
   const engine = fakeEngine();
@@ -87,7 +87,7 @@ function setup(room = ROOM) {
     clock,
     isVisible: () => world.isVisible,
     format: KLAD_TICKS.format,
-    ticksPerSecond: KLAD_TICKS.PER_SECOND,
+    ticksPerSecond,
     engine: { start: (level, shape) => engine.start(level, shape), stop: () => engine.stop(), position: () => engine.position },
   }, page);
   const socket = KLAD_LOBBY.connect('ws://test/klad/api/race/' + ID, sockets.FakeWebSocket, clock);
@@ -147,6 +147,30 @@ test('without a state message the race starts the polled room\'s level and shape
   say({ type: 'go', at: 1763000000000 });
   // then
   assert.deepEqual(engine.starts, [[2, 'landscape']]);
+});
+
+test('a reconnect during the countdown gets state starting and then go: one engine start, and the phase racing', () => {
+  // given
+  const { race, clock, engine, sockets, server, say } = setup();
+  server().onopen();
+  say(STATE);
+  say({ type: 'countdown', seconds: 3 });
+  clock.advance(1000);
+
+  // when
+  server().onclose({ code: NETWORK_DROP });
+  clock.advance(500);
+  server().onopen();
+  say({ ...STATE, state: 'starting' });
+  const phaseAfterState = race.state().phase;
+  say({ type: 'go', at: 1763000000000 });
+  clock.advance(5000);
+
+  // then
+  assert.equal(phaseAfterState, 'countdown');
+  assert.equal(sockets.made.length, 2);
+  assert.deepEqual(engine.starts, [[3, 'portrait']]);
+  assert.equal(race.state().phase, 'racing');
 });
 
 test('a second countdown or go changes nothing once the race runs', () => {
@@ -812,6 +836,23 @@ function raceHooks() {
   return hooks;
 }
 
+test('klad.js: startRace returns true for a level and shape it can play, and false for level 99 or an unknown shape', () => {
+  // given
+  const { game } = loadGame();
+
+  // when
+  const isStartedForValidLevel = game.startRace(1, 'landscape', raceHooks());
+  game.stopRace();
+  const isStartedForLevel99 = game.startRace(99, 'landscape', raceHooks());
+  const isStartedForUnknownShape = game.startRace(1, 'square', raceHooks());
+
+  // then
+  assert.equal(isStartedForValidLevel, true);
+  assert.equal(isStartedForLevel99, false);
+  assert.equal(isStartedForUnknownShape, false);
+  assert.equal(game.racePosition(), null);
+});
+
 test('klad.js: keys typed in a text field, such as the lobby chat, start no game and move no runner', () => {
   // given
   const { game, run, key, typeIn, title } = loadGame();
@@ -1030,12 +1071,23 @@ function loadRacePage() {
     querySelector: () => (Object.values(elements).some((element) => element.open) ? {} : null),
     addEventListener: (type, listener) => { documentListeners[type] = listener; },
   };
+  elements.lobby = node();
   const sandbox = {
     document,
     KLAD_LEVELS: [{ name: 'test' }, { name: 'test' }],
     KLAD_TICKS,
     KLAD_GAME: { startRace: () => true, stopRace() {}, racePosition: () => null },
-    KLAD_LOBBY: { page: { open: () => lobbyCalls.push('open'), leave: () => lobbyCalls.push('leave') } },
+    KLAD_LOBBY: {
+      page: {
+        open: () => lobbyCalls.push('open'),
+        leave: () => lobbyCalls.push('leave'),
+        closeKeepingRoom() {
+          if (!elements.lobby.open) return;
+          lobbyCalls.push('closeKeepingRoom');
+          elements.lobby.open = false;
+        },
+      },
+    },
     KLAD_CHAT: { page: { setRace: (isRacing) => raceCalls.push(isRacing) } },
     Date,
     setTimeout: () => 0,
@@ -1106,7 +1158,23 @@ test('race.js: a reload after the own finish closes the lobby and shows the wait
   assert.equal(elements.lobby.open, false);
   assert.equal(elements['race-notice'].textContent, TEXT.finishedWaiting);
   assert.equal(elements['race-status'].textContent, '');
-  assert.deepEqual(lobbyCalls, []);
+  assert.deepEqual(lobbyCalls, ['closeKeepingRoom']);
+});
+
+test('race.js: results that arrive while the lobby is open close it keeping the room, and send no leave', () => {
+  // given
+  const { elements, lobbyCalls, say, fireCloseEvents } = loadRacePage();
+  say({ type: 'go', at: 1763000000000 });
+  elements.lobby.open = true;
+
+  // when
+  say({ type: 'results', places: [] });
+  fireCloseEvents();
+
+  // then
+  assert.equal(elements.lobby.open, false);
+  assert.equal(elements.race.open, true);
+  assert.deepEqual(lobbyCalls, ['closeKeepingRoom']);
 });
 
 test('race.js: the chat is told the race is on only while racing or waiting after the own finish, and off at the countdown, the results and the end', () => {
@@ -1168,6 +1236,23 @@ test('a position outside the grid plus one cell makes no ghost', () => {
 
   // then
   assert.deepEqual(race.ghosts().map((ghost) => ghost.slot), [2]);
+});
+
+test('the race cap follows the tick rate the page gives: 250 s at 60 ticks a second is 15000 ticks', () => {
+  // given
+  const { race, say, server } = setup(ROOM, 60);
+  server().onopen();
+  say(STATE);
+  say({ type: 'go', at: 1763000000000 });
+
+  // when
+  say({ type: 'results', places: [
+    { slot: 1, nick: 'Anna', place: 1, ticks: 15001, left: false },
+    { slot: 0, nick: 'test', place: 2, ticks: 15000, left: false },
+  ] });
+
+  // then
+  assert.deepEqual(race.state().places.map((entry) => entry.time), ['-', '2:05.00']);
 });
 
 test('a time over the race cap shows as a dash in the results', () => {

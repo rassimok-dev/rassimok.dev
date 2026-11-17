@@ -20,9 +20,9 @@ proxy (below), it is self-contained on purpose so it can be removed in one go.
 | `race.js` | the ghost race on the lobby's socket: countdown, positions, ghosts, finish, the finish screen; its logic half is also loaded by the node tests |
 | `test/levels.test.js` | `node --test`: shape, legend, key-then-exit reachability, revision, fastest clear above the API floor |
 | `test/online.test.js` | `node --test`: `online.js` against a fake `fetch`: request shapes, when results wait or go, a skip during a save, blocked cookies, login codes, verify answers and merges, the read-back after a login, a login ending a skip, logout, 400, 401, 404, 409, 429, offline |
-| `test/lobby.test.js` | `node --test`: `lobby.js` against a fake `fetch`, a fake clock and a fake `WebSocket`: the room id form and the `#room=` link, the room view and the Start condition, the open rooms list (marks, join from it, empty, failed, the poll rate and the poll after leaving), link only, a non-member's room answer, presence and room polls only while open and visible, the poll after an own action, 404, 409 `room_full`, the socket at `starting` and at `racing` after a reload, once (backoff, 1008, the cap in all, its stop), the not-available text when the API drops a player whose socket never opened, the re-join after the sweep (heartbeat 204 not counted, a tap on Ready, 57 s, network failures, a poll answered after a hide), another link and the leave button during a join, the answers after the close, the request budget for an hour (also with one chat message sent), the chat transport (messages kept by `n`, the `after` number on the poll, a repeated, late or lost answer, hostile messages (also a kind other than `human` or `agent`), the cap of 30, the nicks two members share, the own message at once without moving `after`, the send as one request with no poll for 201, 400, 429, 404, 500, offline and 401, a poll in flight during a send kept, one at a time, an answer after leaving, the member hides and their reset in a new room, a re-join keeping them), and the page half in a `vm` context with a stub page (list items, a nick shown as text, the link-only box and switch, the "скрыть в чате" buttons, their hidden names and their focus, the member number for twin nicks and for a sender who left, the `klad:lobby` event, and `lobby.js` with `chat.js` in one context: a room link, the chat lines as text, one POST per message, a sender who left hidden from the line, `chat.js` loaded after the room answered), and the race socket's `chat` frames (kept at once, `after` unmoved, the poll after the race shows each once, hostile frames and a frame after the race ignored, never the own) |
+| `test/lobby.test.js` | `node --test`: `lobby.js` against a fake `fetch`, a fake clock and a fake `WebSocket`: the room id form and the `#room=` link, the room view and the Start condition, the open rooms list (marks, join from it, empty, failed, the poll rate and the poll after leaving), link only, a non-member's room answer, presence and room polls only while open and visible, the poll after an own action, 404, 409 `room_full`, the socket at `starting` and at `racing` after a reload, once (backoff, 1008, the cap in all, its stop), the not-available text when the API drops a player whose socket never opened, the re-join after the sweep (heartbeat 204 not counted, a tap on Ready, 57 s, network failures, a poll answered after a hide), another link and the leave button during a join (also a join that answers 0 or 503 with a new link opened meanwhile), the answers after the close, the request budget for an hour (also with one chat message sent), the chat transport (messages kept by `n`, the `after` number on the poll, a repeated, late or lost answer, hostile messages (also a kind other than `human` or `agent`), the cap of 30, the nicks two members share, the own message at once without moving `after`, the send as one request with no poll for 201, 400, 429, 404, 500, offline and 401, a poll in flight during a send kept, one at a time, an answer after leaving, the member hides and their reset in a new room, a re-join keeping them), and the page half in a `vm` context with a stub page (list items, a nick shown as text, the link-only box and switch, the "скрыть в чате" buttons, their hidden names and their focus, the member number for twin nicks and for a sender who left, the `klad:lobby` event, and `lobby.js` with `chat.js` in one context: a room link, the chat lines as text, one POST per message, a sender who left hidden from the line, `chat.js` loaded after the room answered), and the race socket closed by `race_over` or offline (leave) and by `replaced` (room kept), `close(true)`, one list after a failed re-join, the list after a leave only once it has answered, the list forgotten on create and on a lost session, no join while a create is out, and the page half: spaces in a room item, focus after a changed list, the host's `#room=` URL, Ready disabled while an action is out, `closeKeepingRoom`; and the race socket's `chat` frames (kept at once, `after` unmoved, the poll after the race shows each once, hostile frames and a frame after the race ignored, never the own) |
 | `test/chat.test.js` | `node --test`: `chat.js`'s logic half (the line marks, the name with the member number, the order, a hidden member and a twin with the same nick, "Скрыть чат", each message announced once and never the own, a new room, the texts for each send answer) and its page half in a `vm` context with a stub page and a stub `KLAD_LOBBY.page` (`<img src=x>` and a web address as text, Enter sends once and keeps the focus, the text kept on 400, 429, 404 and a failure and while typing during a send, a blank field, announcements once, the list rebuilt only on change, "Скрыть чат" and its emptied announcements, the part hidden until the room answered, a new room with an empty field, the "скрыть" on a line with its hidden name, a nick that becomes shared, the focus after a hide) and, in the race, a fake clock: the pop-up queue (the 6 s, at most 3, the newest of a batch, clear), the watchers, pop-ups as plain text without focus, none outside a race or over a dialog or for a hidden member or with the chat hidden, twin nicks, the button and the key C (guards, preventDefault), the dialog's send and focus, the race end closing it, the pop-up region and its CSS |
-| `test/race.test.js` | `node --test`: `race.js` on the lobby's real socket module with a fake `WebSocket`, a fake clock and a fake engine: the countdown and go, a missed go, the position rate only while racing, visible and in play, one ping timer across reconnects, finish once and its resend after a reconnect, ghosts by slot (slot 9 makes one, slot 10 none), their interpolation (midpoint, no step back, new attempt and long step at once, a pause, the cap, seen through `ghostSampleCount`, which exists for that test only), fade and resync, the results view (also with 10 places), close 1000, offline, a second race, a reload in the race and after the own finish; `race.js`'s page half in a `vm` context with stub dialogs: Escape on the finish screen leaves the room, "Назад в комнату" and go do not; and `klad.js` in a `vm` context with a stub page: the host's shape whatever the orientation, the exit and deaths in a race with no `klad:clear`, `klad:run` or game over, `stopRace`, ghosts drawn as canvas text, 10 slots in 10 colours, keys typed in a text field (the chat) starting no game and moving no runner, a dialog (the chat) holding the engine and the paused (not running) game after it closes, the pause screen naming the chat key only in a race, and the phases `race.js` reports to the chat |
+| `test/race.test.js` | `node --test`: `race.js` on the lobby's real socket module with a fake `WebSocket`, a fake clock and a fake engine: the countdown and go, a reconnect during the countdown (one start), a missed go, the position rate only while racing, visible and in play, one ping timer across reconnects, finish once and its resend after a reconnect, ghosts by slot (slot 9 makes one, slot 10 none), their interpolation (midpoint, no step back, new attempt and long step at once, a pause, the cap, seen through `ghostSampleCount`, which exists for that test only), fade and resync, the results view (also with 10 places), close 1000, offline, a second race, a reload in the race and after the own finish; `race.js`'s page half in a `vm` context with stub dialogs: Escape on the finish screen leaves the room, "Назад в комнату" and go do not, results while the lobby is open close it keeping the room, the race cap following the tick rate; and `klad.js` in a `vm` context with a stub page: the real `startRace` result (true, false for level 99), the host's shape whatever the orientation, the exit and deaths in a race with no `klad:clear`, `klad:run` or game over, `stopRace`, ghosts drawn as canvas text, 10 slots in 10 colours, keys typed in a text field (the chat) starting no game and moving no runner, a dialog (the chat) holding the engine and the paused (not running) game after it closes, the pause screen naming the chat key only in a race, and the phases `race.js` reports to the chat |
 | `test/proxy.test.js` | `node --test`: the API proxy against a fake `fetch` |
 | `test/ticks.test.js` | `node --test`: the time formatter |
 | `MECHANICS.md` | the original rules as reconstructed from sources |
@@ -106,8 +106,9 @@ closed or the tab is hidden:
   from one: about 360 requests an hour in all. Nothing asks for it inside a
   room, while the tab is hidden or with the dialog closed.
 - The list shows one line per room (host nick, `players` of `size`, level,
-  shape) with a "Войти" button that calls the lobby's join; a full, starting
-  or racing room is marked and has no button. The headings count both lists
+  shape, with a space between the parts for a screen reader) with a "Войти"
+  button that calls the lobby's join; a full, starting or racing room is
+  marked and has no button. The headings count both lists
   ("Сейчас в лобби: N", "Открытые комнаты: N"). An empty list points to
   "Создать комнату"; a failed list request says the server is not answering
   while the rest of the lobby works. Link only: a checkbox before
@@ -118,8 +119,13 @@ closed or the tab is hidden:
   reads as "no member" like any room this player was dropped from. Nicks
   from the list go in with `textContent` only.
 - In a room: `GET /rooms/<id>` every 10 s, plus once right after each own
-  action (join, ready, level, start), about 360 an hour more. Leaving is
-  `POST /rooms/<id>/leave`; closing the dialog leaves too unless a race socket is live.
+  action (join, ready, level, start, and the host's listed switch), about
+  360 an hour more. "Готов" is disabled while such an action is out, so a
+  tap is never dropped. Leaving is `POST /rooms/<id>/leave`, sent after the
+  open rooms are asked again, not in the same tick; closing the dialog
+  leaves too unless a race socket is live. After "Создать комнату" the page
+  writes `#room=<id>` into the host's URL (`history.replaceState`, no
+  `hashchange`), so a reload returns to the room.
 - A room id is checked against `^[A-Za-z0-9_-]{10}$` before any request;
   a malformed one, a 404 and a 409 `room_full` each show their message.
 - When a polled room is `starting`, or `racing` (a reload in the race; the
@@ -129,7 +135,8 @@ closed or the tab is hidden:
   on: it dispatches `klad:race` on `document` with `detail.room` (the polled
   room: id, level, shape, players) and `detail.socket` (`send(object)`,
   `on('message', listener)` for parsed JSON frames, `on('status',
-  listener)`, `status()`, `hasOpened()`, `close(isLeaving)`, `hasLeft()`). The race listens for
+  listener)`, `status()`, `hasOpened()`, `close(isLeaving)`, `hasLeft()`,
+  `wasReplaced()`: the close was 1000 `replaced`). The race listens for
   that event; the lobby only shows a waiting line. A dropped socket tries
   again after 0.5, 1, 2 and 4 s, then reports `offline` and stops; an open
   starts the waits again, but one `connect()` reconnects at most 8 times
@@ -139,9 +146,13 @@ closed or the tab is hidden:
   such a socket is still trying (the API drops a member not connected 15 s
   after Start). The lobby closes the socket on leaving and once the room
   is back in the lobby state. Closing the dialog leaves the room unless a
-  race socket is live (not `closed` or `offline`); the waiting line shows
-  only while the room is `starting`. `KLAD_LOBBY.page` (`open()`, `leave()`) lets
-  the race's finish screen open the lobby again or leave the room;
+  race socket is live (not `closed` or `offline`) or another tab replaced it
+  (1000 `replaced`: leaving would end the race in that tab); the waiting line
+  shows only while the room is `starting`. `KLAD_LOBBY.page` (`open()`,
+  `closeKeepingRoom()`, `leave()`) lets the race close the lobby without
+  leaving the room (`close(isKeepingRoom)`, so the order of the socket's and
+  the dialog's close events does not matter), and its finish screen open the
+  lobby again or leave the room;
   `sendMessage(text)` and `toggleMemberHidden(member)` are the chat's.
 - The room marks the caller's own entry with `you`, so the lobby finds this
   player by it (nicks may repeat among guests). An empty room (host null,
@@ -245,7 +256,7 @@ socket or reconnect loop of its own. Other players cannot change this
 player's game: no shared world, no collision.
 
 - The server's `state` (sent on every connect) gives the level, the host's
-  shape and each player's `slot`. `countdown` closes the lobby dialog and
+  shape and each player's `slot`. `countdown` closes the lobby dialog (`closeKeepingRoom()`) and
   shows 3, 2, 1 a second apart in the race dialog; `go` closes it and starts
   the level fresh in the host's shape, whatever this device's orientation.
   A `state` that says `racing` before any `go` starts it too, unless it

@@ -13,6 +13,7 @@ const KLAD_LOBBY = (() => {
   const SOCKET_FIRST_WAIT = 500;
   const NORMAL_CLOSE = 1000;
   const POLICY_CLOSE = 1008;
+  const REPLACED_REASON = 'replaced';
   const FIRST_SHAPE = 'landscape';
   const ROOM_LINK = '#room=';
   const ROOM_ID = /^[A-Za-z0-9_-]{10}$/;
@@ -134,6 +135,7 @@ const KLAD_LOBBY = (() => {
     let status = 'connecting';
     let hasOpened = false;
     let hasLeft = false;
+    let wasReplaced = false;
 
     function report(next) {
       status = next;
@@ -151,9 +153,10 @@ const KLAD_LOBBY = (() => {
       for (const listener of listeners.message) listener(message);
     }
 
-    function dropped(code) {
+    function dropped(code, reason) {
       socket = null;
       if (code === NORMAL_CLOSE) {
+        wasReplaced = reason === REPLACED_REASON;
         report('closed');
       } else if (code === POLICY_CLOSE || tries >= SOCKET_TRIES || reconnects >= SOCKET_RECONNECTS) {
         report('offline');
@@ -187,7 +190,7 @@ const KLAD_LOBBY = (() => {
         report('open');
       };
       current.onmessage = (event) => { if (current === socket) receive(event.data); };
-      current.onclose = (event) => { if (current === socket) dropped(event.code); };
+      current.onclose = (event) => { if (current === socket) dropped(event.code, event.reason); };
     }
 
     function send(message) {
@@ -216,6 +219,7 @@ const KLAD_LOBBY = (() => {
       status: () => status,
       hasOpened: () => hasOpened,
       hasLeft: () => hasLeft,
+      wasReplaced: () => wasReplaced,
     };
   }
 
@@ -416,11 +420,12 @@ const KLAD_LOBBY = (() => {
       }
       if (wasLongUnseen && wasDropped(answer)) {
         if (isActive()) await enter();
+        page.render();
       } else {
         take(answer, true);
+        page.render();
+        if (roomId === null) listRooms();
       }
-      page.render();
-      if (roomId === null) listRooms();
     }
 
     /* The open rooms, only while the player is in no room. An answer that
@@ -606,11 +611,12 @@ const KLAD_LOBBY = (() => {
       page.render();
     }
 
-    /* The player's own leave: the open rooms are fetched once more. */
+    /* The player's own leave: the open rooms are fetched once more, after
+       the leave has answered, so the list does not still count this player. */
     function leaveRoom() {
       const wasInRoom = roomId !== null;
       const sent = leave();
-      if (wasInRoom) listRooms();
+      if (wasInRoom) sent.then(() => listRooms());
       return sent;
     }
 
@@ -653,13 +659,16 @@ const KLAD_LOBBY = (() => {
       resume();
     }
 
-    /* A live race socket keeps the room: the race closes this dialog to
-       play. A join still out leaves in enter(). */
-    function close() {
+    /* A live race socket keeps the room, and so does one that another tab
+       took over: leaving here would end the race in that tab. The race
+       closes this dialog with isKeepingRoom when it needs the screen. A
+       join still out leaves in enter(). */
+    function close(isKeepingRoom) {
       isOpen = false;
       phase = 'closed';
-      const isRaceLive = socket !== null && socket.status() !== 'closed' && socket.status() !== 'offline';
-      if (!isJoining && roomId !== null && !isRaceLive) leave();
+      const isRaceLive = socket !== null
+        && (socket.wasReplaced() || (socket.status() !== 'closed' && socket.status() !== 'offline'));
+      if (!isJoining && roomId !== null && !isRaceLive && isKeepingRoom !== true) leave();
       resume();
     }
 
@@ -704,7 +713,7 @@ const KLAD_LOBBY = (() => {
   }
 
   return {
-    create, connect, roomIdOf, inviteMailto, isRoomId, raceUrl, roomView, sharedNicks, TEXT,
+    create, connect, ROOM_LINK, roomIdOf, inviteMailto, isRoomId, raceUrl, roomView, sharedNicks, TEXT,
     PRESENCE_EVERY, ROOM_EVERY, SWEEP_AFTER, REJOIN_AFTER, SOCKET_TRIES, SOCKET_RECONNECTS, SOCKET_FIRST_WAIT,
     CHAT_KEPT,
   };
@@ -797,7 +806,7 @@ if (typeof document !== 'undefined') (() => {
     const details = document.createElement('span');
     details.className = 'kind';
     details.textContent = 'игроков ' + line.players + ' из ' + line.size + ', ' + levelText(line);
-    item.append(host, details);
+    item.append(host, ' ', details, ' ');
     if (line.canJoin) {
       const button = document.createElement('button');
       button.type = 'button';
@@ -892,6 +901,21 @@ if (typeof document !== 'undefined') (() => {
     }
   }
 
+  /* A tap on Ready while an earlier action is out would be dropped, so the
+     button waits. A disabled button can lose the keyboard focus, so the
+     focus it had is given back when it is enabled again, unless it went
+     somewhere else meanwhile. */
+  let wasReadyFocused = false;
+
+  function renderReady(state, isLobby) {
+    if (state.isBusy && document.activeElement === readyButton) wasReadyFocused = true;
+    readyButton.disabled = !isLobby || state.isBusy;
+    if (state.isBusy || !wasReadyFocused) return;
+    wasReadyFocused = false;
+    const active = document.activeElement;
+    if (isLobby && (active === null || active === document.body)) readyButton.focus();
+  }
+
   function renderRoom(state) {
     const view = state.room;
     const isLobby = Boolean(view && view.state === 'lobby');
@@ -910,7 +934,7 @@ if (typeof document !== 'undefined') (() => {
     if (view && (document.activeElement !== levelSelect || !state.isBusy)) levelSelect.value = String(view.level);
     levelSelect.disabled = !isLobby;
     readyButton.hidden = !view;
-    readyButton.disabled = !isLobby;
+    renderReady(state, isLobby);
     readyButton.setAttribute('aria-pressed', String(Boolean(view && view.isReady)));
     startButton.hidden = !(view && view.canStart);
     startNote.textContent = view && view.isHost && isLobby && !view.canStart
@@ -918,8 +942,9 @@ if (typeof document !== 'undefined') (() => {
     raceLine.textContent = state.race || (view && view.state === 'racing' ? 'В комнате идёт гонка.' : '');
   }
 
-  /* Buttons are not disabled while a request is out: a disabled button
-     loses the keyboard focus, and the logic half drops a second action. */
+  /* Buttons stay enabled while a request is out: a disabled button loses the
+     keyboard focus, and the logic half drops a second action. Ready is the
+     one exception (renderReady). */
   function render() {
     const state = lobby.state();
     const isReady = state.phase === 'ready';
@@ -955,15 +980,20 @@ if (typeof document !== 'undefined') (() => {
 
   $('h-lobby').addEventListener('click', () => showLobby());
   $('lobby-close').addEventListener('click', () => dialog.close());
+  let isKeepingRoom = false;
   dialog.addEventListener('close', () => {
-    lobby.close();
+    lobby.close(isKeepingRoom);
+    isKeepingRoom = false;
     backToGame();
   });
   $('nick').addEventListener('close', () => { if (lobby.afterNick()) showLobby(); });
   $('lobby-choose').addEventListener('click', () => lobby.askNick());
 
+  /* replaceState fires no hashchange, so the new room is not joined again. */
   createButton.addEventListener('click', async () => {
     await lobby.createRoom(!privateBox.checked);
+    const { roomId } = lobby.state();
+    if (roomId !== null) history.replaceState(null, '', KLAD_LOBBY.ROOM_LINK + roomId);
     if (!roomPart.hidden) copyButton.focus();
   });
   copyButton.addEventListener('click', async () => {
@@ -991,11 +1021,17 @@ if (typeof document !== 'undefined') (() => {
 
   document.addEventListener('visibilitychange', () => lobby.onVisibility());
   addEventListener('hashchange', openLink);
-  /* race.js opens the lobby again and leaves the room from its finish
-     screen; chat.js sends and hides members through it and reads the state
-     from klad:lobby. */
+  /* race.js opens the lobby again, closes it and leaves the room from its
+     finish screen; chat.js sends and hides members through it and reads the
+     state from klad:lobby. The flag is set only for an open dialog, whose
+     close event resets it. */
+  function closeKeepingRoom() {
+    if (!dialog.open) return;
+    isKeepingRoom = true;
+    dialog.close();
+  }
   KLAD_LOBBY.page = {
-    open: () => showLobby(), leave: () => lobby.leave(), sendMessage: (text) => lobby.sendMessage(text),
+    open: () => showLobby(), closeKeepingRoom, leave: () => lobby.leave(), sendMessage: (text) => lobby.sendMessage(text),
     toggleMemberHidden: (member) => lobby.toggleMemberHidden(member),
   };
   openLink();

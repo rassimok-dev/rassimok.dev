@@ -340,8 +340,8 @@ const KLAD_GAME = (() => {
   function title() {
     loadLevel(S.level);
     show('КЛАД', touch
-      ? 'ОГОНЬ — старт · крестовина — ход · этап ' + (S.level + 1)
-      : '← → ↑ ↓ ход · Z/пробел выстрел · P пауза · R заново (−1 жизнь) · M звук · T таблицы · 1–5 этап · Enter старт');
+      ? 'ОГОНЬ — старт · крестовина — ход · ← → этап ' + (S.level + 1) + ' из ' + LEVELS.length
+      : '← → ↑ ↓ ход · Z/пробел выстрел · P пауза · R заново (−1 жизнь) · M звук · T таблицы · на заставке ← → или 1–' + Math.min(9, LEVELS.length) + ': этап ' + (S.level + 1) + ' из ' + LEVELS.length + ' · Enter старт');
     setPhase('title');
   }
   function timers(dt) {
@@ -357,7 +357,7 @@ const KLAD_GAME = (() => {
       if (S.level >= LEVELS.length) {
         S.level = 0;
         report('klad:run', { ...run, score: S.score });
-        show('ТЫ ВЫБРАЛСЯ', 'все пять этапов пройдены · счёт ' + S.score);
+        show('ТЫ ВЫБРАЛСЯ', 'все этапы пройдены · счёт ' + S.score);
         setPhase('won');
       } else intro();
     }
@@ -485,6 +485,10 @@ const KLAD_GAME = (() => {
       else { hide(); setPhase('play'); }
     } else if (action === 'restart' && S.phase === 'play') die();
   }
+  function stepLevel(step) {
+    S.level = (S.level + step + LEVELS.length) % LEVELS.length;
+    title();
+  }
   const isTyping = (e) => /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName);
   /* Space and Enter on a focused HUD button press the button, not fire. The
      pad buttons have no click handler, so keys on them still play. */
@@ -495,16 +499,21 @@ const KLAD_GAME = (() => {
     if (e.repeat) { if (KEYMAP[e.code]) e.preventDefault(); return; }
     audio();
     if (e.code === 'KeyM') { setMuted(!muted); return; }
+    if (S.phase === 'title' && (e.code === 'ArrowLeft' || e.code === 'ArrowRight')) { stepLevel(e.code === 'ArrowLeft' ? -1 : 1); e.preventDefault(); return; }
     if (KEYMAP[e.code]) { keys[KEYMAP[e.code]] = true; e.preventDefault(); return; }
     if (e.code === 'Space' || e.code === 'KeyZ' || e.code === 'KeyX' || e.code === 'Enter') { press('fire'); e.preventDefault(); }
     else if (e.code === 'KeyP' || e.code === 'Escape') press('pause');
     else if (e.code === 'KeyR') press('restart');
-    else if (S.phase === 'title' && /^Digit[1-5]$/.test(e.code)) { S.level = +e.code[5] - 1; title(); }
+    else if (S.phase === 'title' && /^Digit[1-9]$/.test(e.code) && +e.code[5] <= LEVELS.length) { S.level = +e.code[5] - 1; title(); }
   });
   addEventListener('keyup', (e) => { if (KEYMAP[e.code]) keys[KEYMAP[e.code]] = false; });
   for (const b of document.querySelectorAll('[data-k]')) {
     const k = b.dataset.k;
-    const down = (e) => { e.preventDefault(); b.setPointerCapture(e.pointerId); audio(); if (k === 'fire') press('fire'); else keys[k] = true; };
+    const down = (e) => { e.preventDefault(); b.setPointerCapture(e.pointerId); audio();
+      if (k === 'fire') press('fire');
+      else if (S.phase === 'title' && (k === 'left' || k === 'right')) stepLevel(k === 'left' ? -1 : 1);
+      else keys[k] = true;
+    };
     const up = () => { if (k !== 'fire') keys[k] = false; };
     b.addEventListener('pointerdown', down);
     b.addEventListener('pointerup', up);

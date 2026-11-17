@@ -794,9 +794,9 @@ function loadGame(options = {}) {
     dispatchEvent: (event) => events.push(event.type),
   };
   const sandbox = {
-    KLAD_LEVELS: TEST_LEVELS,
+    KLAD_LEVELS: options.levels || TEST_LEVELS,
     document,
-    location: { hash: '' },
+    location: { hash: options.hash || '' },
     history: { replaceState: (state, title, hash) => hashes.push(hash) },
     matchMedia: (query) => ({ matches: query === '(orientation: portrait)' && options.isPortrait === true }),
     getComputedStyle: () => ({ getPropertyValue: () => '' }),
@@ -828,6 +828,45 @@ function loadGame(options = {}) {
   const body = () => elements['msg-body'].textContent;
   return { game, events, texts, hashes, elements, run, key, hold, typeIn, title, body, setDialogOpen };
 }
+
+const SIX_LEVELS = Array.from({ length: 6 }, (unused, index) => ({ ...TEST_LEVELS[0], name: 'level ' + (index + 1) }));
+
+test('klad.js: with six levels the title screen picks level 6 by the key 6 and by stepping, and the texts follow the count', () => {
+  // given
+  const byKey = loadGame({ levels: SIX_LEVELS });
+  const byStepping = loadGame({ levels: SIX_LEVELS });
+  const wrapping = loadGame({ levels: SIX_LEVELS });
+  const shortList = loadGame();
+
+  // when
+  byKey.key('Digit6');
+  for (let step = 0; step < 5; step++) byStepping.key('ArrowRight');
+  wrapping.key('ArrowLeft');
+  shortList.key('Digit6');
+  const shortTitle = shortList.body();
+  shortList.key('ArrowRight');
+
+  // then
+  assert.match(byKey.body(), /этап 6 из 6/);
+  assert.match(byKey.body(), /1–6/);
+  assert.match(byStepping.body(), /этап 6 из 6/);
+  assert.match(wrapping.body(), /этап 6 из 6/);
+  assert.match(shortTitle, /этап 1 из 1/);
+  assert.match(shortList.body(), /этап 1 из 1/);
+  byStepping.key('Enter');
+  byStepping.run(3);
+  assert.equal(byStepping.hashes.at(-1), '#6');
+});
+
+test('klad.js: a hash above the last level starts level 1 and a hash of 6 starts level 6', () => {
+  // given
+  const sixth = loadGame({ levels: SIX_LEVELS, hash: '#6' });
+  const beyond = loadGame({ levels: SIX_LEVELS, hash: '#7' });
+
+  // then
+  assert.match(sixth.body(), /этап 6 из 6/);
+  assert.match(beyond.body(), /этап 1 из 6/);
+});
 
 function raceHooks() {
   const hooks = { finishes: [], ghostList: [] };

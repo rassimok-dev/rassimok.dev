@@ -3,6 +3,38 @@
 Dated entries, newest first. Written for a reader picking this up cold —
 or a future session needing to know what already exists and why.
 
+## 2026-11-17 (later still) - Klad: the game shell works with more than five levels (RAS-63)
+
+New levels above 5 are planned. The game already followed `KLAD_LEVELS`
+for the lobby, the boards and the hash; this entry removes the number five
+from the rest. On the title screen left and right (the arrow keys and the
+touch pad's left and right buttons) step through the levels, and the keys 1
+to 9 stay shortcuts (a key above the level count does nothing, as before).
+Touch players get a level choice this way. The title text shows the current
+level and the count from `LEVELS.length`; the win text says "все этапы
+пройдены"; the home page, the game page's meta description,
+`klad/README.md` and `MECHANICS.md` say "levels" without a count. The user
+decided Q1 a and Q2 a. With five levels the game plays as before; the
+sixth level is checked only on a Pages preview with a test level, never
+merged.
+
+### Decisions worth not relitigating
+
+- **Stepping wraps** (right on the last level goes to level 1, left on level
+  1 to the last): with ten levels it saves up to nine presses and a touch
+  player has only these two buttons.
+- **Only the arrow keys step, not A and D**, and only on the title screen;
+  in play they move the runner as before, and on the title screen they no
+  longer set the move keys, so nothing is held when the game starts.
+- **Digits stay 1 to 9** (`Digit1` to `Digit9`); level 10 and above are
+  reached by stepping or the hash. The title text names the digit range as
+  1 to min(9, count).
+- The hash rule is unchanged: `/klad/#n` starts level n, above the last level
+  starts level 1.
+- The unit test runs `klad.js` in the vm sandbox of `race.test.js` with six
+  levels (key 6, stepping, wrap, hash 6 and 7). The touch pad's step is not
+  in the stub page and is checked by hand on the preview.
+
 ## 2026-11-17 (later) - Lobby and race: test gaps, edge cases and a Ready that waits (RAS-38)
 
 The joint review of the lobby and the race (RAS-33 and RAS-34, round 2)

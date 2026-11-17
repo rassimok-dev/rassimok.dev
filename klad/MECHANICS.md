@@ -42,8 +42,8 @@ ameblo «ライズアウト (MSX)» player write-up; idpixel. MobyGames, GoodOld
 - MSX: CTRL+P password entry, CTRL+R restart level (costs a life).
 
 ## Our deviations (deliberate)
-- 5 levels, our own layouts, same lesson order as Korvet 1-4: wall up a guard; outrun guards;
-  wall up several; trick a guard; 5 = everything together.
+- Several levels, our own layouts, same lesson order as Korvet 1-4: wall up a guard; outrun guards;
+  wall up several; trick a guard; 5 = everything together (later levels are new).
 - Level code = URL hash (no storage). Two shapes per level (landscape/portrait).
 - Fire left out of v1 until behaviour is confirmed.
 - A wall that regrows while the player stands in the gap waits for them to leave

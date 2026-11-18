@@ -118,7 +118,7 @@ for (const shape of ['landscape', 'portrait']) {
     assert.equal(play.lives(), 3);
   });
 
-  test(`level 6 ${shape}: the same way without the shots keeps the runner in the start shaft, away from the key`, () => {
+  test(`level 6 ${shape}: the same way without the shots never reaches the key`, () => {
     // given
     const play = playLevel(LEVEL, shape);
 

@@ -57,7 +57,8 @@ door and the exit, with the guards climbing alongside behind the columns.
   The safe rows are the far side's short ladder, right under the guard's
   ledge. One row higher the tunnel ends at the ledge's stone (harmless);
   higher still the guard comes through; one row lower the runner falls
-  into the pool. So the lesson is the height, not luck.
+  into the pool. So the lesson is mostly the height (see the walling-up
+  trick under How it was checked).
 - **Small pools, not a deadly floor:** one tile of water at the foot of
   each column on its far side, and one in the corner of a ledge in the
   start shaft beside a chest. The two short ladders end over air above a
@@ -74,7 +75,7 @@ door and the exit, with the guards climbing alongside behind the columns.
 - **Both shapes hold the lesson** (S1 a). The columns are 20 rows tall in
   portrait and 12 in landscape; there the guards' ladders reach rows 3 to
   6 and 3 to 9, and the safe rows are 8 to 9 and 11 to 12.
-- guardSpeed 3.5, between level 4's 3.3 and level 5's 3.8; here it only
+- guardSpeed 3.5, the fastest so far (levels 1 to 5 run 3.0 to 3.3); here it only
   sets how fast a guard walks along its ledge and through a wrong tunnel.
   The name is an imperative like the other level names and hints at the
   lesson without giving the rows away.
@@ -109,12 +110,19 @@ door and the exit, with the guards climbing alongside behind the columns.
   the safe rows and the harmless row at the ledge survive. Every guard row
   again with waits of 0 to 4 s before the shots, with and without 1 s
   between them: 228 attempts, all fatal.
-- Argued, not searched: that no timing opens a guard row. A guard reaches
-  its ledge before the quickest runner reaches its row, then climbs at the
-  runner's speed, and a column can only be shot from the row it is broken
-  on. No guard falls into a shot hole on any scripted way, so the late-fall
-  quirk of the RAS-64 entry does not arise. Not played by hand; the user's
-  play on the preview stands in.
+- A timing trick exists (found by the review on the real klad.js, both
+  shapes): two shots from the start ladder on the first guard's ledge
+  row, about 4 s apart (gaps of 3.60 to 3.70 s and 3.84 to 4.19 s work),
+  wall that guard up inside the first column; the runner can then break
+  the rows above and stand on its ladder, and shots at range from there
+  lure the second guard out of its shaft. This is the walling-in of the
+  RAS-60 chase. Not searched: whether a runner can then reach the empty
+  shaft and skip the first column's safe rows. The second column's safe
+  rows above its pool stay required even with no guards. Kept as a
+  skilled trick for the user's play on the preview; a redraw (no open
+  rows between the guards' ladders above the first ledge) is the other
+  option. Not played by hand; the user's play on the preview stands
+  in.
 
 ## 2026-11-19 - Klad level 5: open sealed caches while a guard comes down after you (RAS-68)
 

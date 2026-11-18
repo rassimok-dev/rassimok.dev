@@ -158,6 +158,22 @@ test('level 5 needs the shot: without one the key in its cache at the foot of th
   }
 });
 
+test('level 6 needs the shot: without one the key past the columns is out of reach, in both shapes', () => {
+  // given
+  const level = LEVELS.find((candidate) => candidate.name === 'выбери высоту');
+
+  for (const shape of Object.keys(DIMS)) {
+    // when
+    const rows = level[shape];
+    const [px, py] = find(rows, 'P')[0];
+    const [kx, ky] = find(rows, 'K')[0];
+    const cells = reach(rows, false, px, py, false);
+
+    // then
+    assert.ok(!cells.has(`${kx},${ky}`), `${shape}: the key is reachable without a shot`);
+  }
+});
+
 /* The shot in the checks, on small maps. Coordinates are column,row. */
 test('route check: a chest sealed in brick next to where the player stands is reachable with a shot', () => {
   // given

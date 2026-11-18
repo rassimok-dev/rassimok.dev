@@ -60,12 +60,19 @@ it.
   full speed got into the room before the guard reached the top; the guard
   then waited above, and the trap rested on a race to the ladder's top.
 - **The ledges above never reach the pit's column**, so the guard falls in
-  only when the runner goes to the walkway's far end on purpose. That end
-  holds no chest, so going there is a choice, not a detour for treasure.
-  In landscape the guard needs about 1 s to arrive and fall in; in
-  portrait it is already close behind.
-- **The life chest lies on the start ledge**, away from the room: in the
-  room it would give back the life the trap takes.
+  only when the runner goes to the walkway's far end. That end holds no
+  chest, so going there is a choice, not a detour for treasure. In
+  landscape the guard needs about 1 s to arrive and fall in. In portrait
+  it is already close behind (the zig-zag down pulls it along), so a
+  touch of the pit end is enough: two steps left and back clear it.
+  Portrait is the easier shape; whether it should stay so is for the
+  user's play on the preview.
+- **The life chest lies on the start ledge**, off the way to the room. A
+  death reloads the level and refills the chests while lives carry over,
+  so it gives back one trap death per attempt wherever it lies; here it
+  at least costs a detour (12 tiles in landscape, 1 in portrait). Whether
+  the trap should cost a life in portrait is for the user's play on the
+  preview (removing the chest would be a deletion).
 - **No brick, plank or water**, so none of the engine notes of RAS-64 to
   RAS-67 arise here. 18 chests in landscape and 15 in portrait, well
   inside the API's 100 per level.
@@ -97,8 +104,9 @@ it.
   clear in either shape, searched to the end with the guard's position
   rounded to 0.001 tile (about 700,000 states in landscape and 570,000 in
   portrait). About 27,700 and 14,100 of those states hold the key: the
-  room is reached, never left. With the pit filled with stone there is no clear at all; with
-  the pit, the shortest clear found goes to the pit's end first. A second
+  room is reached, never left. With the pit filled with stone there is
+  no clear at all; with the pit, the shortest clear found goes to the
+  pit's end first. A second
   search, with the pit dropped too: no state has the runner in the room
   while the guard is still in its hall, at guardSpeed 3.5 and 3.3 in
   landscape and 3.5 down to 3.1 in portrait, so the guard always follows

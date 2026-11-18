@@ -45,12 +45,24 @@ the ladder.
 - **No guard has a ladder up.** The ladder at the drop starts in each
   ledge's floor, so a guard can only climb down it, toward a runner
   below. A guard follows the runner's column at any height: it walks into
-  the lake while the runner is left of the ledges, stands still above a
-  runner on the bridge, and waits at its wall when the runner is further
-  right. Only the drop and the climb past the two ledges are in reach.
+  the lake while the runner is left of the ledges, stands still on its
+  ledge above a runner on the bridge, and waits at its wall when the
+  runner is further right. After a drop late in the window, a guard
+  follows down the ladder and along the bridge, so the runner must keep
+  moving to the exit. A stop at the ladder's foot is always caught.
 - **Both crossings go one way.** Nothing leads back up from the left
   vault to the walkway, or from the ledges to the vault, so the drop is
   the only way on.
+- **Known gap, open for the user's preview play: only the second
+  crossing is deadly.** The ticket asks that both vaults be reached only
+  across the water with the guards in between, a wrong step there
+  costing a life. That holds for the right vault only. The walk to the
+  left vault runs on unbroken stone ten or more rows above the lake, the
+  guards cannot climb to it, and it cannot be failed; the only fatal step
+  on that side is the one past the key, inside the vault. The engine has
+  no jump, so a gap in the walkway cannot change this. If the user wants
+  the first crossing deadly too, that is a new layout, built on the
+  release branch before the release PR.
 - **The left vault has a door that the key opens** (one key opens every
   door, S4 a). A draft had the key off the way to the drop. A runner who
   skipped it could drop and be shut in at the right vault's door with no
@@ -63,11 +75,18 @@ the ladder.
   water, and the lesson could be skipped.
 - **The ledges end close to the ladder** (walls at landscape column 13,
   portrait column 10). A guard back from the water reaches the ladder
-  soon, so a drop at the wrong moment meets it. After the second guard
-  falls, the runner may start the drop within about 3.4 s (landscape) or
-  2.4 s (portrait). A start in the next 2 s (landscape) or 2.7 s
-  (portrait) meets a guard, and then the guards walk in again. Level 4
-  shipped with 1.65 s and 2.4 s.
+  soon, so a drop at the wrong moment meets it. In the first cycle after
+  the second guard falls, the runner may start the drop within about
+  3.4 s (landscape) or 2.4 s (portrait); a start in the next 2 s
+  (landscape) or 2.7 s (portrait) meets a guard. The two guards fall
+  different heights into the lake (landscape 7 and 5 rows, portrait 8
+  and 5), so their rhythm drifts apart while the runner stays in the
+  left vault. The window is widest in the first cycles and narrows to
+  about 1 s after about a minute of waiting (landscape) or 0.8 s after
+  about half a minute (portrait), without closing. Evening out the two
+  cycles (equal falls, or ledges of different lengths) is an option for
+  the user's preview play, not built. Level 4 shipped with 1.65 s and
+  2.4 s.
 - **No part of the left vault lies below a guard's row.** The lower room
   is on the upper guard's row (landscape) or above it (portrait). A
   guard climbs down the ladder only toward a runner below it, so it
@@ -79,7 +98,8 @@ the ladder.
   would pay back each death there (level 3's reasoning).
 - guardSpeed 3.5. The name follows the imperative of the other level
   names; хранители is the game's word for the guards.
-- The lesson fits both sizes, 24x16 and 16x24 (S1 a).
+- Both sizes, 24x16 and 16x24 (S1 a), hold the same layout, the known
+  gap above included.
 
 ### How it was checked
 
@@ -87,16 +107,19 @@ the ladder.
   fastest clear (a lower bound) is 1774 ticks in landscape and 1608 in
   portrait.
 - `klad/test/level-8.test.js` (new) finds the level's number by name.
-  Per shape it has three tests:
+  Per shape it has four tests:
   - a fixed key script clears the level with both guards active
     (`klad:clear` with level 8 and revision 1, four lives: three and the
     life chest);
   - dropping at once, while the guards walk back, costs a life;
-  - one step past the key into the lake costs a life.
+  - one step past the key into the lake costs a life;
+  - after a safe drop, one step left off the ladder's foot into the lake
+    costs a life.
 
-  All six tests give the same result with start delays from 0 to 0.3 s
+  All eight tests give the same result with start delays from 0 to 0.3 s
   in 16 ms steps. On a throwaway copy with the open ends of both ledges
-  walled, both clear tests fail.
+  walled, both clear tests fail; with the gap beside the ladder's foot
+  filled in, both step-off tests fail.
 - The validator's movement rules, which are exact for the runner here
   since the level has no brick:
   - with the ladder at the drop turned to stone, there is no way to the

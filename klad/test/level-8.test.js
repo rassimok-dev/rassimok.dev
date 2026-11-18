@@ -22,12 +22,16 @@ const DOWN = 'ArrowDown';
 const FALL_SECONDS = { landscape: 0.3, portrait: 0.5 };
 /* Both guards walk into the lake about 1.5 s (landscape) or 2.2 s (portrait)
    after the runner reaches the edge; the drop is safe for about 3.4 s or
-   2.4 s after that. */
+   2.4 s after that. Later windows narrow: the guards fall different heights,
+   so their rhythm drifts apart. */
 const WAIT_AT_THE_EDGE_SECONDS = 3.2;
 /* Dropping at once: the runner lands in front of the upper guard (landscape)
    or meets the lower one on the ladder (portrait). */
 const MEETING_SECONDS = { landscape: 0.3, portrait: 1.2 };
 const FALL_INTO_THE_LAKE_SECONDS = { landscape: 1, portrait: 1.2 };
+/* Two rows from the bridge into the lake, read before a guard that follows
+   down the ladder could reach the runner. */
+const FALL_OFF_THE_BRIDGE_SECONDS = 0.4;
 /* The death screen stays 1.4 s before the life is taken. */
 const DEATH_SECONDS = 1.6;
 
@@ -64,6 +68,8 @@ const TO_THE_EDGE = {
   },
 };
 
+const LADDER_TILES = { landscape: 5, portrait: 6 };
+
 function drop(play, shape) {
   play.walk(RIGHT, 2);
   play.run(FALL_SECONDS[shape]);
@@ -73,12 +79,12 @@ function drop(play, shape) {
    through the door and up to the exit. */
 const DOWN_AND_OUT = {
   landscape(play) {
-    play.climb(DOWN, 5);
+    play.climb(DOWN, LADDER_TILES.landscape);
     play.walk(RIGHT, 16);
     play.climb(UP, 11);
   },
   portrait(play) {
-    play.climb(DOWN, 6);
+    play.climb(DOWN, LADDER_TILES.portrait);
     play.walk(RIGHT, 10);
     play.climb(UP, 16);
   },
@@ -138,6 +144,28 @@ for (const shape of ['landscape', 'portrait']) {
     // then
     assert.equal(titleAfterStep, 'ПОГИБ');
     assert.equal(play.lives(), livesAtTheKey - 1);
+    assert.deepEqual(play.events, []);
+  });
+
+  test(`level 8 ${shape}: after a safe drop, one step left off the foot of the ladder drops the runner into the lake and costs a life`, () => {
+    // given
+    const play = playLevel(LEVEL, shape);
+    TO_THE_KEY[shape](play);
+    TO_THE_EDGE[shape](play);
+    play.run(WAIT_AT_THE_EDGE_SECONDS);
+    drop(play, shape);
+    play.climb(DOWN, LADDER_TILES[shape]);
+    const livesOnTheBridge = play.lives();
+
+    // when
+    play.walk(LEFT, 1);
+    play.run(FALL_OFF_THE_BRIDGE_SECONDS);
+    const titleAfterStep = play.title();
+    play.run(DEATH_SECONDS);
+
+    // then
+    assert.equal(titleAfterStep, 'ПОГИБ');
+    assert.equal(play.lives(), livesOnTheBridge - 1);
     assert.deepEqual(play.events, []);
   });
 }

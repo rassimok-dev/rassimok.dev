@@ -56,7 +56,11 @@ onto a raised pier and climbs the far ladder to the exit.
   runner who stops near the key for about 0.8 to 1.2 s and then walks on
   meets it there. Kept: the guard is in sight, falling, for about a
   second before it reaches the bridge, and it is the lesson's own rule
-  at work. Walking on at once, or waiting until it has passed, is safe.
+  at work. Walking on at once is safe. Waiting until it has passed is
+  safe on the bridge, but the far ladder must still be climbed before
+  the guard comes back: a stop of more than about 1.6 s (landscape) or
+  2.4 s (portrait) means waiting for its next fall, about 4.9 s
+  (landscape) or 5.8 s (portrait) later.
 - **The key lies well left of the guard's door.** So the guard commits
   to its fall before a runner who keeps walking passes under its
   column. A portrait draft had the key two columns left of the door: a
@@ -72,8 +76,9 @@ onto a raised pier and climbs the far ladder to the exit.
   far ladder is 10 rows high; a draft with the bridge at the bottom had
   a 17-row climb and left 0.85 s. The lower level below it, with three
   chests, reaches no further right than the guard's column, so going
-  there never sends the guard toward the far ladder. Landscape has a chest on a shelf of the far ladder:
-  taking it costs part of the time the guard is gone.
+  there never sends the guard toward the far ladder.
+- **Landscape has a chest on a shelf of the far ladder:** taking it
+  costs part of the time the guard is gone.
 - **The level has no brick.** A shot changes nothing here, so the lesson
   stays with the planks. Chests may stand on planks over water: the tile
   below them is the plank (the level test's rule, and RAS-66's "no chest

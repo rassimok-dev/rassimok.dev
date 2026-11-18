@@ -96,9 +96,13 @@ for (const shape of ['landscape', 'portrait']) {
     // when
     downTheTrapdoor(play);
     TO_THE_FAR_LADDER[shape](play);
+    const livesAtTheLadder = play.lives();
+    const titleAtTheLadder = play.title();
     play.run(GUARD_RETURN_SECONDS);
 
     // then
+    assert.equal(livesAtTheLadder, 3);
+    assert.notEqual(titleAtTheLadder, 'ПОГИБ');
     assert.equal(play.lives(), 2);
     assert.deepEqual(play.events, []);
   });

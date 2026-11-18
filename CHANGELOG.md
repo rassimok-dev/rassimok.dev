@@ -3,6 +3,116 @@
 Dated entries, newest first. Written for a reader picking this up cold —
 or a future session needing to know what already exists and why.
 
+## 2026-11-18 - Klad level 1: a dense maze and a guard to wall up (RAS-64)
+
+Level 1 has a new layout of our own, revision 2, named "найди дорогу"
+(find the way). It replaces "замуруй хранителя" (revision 1) in both
+shapes; the user approved that deletion on 2026-11-18. The lesson is the
+one read from Korvet maze 1, the first maze in the Korvet order: find the
+way through a dense maze of brick, ladders and planks to chests in dead
+ends, past one guard you wall up, over a deadly floor. It was read from
+still frames, not from play, so the layout is a candidate that the user
+plays on the release preview and corrects (RAS-64 Q1). Clean room: the
+layout is drawn from that lesson only, never transcribed from a
+screenshot, a video frame, an original level or a remake level. It ships
+on `release/klad-levels` with the new chase (RAS-60) and the other
+rewritten levels; the API learns revision 2 in RAS-62, which deploys
+first.
+
+How it plays, in both shapes: corridors one tile high, stacked, with
+brick floors and walls, ladders between them and chests in the dead ends.
+Water fills the row above the stone bottom row (RAS-64 Q2 a), so a gap in
+the lowest floor, or a fall onto a plank, drowns the runner. The key lies
+in a room held by the guard. The guard runs toward the player's column, so
+it waits at the stone end of its room, on a brick. A ladder ends right
+beside that brick, one row below the room: from its top a shot opens the
+brick, the guard drops in and is walled up when the brick grows back. The
+only way into the room is a drop from the corridor above onto the guard's
+waiting tile; without the shot the runner lands on the guard. From the
+room a ladder leads up to the door and the exit, and a side with more
+chests opens after the key.
+
+### Decisions worth not relitigating
+
+- **Before the room, the player never gets past the guard's waiting
+  column** (landscape column 14, portrait column 10), even if every brick
+  were shot open. So the guard stays on its tile until it is walled up,
+  and the shot always finds it there. A draft that let the player go
+  further let the guard follow the player along its room. A player could
+  then dodge it at the drop and outrun it to the key, or bring it back
+  late over a brick shot open too early (see the engine quirk below).
+- **The drop lands on the waiting tile, not beside it.** With the drop two
+  tiles away, a player who stepped back and forth above the room landed
+  ahead of the guard.
+- **The room's shell is stone except the trap brick, the drop and the
+  ladder out, with stone under the trap brick**, so no other shot reaches
+  the guard and nobody falls through the open hole. The trap brick's row
+  is open to a shot only from that one ladder top.
+- **The way round from the shot to the drop takes longer than the brick
+  takes to grow back**: at full speed about 5.5 s in landscape and 5.1 s
+  in portrait, against 4.2 s. A player who shoots and runs at once lands
+  on a walled-up guard, never in the open hole on top of it. A first
+  draft's way round took 3.5 s in landscape, which would have killed a
+  quick player who had done the lesson right.
+- **The side after the key** (lower right in landscape, the right column
+  in portrait) is reached only through the room, so standing there cannot
+  pull the guard off its tile before the shot. Every ladder reaches down
+  to the corridor at its foot, so it can be climbed back; a draft had the
+  ladder into that side end one tile short, a way down with no way back.
+- guardSpeed stays 3.0: the guard only walks from its start to its waiting
+  tile. The name follows the imperative of the other level names.
+
+### How it was checked
+
+- `klad/test/levels.test.js`: both shapes pass the validator as before,
+  including the guard-free key-then-exit route.
+- `klad/test/level-1.test.js` (new): per shape, a fixed key script clears
+  the level with the guard active (`klad:clear` with level 1 and revision
+  2, no life lost), going on at once after the shot, and the same keys
+  without the shot cost a life. Both give the same result with start
+  delays from 0 to 0.3 s in 16 ms steps (checked once with a throwaway
+  script).
+- A throwaway sweep with the validator's movement rules: from every tile
+  the player can reach before the key the key can still be reached, and
+  from every tile after it an exit; the only exceptions are the tiles of
+  a fall into water.
+- A throwaway search over the player's one-tile moves, waits and shots on
+  the real `klad.js`, with every state that has a walled-in guard dropped:
+  no clear and not even the key without shots, and none with shots from
+  that ladder top, both searched to the end in both shapes. Shots from
+  anywhere else were not searched to the end (too many states). They
+  cannot touch the guard, for the reasons in the decisions above. The
+  search rounds the guard's position, so this is "no clear found", not a
+  proof. Not played by hand; the user's play on the preview stands in.
+
+### An engine quirk found on the way (not changed here)
+
+A guard that falls into a shot hole in the moment the brick grows back
+(while it is in the upper half of its one-tile fall, about 55 ms) is not
+walled in: it finishes the fall inside the brick and then walks or falls
+out of it. The search found this when the brick was shot early and the
+guard arrived late. Level 1 avoids it by keeping the guard on its tile;
+a level where a guard reaches a hole late can show it.
+
+### The play harness for the level tickets
+
+- `klad/test/play.js` (new) runs `levels.js`, `ticks.js`, `chase.js` and
+  `klad.js` in the page's order in a vm context with a stub page.
+  `playLevel(n, shape)` starts level n in one shape at its first frame of
+  play. The harness gives keys held for seconds, `walk` and `climb` by
+  whole tiles, `shoot`, time in 16 ms frames, the dispatched events
+  (`events`, the types) with their `details` in the same order, the title
+  and the lives. The game is deterministic (a fixed update step, no
+  randomness), so a fixed script plays the same game every time.
+- It is `loadGame` from `race.test.js`, moved rather than copied:
+  `race.test.js` keeps its 68 tests unchanged through a one-line wrapper
+  that keeps its test levels as the default. The race tests now also load
+  `ticks.js`, as the page does; `klad.js` does not read it.
+- `klad/test/level-1.test.js` is the pattern for `level-<n>.test.js` in
+  RAS-65 to RAS-71: a script per shape that clears the level with the
+  guards active, and where it is cheap, the same script without the
+  level's trick, which costs a life.
+
 ## 2026-11-17 (fourth) - Klad guards chase straight at the player, no way around (RAS-60)
 
 Guards no longer search for a path to the player. Whenever a guard stands

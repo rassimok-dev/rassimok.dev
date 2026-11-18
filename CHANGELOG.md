@@ -3,6 +3,119 @@
 Dated entries, newest first. Written for a reader picking this up cold —
 or a future session needing to know what already exists and why.
 
+## 2026-11-19 (later) - Klad level 6: break through tall columns between the guards and the pools (RAS-69)
+
+Level 6 is new, revision 1, named "выбери высоту" (choose the height). It
+takes the next free number (S6 a). The lesson is the one read from level 6
+of the Android remake: climbing between tall columns, shooting through
+brick and avoiding small water traps, with two guards that start high. It
+was read from still frames, not from play, and its place in the Korvet
+order is not verified, so the layout is a candidate that the user plays on
+the release preview and corrects. Clean room: the layout is our own, drawn
+from that lesson only, never transcribed from a screenshot, a video frame,
+an original level or a remake level. It ships on `release/klad-levels`
+with the new chase (RAS-60) and the rewritten levels; the API learns level
+6 at revision 1 in RAS-62, which deploys first. The title screen and the
+lobby offer it because both follow `LEVELS.length` (RAS-63).
+
+How it plays, in both shapes: two tall brick columns stand between three
+shafts. The runner starts at the foot of the left shaft, the key lies at
+the bottom of the right shaft, beyond both columns, and the exit is at the
+top of the left shaft, behind the door. Each guard starts at the top of
+the next shaft, comes down its ladder at once to the stone ledge at its
+foot and from then on climbs that ladder to the runner's row. So it stands
+right behind the column whenever the runner could shoot it on a row the
+ladder reaches. Below the guard's ledge the far side has a short ladder on
+two rows only; a column broken any lower lets the runner step into air and
+fall into the small pool at the column's foot (the floor row leads
+straight into it). Each column is broken on the two rows between its guard
+and its pool: through the first into the middle shaft, down its far
+ladder, through the second and on to the key. Back the same way (the
+second column's holes are still open, the first column's have grown back
+and are shot again), then up the long ladder of the start shaft to the
+door and the exit, with the guards climbing alongside behind the columns.
+
+### Decisions worth not relitigating
+
+- **A correct runner is never chased.** The guards never leave their
+  shafts; they decide on which rows the columns may be broken. That is the
+  chase as built (a guard climbs first when a ladder step toward the
+  runner's row is possible) put to work for the lesson, and the first
+  thing for the user to judge on the preview. Only the first guard closes
+  a way the runner could otherwise take (below); the second guard's shaft
+  leads nowhere even without it, so that guard only punishes a wrong break
+  and stands on the first guard's way round.
+- **The guards come down at once and then wait behind the columns.** They
+  start at the top of their shafts and nothing holds them there; with the
+  runner below, they reach their ledges within about 1 to 3 s and wait
+  there, on stone, never on brick. No water lies where a guard can go, so
+  a guard never drowns and never respawns. Without the guards the first
+  column could also be broken at the first guard's foot: along its ledge,
+  through the second column into the second guard's ladder and back into
+  the middle shaft. The guards close that way.
+- **Two safe rows per column, with danger next to them on both sides.**
+  The safe rows are the far side's short ladder, right under the guard's
+  ledge. One row higher the tunnel ends at the ledge's stone (harmless);
+  higher still the guard comes through; one row lower the runner falls
+  into the pool. So the lesson is the height, not luck.
+- **Small pools, not a deadly floor:** one tile of water at the foot of
+  each column on its far side, and one in the corner of a ledge in the
+  start shaft beside a chest. The two short ladders end over air above a
+  pool, so climbing down past them drowns; every other ladder ends on
+  stone. The level has no plank.
+- **The exit is above the start, behind the door.** Without the door the
+  runner could climb straight out. One door, one key (S4 a).
+- **Every chest can be taken without meeting a guard:** none lies where a
+  guard can go.
+- **No step waits for a hole:** the scripted return passes the second
+  column more than a second before its holes grow back (about 1.3 s in
+  landscape, 1.6 s in portrait) and shoots the first column again about
+  1.5 s (portrait) and 2.2 s (landscape) after its holes have grown back.
+- **Both shapes hold the lesson** (S1 a). The columns are 20 rows tall in
+  portrait and 12 in landscape; there the guards' ladders reach rows 3 to
+  6 and 3 to 9, and the safe rows are 8 to 9 and 11 to 12.
+- guardSpeed 3.5, between level 4's 3.3 and level 5's 3.8; here it only
+  sets how fast a guard walks along its ledge and through a wrong tunnel.
+  The name is an imperative like the other level names and hints at the
+  lesson without giving the rows away.
+
+### How it was checked
+
+- `klad/test/levels.test.js`: both shapes pass the validator as every
+  level does; the fastest clear with every brick open is 1366 ticks in
+  landscape and 1379 in portrait, and no chest is out of reach.
+- `klad/test/level-6.test.js` (new): per shape, a fixed key script clears
+  the level with the guards active (`klad:clear` with level 6, revision 1,
+  no life lost); the same keys without the shots leave the runner in the
+  start shaft without the key; breaking through the first column one row
+  lower drops the runner into the pool, and breaking through either column
+  on a row its guard's ladder reaches lets the guard through, each costing
+  a life. The level is found by its name, so the test holds wherever the
+  level sits in the list. Checked once with throwaway scripts: all ten
+  tests give the same result with start delays from 0 to 0.3 s in 16 ms
+  steps; with the guards removed the four guard tests fail, with the pools
+  turned to stone the two pool tests fail, and with the columns turned to
+  air the two tests without shots fail.
+- Proven on the maps, with throwaway checks that use the validator's
+  movement rules: there is no clear without a shot. With every tile a
+  guard can ever reach counted as fatal, every clear breaks each column on
+  its two safe rows. With the pools turned to stone as well, the first
+  column (and in landscape the second) also leads on from the rows below,
+  since a fall from them lands on that stone. From every tile the runner
+  can stand on, the key (before it) and an exit (after it) stay reachable;
+  the only exceptions are the tiles of a fall into a pool.
+- Probed on the real `klad.js` through `test/play.js`: every row of both
+  columns broken from the scripted tiles and stepped through at once; only
+  the safe rows and the harmless row at the ledge survive. Every guard row
+  again with waits of 0 to 4 s before the shots, with and without 1 s
+  between them: 228 attempts, all fatal.
+- Argued, not searched: that no timing opens a guard row. A guard reaches
+  its ledge before the quickest runner reaches its row, then climbs at the
+  runner's speed, and a column can only be shot from the row it is broken
+  on. No guard falls into a shot hole on any scripted way, so the late-fall
+  quirk of the RAS-64 entry does not arise. Not played by hand; the user's
+  play on the preview stands in.
+
 ## 2026-11-19 - Klad level 5: open sealed caches while a guard comes down after you (RAS-68)
 
 Level 5 has a new layout of our own, revision 2, named "не мешкай"

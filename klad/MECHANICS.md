@@ -67,7 +67,9 @@ ameblo «ライズアウト (MSX)» player write-up; idpixel. MobyGames, GoodOld
   guard the key lets out falls through them and drowns (from level 4 of the remake, read from
   still frames); shoot open sealed caches beside a shaft while a guard comes down it after you,
   then run out under pens whose guards the key lets out, one door each, from level 5 of the
-  remake, read from still frames (later levels are new).
+  remake, read from still frames (later levels are new: 6, climb between tall brick columns and
+  break through them only on the rows below the guards that climb level with you behind them
+  and above the small pools at their feet, from level 6 of the remake, read from still frames).
 - Level code = URL hash (no storage). Two shapes per level (landscape/portrait).
 - Fire left out of v1 until behaviour is confirmed.
 - Guard chase: only "straight at the player, no way around" was observed. The other cases

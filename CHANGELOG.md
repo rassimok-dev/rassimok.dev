@@ -3,6 +3,116 @@
 Dated entries, newest first. Written for a reader picking this up cold —
 or a future session needing to know what already exists and why.
 
+## 2026-11-18 (fourth) - Klad level 4: a route across planks over water (RAS-67)
+
+Level 4 has a new layout of our own, revision 2, named "смотри, куда
+падаешь" (watch where you fall). It replaces "обмани хранителя"
+(revision 1) in both shapes; the user approved that deletion on
+2026-11-18. That level's trick was that guards planned as if planks
+always hold, and the chase of RAS-60 removed that planning. The lesson
+is the one read from level 4 of the Android remake: plan the route
+across planks over water, because a plank holds whoever walks onto it
+and drops whoever lands on it from a fall. It was read from still
+frames, not from play, so the layout is a candidate that the user plays
+on the release preview and corrects. Clean room: the layout is drawn
+from that lesson only, never transcribed from a screenshot, a video
+frame, an original level or a remake level. It ships on
+`release/klad-levels` with the new chase and the other rewritten
+levels; the API learns revision 2 in RAS-62, which deploys first.
+
+How it plays, in both shapes: a hall over the deadly water (the row
+above the stone bottom row), crossed by bridges of planks. The runner
+starts on a ledge at the top left. The key lies on a bridge straight
+below the gap beside the ledge, but the drop toward it goes through the
+planks into the water. A ladder leads only to a shelf with chests. The
+way down is the hole at the far left: its fall goes through a plank in
+the shelf and ends on stone. From there the bridge is walked to the
+key. The key also opens the door of the guard's ledge at the top right.
+The guard steps out toward the runner, walks off the edge, falls through
+the planks and drowns. While it is gone the runner takes a short ladder
+onto a raised pier and climbs the far ladder to the exit.
+
+### Decisions worth not relitigating
+
+- **The only way down is a fall through a plank onto stone.** So every
+  clear needs one fall onto a plank, and the runner has to pick the one
+  with stone under it, not the drop toward the key.
+- **The guard waits behind a door that the key opens** (one key opens
+  every door). The runner is always to its left before the key, because
+  the right side is reached only past the key, so the guard stands at
+  its closed door. A draft without the door had it walk off its ledge
+  and drown over and over from the first second, which looks like a
+  broken guard.
+- **After the key the far ladder has to be climbed while the guard is
+  gone.** Whenever the runner is left of the guard's ledge, it falls
+  through the planks again; once the runner is right of it, it walks to
+  the head of the far ladder and climbs down. A runner who goes straight
+  to the foot of the far ladder may wait there up to 1.65 s in landscape
+  and 2.4 s in portrait before climbing. The repeated drowning follows
+  from the chase as built (a guard may walk into water); it is not a
+  bug.
+- **The guard falls through the bridge on the runner's way** (landscape
+  column 15, portrait column 7), about 1.7 s after the key is taken. A
+  runner who stops near the key for about 0.8 to 1.2 s and then walks on
+  meets it there. Kept: the guard is in sight, falling, for about a
+  second before it reaches the bridge, and it is the lesson's own rule
+  at work. Walking on at once is safe. Waiting until it has passed is
+  safe on the bridge, but the far ladder must still be climbed before
+  the guard comes back: a stop of more than about 1.6 s (landscape) or
+  2.4 s (portrait) means waiting for its next fall, about 4.9 s
+  (landscape) or 5.8 s (portrait) later.
+- **The key lies well left of the guard's door.** So the guard commits
+  to its fall before a runner who keeps walking passes under its
+  column. A portrait draft had the key two columns left of the door: a
+  runner who did not stop turned the guard toward the far ladder and
+  met it there, a death the plank lesson does not explain.
+- **Every ladder stands on stone, not on a plank.** Climbing down off
+  the foot of a ladder into a plank tile drops the runner through it; a
+  draft had both short ladders on planks.
+- **The raised pier is one row above the bridge.** Walking off it toward
+  the bridge is a one-row fall onto a plank and drowns; the short ladder
+  is the way back down to the bridge.
+- **In portrait the key's bridge spans the middle of the shaft**, so the
+  far ladder is 10 rows high; a draft with the bridge at the bottom had
+  a 17-row climb and left 0.85 s. The lower level below it, with three
+  chests, reaches no further right than the guard's column, so going
+  there never sends the guard toward the far ladder.
+- **Landscape has a chest on a shelf of the far ladder:** taking it
+  costs part of the time the guard is gone.
+- **The level has no brick.** A shot changes nothing here, so the lesson
+  stays with the planks. Chests may stand on planks over water: the tile
+  below them is the plank (the level test's rule, and RAS-66's "no chest
+  directly above water" read the same way).
+- guardSpeed 3.3. The name follows the imperative of the other level
+  names.
+
+### How it was checked
+
+- `klad/test/levels.test.js`: both shapes pass the validator as before.
+- `klad/test/level-4.test.js` (new): per shape, a fixed key script
+  clears the level with the guard active (`klad:clear` with level 4 and
+  revision 2, no life lost); walking off the ledge toward the key costs
+  a life in the water; waiting at the foot of the far ladder lets the
+  guard come back down it and costs a life. All three give the same
+  result with start delays from 0 to 0.3 s in 16 ms steps (checked once
+  with a throwaway script).
+- Throwaway analyses with the validator's movement rules, exact for the
+  runner since the level has no brick: with every plank turned to air
+  there is no clear, so the bridge must be walked; with every fall onto
+  a plank counted as drowning there is no clear, so the fall through the
+  plank over stone is needed; with planks that always hold, the
+  quickest clear falls onto planks that in the real game drop the runner
+  into the water; and from every tile the runner can stand on, the key
+  (before it) and an exit (after it) stay reachable.
+- A throwaway search over the runner's one-tile moves and waits on the
+  real `klad.js` with the guard active finds the scripted route as the
+  shortest clear in both shapes. With the plank over stone turned to
+  stone, and with every plank turned to air, it runs to the end with no
+  clear. With `klad.js` patched so that planks always hold, all six
+  level 4 tests fail, and that game's shortest clear drowns on the real
+  one within its first moves. Not played by hand; the user's play on
+  the preview stands in.
+
 ## 2026-11-18 (later still) - Klad level 3: careful climbing over a lake, no guard (RAS-66)
 
 Level 3 has a new layout of our own, revision 2, named "не оступись"

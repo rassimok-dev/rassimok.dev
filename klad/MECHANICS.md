@@ -56,10 +56,16 @@ ameblo «ライズアウト (MSX)» player write-up; idpixel. MobyGames, GoodOld
 - MSX: CTRL+P password entry, CTRL+R restart level (costs a life).
 
 ## Our deviations (deliberate)
-- Several levels, our own layouts, same lesson order as Korvet 1-4: find the way through a dense
-  maze over deadly water, to a key whose room is held by one guard you must wall up first (from
-  Korvet maze 1); shoot open treasure sealed in brick, the key too, while the guards come up from below (from Korvet maze 2); climb with care over a lake with no guard, every slip fatal
-  (from level 2 of the remake); trick a guard; 5 = everything together (later levels are new).
+- Several levels, our own layouts. The lesson order follows Korvet where it is verified
+  (levels 1 and 2); level 3's place is the user's choice of 2026-11-18, against the wiki's
+  "Levels 1 and 3" above (Korvet maze 3 not seen); level 4 follows the remake. Lessons: find
+  the way through a dense maze over deadly water, to a key whose room is held by one guard you
+  must wall up first (from Korvet maze 1); shoot open treasure sealed in brick, the key too,
+  while the guards come up from below (from Korvet maze 2); climb with care over a lake with no
+  guard, every slip fatal (from level 2 of the remake); plan the route across planks over
+  water, walking onto them and falling through one only where stone lies below, while the
+  guard the key lets out falls through them and drowns (from level 4 of the remake, read from
+  still frames); 5 = everything together (later levels are new).
 - Level code = URL hash (no storage). Two shapes per level (landscape/portrait).
 - Fire left out of v1 until behaviour is confirmed.
 - Guard chase: only "straight at the player, no way around" was observed. The other cases

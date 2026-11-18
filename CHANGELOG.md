@@ -11,9 +11,11 @@ user approved that deletion on 2026-11-18. The lesson is careful
 climbing: chests hang over water, every slip is fatal, and there is no
 guard. It was read from still frames of level 2 of an Android remake,
 not from play, so the layout is a candidate that the user plays on the
-release preview and corrects. The user chose the Korvet order for the
-first levels (S5 a: level 2 sealed treasure, level 3 this lesson), even
-though the Old-Games wiki cited in `klad/MECHANICS.md` calls Korvet
+release preview and corrects. The name follows the imperative of the
+other level names. The user chose the Korvet order where it is verified
+(S5 a: level 2 sealed treasure from Korvet maze 2) and put this lesson,
+from the remake's level 2 whose Korvet place is not verified, at level 3,
+even though the Old-Games wiki cited in `klad/MECHANICS.md` calls Korvet
 level 3 "wall up the guards"; Korvet maze 3 itself has not been seen,
 and the wiki sentence stays in `MECHANICS.md` as a source. Clean room:
 the layout is drawn from the lesson only, never transcribed from a
@@ -60,8 +62,7 @@ and behind the exit.
   the name.
 - **Two rows of water** look like a lake; no rule depends on the depth.
 - guardSpeed stays 3.3: no guard reads it, and removing the field was
-  not part of the approved deletion. The name follows the imperative of
-  the other level names.
+  not part of the approved deletion.
 
 ### How it was checked
 

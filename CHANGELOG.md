@@ -3,7 +3,7 @@
 Dated entries, newest first. Written for a reader picking this up cold —
 or a future session needing to know what already exists and why.
 
-## 2026-11-17 (fourth) - Klad guards chase straight at the player, no way around (RAS-60, draft)
+## 2026-11-17 (fourth) - Klad guards chase straight at the player, no way around (RAS-60)
 
 Guards no longer search for a path to the player. Whenever a guard stands
 on a tile it takes one step that brings it closer to the player, never one
@@ -20,18 +20,19 @@ below the player with no ladder step it stands still; it never plans around
 water, so it may walk into a pool, or off a ledge onto a plank and through
 it, and drown.
 
-This is a draft for the user's playtest next to the remake. It is not
-merged until the user has played it, has decided how it ships (with the
-rewritten levels or alone, RAS-60 Q2) and has approved the deletion below.
+It ships with the rewritten levels 1 to 5 and the new levels 6 to 8 on
+one release branch, `release/klad-levels`, which the user plays on its
+Pages preview before it merges (RAS-60 Q2 a, decided 2026-11-18): the
+current levels were built for the old guards (below).
 
 ### Decisions worth not relitigating
 
-- **Once merged, this supersedes "Guards path with BFS and believe planks
-  always hold" (2026-10-30 (later)).** The breadth-first search is removed
-  from `klad.js` on this branch (`pathStep`, `gNeighbors`, `gSupported`
+- **This supersedes "Guards path with BFS and believe planks always
+  hold" (2026-10-30 (later)).** The breadth-first search is removed from
+  `klad.js` (`pathStep`, `gNeighbors`, `gSupported`
   and the arrays `prev`, `queue`, `nb`), and with it two behaviours: guards
   that believe planks hold, and guards that never step into water. The
-  removal waits for the user's approval at merge.
+  user approved the removal on 2026-11-18.
 - **The rule is one pure function, `KLAD_CHASE.step` in `klad/chase.js`**
   (a global plus `module.exports`, like `ticks.js`), loaded between
   `ticks.js` and `klad.js`, so `klad/test/chase.test.js` checks each case on

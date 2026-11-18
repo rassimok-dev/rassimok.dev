@@ -12,7 +12,7 @@ proxy (below), it is self-contained on purpose so it can be removed in one go.
 | `index.html` | page: HUD, canvas, touch pad, footer, the nick prompt, boards, lobby (with the room chat), race and race chat dialogs, the HUD button Чат and the pop-up region |
 | `klad.css` | styles; defines the palette the game reads |
 | `klad.js` | engine: movement, guards (each step from `chase.js`), shots, holes, phases, render, input; holds while a dialog is open; the race hook `KLAD_GAME` |
-| `levels.js` | levels, each in two shapes (landscape 24×16, portrait 16×24), with a `revision` |
+| `levels.js` | levels, each in two shapes (landscape 24×16, portrait 16×24), with a `revision`; what each level teaches and why is in `MECHANICS.md` (Our deviations) and `CHANGELOG.md` |
 | `ticks.js` | tick constants and the time formatter (`m:ss.cc`), also loaded by the node tests |
 | `chase.js` | the guards' chase rule as one function: the next tile of a standing guard, one step closer to the player and never away (`MECHANICS.md`, Guards); also loaded by the node tests. Script order in `index.html`: `levels.js`, `ticks.js`, `chase.js`, `klad.js`, `online.js`, `lobby.js`, `chat.js`, `race.js` |
 | `online.js` | online part: nick prompt, sending clears and runs, the boards, accounts (login by emailed code, logout); its logic half is also loaded by the node tests |

@@ -3,6 +3,109 @@
 Dated entries, newest first. Written for a reader picking this up cold —
 or a future session needing to know what already exists and why.
 
+## 2026-11-19 (later still) - Klad level 7: lead the guard away from a rich treasure room (RAS-70)
+
+Level 7 is a new level, revision 1, named "уведи хранителя" (lead the
+guard away). It takes the next free number (S6 a), after the new level 6
+(RAS-69). The lesson is the one read from level 10 of the Android remake:
+a rich treasure room with one way in, where a guard can trap you inside.
+It was read from still frames, not from play. The original's way out past
+the guard is unknown (RAS-70 Q2), so the layout is a candidate that the
+user plays on the release preview and corrects. Clean room: the layout is
+our own, drawn from that lesson only, never transcribed from a
+screenshot, a video frame, an original level or a remake level. It ships
+on `release/klad-levels` with the chase of RAS-60 and the other levels;
+the API learns level 7 at revision 1 in RAS-62, which deploys first.
+
+How it plays, in both shapes: the runner comes down from the start onto a
+walkway. Under the walkway lies the guard's hall, with a pit at its far
+end and, at the other end, the ladder down into the treasure room: a dead
+end deep below, with ten chests (landscape) or eight (portrait) and the
+key at its far end. The only way into the hall is a drop through the
+walkway's floor right above that ladder. Under the walkway the guard
+follows the runner's column. A runner who drops in while the guard is in
+the hall is followed down the ladder and caught in the room, turning back
+with the key. A runner who first stands over the pit's end of the walkway
+leads the guard into the pit, where it stays, and then empties the room
+and leaves by the door at the hall's other end and the exit ladder behind
+it.
+
+### Decisions worth not relitigating
+
+- **The way past the guard is the lure, not a shot hole** (Q2, the
+  agent's choice). The chase of RAS-60 walks a guard into any gap on its
+  way toward the runner, so leading it into a pit is the trick. Levels 1
+  and 2 already teach the shot, and this level has no brick.
+- **The pit is dry and has no ladder, so the guard stays in it.** A guard
+  that could climb out, or drown and come back from its start, would make
+  the room a timed raid and the lesson a race.
+- **The key lies at the room's far end**, so every clear goes through the
+  room; with the key elsewhere, skipping the room would clear the level.
+- **The hall's only ways out are the pit, the ladder down into the room
+  and the locked door.** Nothing leads up from it, so the guard never
+  reaches the walkway or the ledges above; it only follows the runner's
+  column from below.
+- **The drop lies right above the room's ladder, and the ladder onto the
+  walkway comes down far from it** (14 tiles in landscape, 9 in
+  portrait). A runner who hurries to the room outruns the guard to the
+  drop and gets into the room, so the trap shows in the room. A runner who
+  waits next to the drop has the guard waiting below and drops onto it.
+- **The room is one tile high.** A draft had a room two tiles high, and a
+  search found an escape: stepping off the ladder into the upper row cut
+  the way in short, and later the guard, coming down, stepped into that
+  row and fell beside the runner, who slipped past it to the ladder.
+- **The room's ladder is 8 rows deep in both shapes**: the time the guard
+  has to reach the ladder's top while the runner is still on it. With 6
+  rows (a landscape draft) a runner who turned at the edge of the pit at
+  full speed got into the room before the guard reached the top; the guard
+  then waited above, and the trap rested on a race to the ladder's top.
+- **The ledges above never reach the pit's column**, so the guard falls in
+  only when the runner goes to the walkway's far end on purpose. That end
+  holds no chest, so going there is a choice, not a detour for treasure.
+  In landscape the guard needs about 1 s to arrive and fall in; in
+  portrait it is already close behind.
+- **The life chest lies on the start ledge**, away from the room: in the
+  room it would give back the life the trap takes.
+- **No brick, plank or water**, so none of the engine notes of RAS-64 to
+  RAS-67 arise here. 18 chests in landscape and 15 in portrait, well
+  inside the API's 100 per level.
+- guardSpeed 3.5. A slower guard still always follows the runner down at
+  3.3 in landscape and at 3.1 in portrait (searched, below). The name
+  follows the imperative of the other level names.
+
+### How it was checked
+
+- `klad/test/levels.test.js`: both shapes pass the validator (fastest
+  clear without the guard 1627 ticks in landscape, 2451 in portrait).
+- `klad/test/level-7.test.js` (new): per shape, a fixed key script that
+  stands over the pit's end until the guard falls in, then empties the
+  room, clears the level with the guard active (`klad:clear` with level 7
+  and revision 1, no life lost); dropping in with the guard in its hall,
+  or with the guard led only to the edge of the pit, lets it follow the
+  runner into the room, where it catches them turning back with the key.
+  The level number comes from the level's name, so the test holds when
+  the new levels are stacked. All three give the same result with start
+  delays from 0 to 0.3 s in 16 ms steps. With the pit filled the clear
+  fails, without the guard neither trap script dies, and with the lure
+  added the careless script does not die (each checked once with a
+  throwaway script).
+- A throwaway breadth-first search over the runner's one-tile moves and
+  waits of 3 and 12 ticks on the real `klad.js` with the guard active,
+  from snapshots of the game state, in two models: a stop on each tile,
+  and keys held through each tile with the next key deciding on arrival.
+  With every state that has the guard in the pit dropped, there is no
+  clear in either shape, searched to the end with the guard's position
+  rounded to 0.001 tile (about 700,000 states in landscape and 570,000 in
+  portrait). About 27,700 and 14,100 of those states hold the key: the
+  room is reached, never left. With the pit filled with stone there is no clear at all; with
+  the pit, the shortest clear found goes to the pit's end first. A second
+  search, with the pit dropped too: no state has the runner in the room
+  while the guard is still in its hall, at guardSpeed 3.5 and 3.3 in
+  landscape and 3.5 down to 3.1 in portrait, so the guard always follows
+  the runner down. The rounding makes these "no clear found", not a proof.
+- Argued, not proven: that the lure plays like the original's level 10.
+  Not played by hand; the user's play on the preview stands in.
+
 ## 2026-11-19 (later) - Klad level 6: break through tall columns between the guards and the pools (RAS-69)
 
 Level 6 is new, revision 1, named "выбери высоту" (choose the height). It

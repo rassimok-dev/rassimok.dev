@@ -198,47 +198,12 @@ const KLAD_GAME = (() => {
     if (g.inHole > 0 || g.stuck || g.dead > 0) return false;
     if (!supported(g)) return fall(g);
     g.falling = false; g.fallRows = 0;
-    const next = pathStep(g);
-    if (next == null) return false;
-    const nx = next % W, ny = (next - nx) / W;
-    if (nx !== g.cx) g.dir = nx > g.cx ? 1 : -1;
-    startMove(g, nx, ny);
+    const next = KLAD_CHASE.step({ x: g.cx, y: g.cy }, { x: Math.round(player.x), y: Math.round(player.y) },
+      { isPassable: passable, isLadder });
+    if (next === null) return false;
+    if (next.x !== g.cx) g.dir = next.x > g.cx ? 1 : -1;
+    startMove(g, next.x, next.y);
     return true;
-  }
-
-  /* Guards believe planks always hold. They do not, which is how you trick them. */
-  function gSupported(x, y) {
-    return isLadder(x, y) || y + 1 >= H || isSolid(x, y + 1) || isLadder(x, y + 1) || isPlank(x, y + 1);
-  }
-  function gNeighbors(x, y, out) {
-    out.length = 0;
-    const ok = (nx, ny) => nx >= 0 && nx < W && ny >= 0 && ny < H && passable(nx, ny) && !isWater(nx, ny);
-    if (!gSupported(x, y)) { if (ok(x, y + 1)) out.push(idx(x, y + 1)); return out; }
-    if (ok(x - 1, y)) out.push(idx(x - 1, y));
-    if (ok(x + 1, y)) out.push(idx(x + 1, y));
-    if (isLadder(x, y) && ok(x, y - 1)) out.push(idx(x, y - 1));
-    if (ok(x, y + 1)) out.push(idx(x, y + 1));
-    return out;
-  }
-  const prev = new Int32Array(64 * 64), queue = new Int32Array(64 * 64), nb = [];
-  function pathStep(g) {
-    const start = idx(g.cx, g.cy), goal = cellOf(player);
-    if (start === goal) return null;
-    prev.fill(-1, 0, W * H);
-    prev[start] = start;
-    let qh = 0, qt = 0;
-    queue[qt++] = start;
-    while (qh < qt) {
-      const cur = queue[qh++];
-      if (cur === goal) break;
-      const cx = cur % W, cy = (cur - cx) / W;
-      gNeighbors(cx, cy, nb);
-      for (const n of nb) if (prev[n] === -1) { prev[n] = cur; queue[qt++] = n; }
-    }
-    if (prev[goal] === -1) return null;
-    let c = goal;
-    while (prev[c] !== start) c = prev[c];
-    return c;
   }
 
   function onArrive(e) {

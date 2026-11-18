@@ -23,6 +23,20 @@ ameblo «ライズアウト (MSX)» player write-up; idpixel. MobyGames, GoodOld
 
 ## Guards (хранители, «чертики» on Korvet)
 - Chase the player. Contact = instant death, level restarts.
+- How they chase (observed in a remake, 2026-11-15; the user's observation, hedged with
+  "apparently", not documented for the Korvet game): straight at the player, never around.
+  A guard standing directly above or below the player does not go around; it stays put.
+  Our rule (2026-11-17, `chase.js`): whenever a guard reaches a tile it takes one step that
+  brings it closer to the player, never one that leads away, and plans nothing further:
+  - on the player's row: a step toward the player; a wall in the way -> it waits at the wall;
+  - a gap in the floor ahead does not stop it: it walks on and falls (this is how a guard is
+    lured into a shot hole);
+  - player on another row, and a ladder step toward that row is possible (a ladder at the
+    guard's tile, or one set into the floor under it when going down) -> it climbs first;
+  - player on another row, no such ladder step -> it runs toward the player's column;
+  - directly above or below the player with no such ladder step -> it stands still;
+  - no water planning: a step toward the player is taken into water or off a ledge over
+    a plank, and the guard drowns.
 - Only die by falling into water; then respawn at their start position (MSX).
 - Can be walled in: lure into a shot hole, wall regrows -> guard immobilised ("замуровать").
   Korvet players remember this as the core trick. Levels 1 and 3 are "wall up the guard(s)".
@@ -46,6 +60,11 @@ ameblo «ライズアウト (MSX)» player write-up; idpixel. MobyGames, GoodOld
   wall up several; trick a guard; 5 = everything together (later levels are new).
 - Level code = URL hash (no storage). Two shapes per level (landscape/portrait).
 - Fire left out of v1 until behaviour is confirmed.
+- Guard chase: only "straight at the player, no way around" was observed. The other cases
+  (climb first, run toward the player's column, walk into gaps and water) are our reading of
+  that observation, to be checked against the remake. Guards decide only on a tile, never
+  mid-step, and climb as fast as the player; their walking speed is ours per level
+  (3.0 to 3.9 tiles/s against the player's 5).
 - A wall that regrows while the player stands in the gap waits for them to leave
   instead of killing them (Lode Runner kills; the original is undocumented here).
 - Sound is synthesised square waves in the spirit of the Korvet beeper, not

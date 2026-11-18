@@ -2,8 +2,9 @@
 /* klad/race.js without a browser, on the lobby's real socket module: a fake
    WebSocket opens, receives and drops only when a test says so, a fake clock
    runs timers only when a test advances it, and a fake engine records what
-   the race asks of it. The last parts run klad.js itself and race.js's page
-   half in a vm context with a stub page, for what only they can prove. */
+   the race asks of it. The last parts run klad.js itself (after chase.js, as
+   on the page) and race.js's page half in a vm context with a stub page, for
+   what only they can prove. */
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -763,6 +764,12 @@ const TEST_LEVELS = [{
   landscape: ['PE' + '.'.repeat(22), ...Array(15).fill(ROW(24))],
   portrait: ['.'.repeat(14) + 'EP', ...Array(23).fill(ROW(16))],
 }];
+const GUARD_LEVELS = [{
+  name: 'guard',
+  revision: 1,
+  landscape: ['P...G' + '.'.repeat(19), ...Array(15).fill(ROW(24))],
+  portrait: ['P...G' + '.'.repeat(11), ...Array(23).fill(ROW(16))],
+}];
 
 function loadGame(options = {}) {
   const windowListeners = {};
@@ -810,6 +817,7 @@ function loadGame(options = {}) {
   };
   sandbox.window = sandbox;
   vm.createContext(sandbox);
+  vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'chase.js'), 'utf8'), sandbox);
   vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'klad.js'), 'utf8'), sandbox);
   const game = vm.runInContext('KLAD_GAME', sandbox);
   function run(seconds) {
@@ -990,6 +998,20 @@ test('klad.js: the same exit outside a race dispatches klad:clear', () => {
   hold('ArrowRight', 1);
   // then
   assert.deepEqual(events, ['klad:clear']);
+});
+
+test('klad.js: a guard on the player\'s row runs at a player who stands still and catches them, by the rule in chase.js', () => {
+  // given
+  const { game, run, title } = loadGame({ levels: GUARD_LEVELS });
+  game.startRace(1, 'landscape', raceHooks());
+  // when
+  run(0.5);
+  const halfway = game.racePosition();
+  run(0.5);
+  // then
+  assert.notEqual(halfway, null);
+  assert.equal(game.racePosition(), null);
+  assert.equal(title(), 'ПОГИБ');
 });
 
 test('klad.js: a race has no game over: deaths never end it and never dispatch klad:run', () => {

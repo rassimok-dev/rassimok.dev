@@ -3,6 +3,98 @@
 Dated entries, newest first. Written for a reader picking this up cold —
 or a future session needing to know what already exists and why.
 
+## 2026-11-17 (fourth) - Klad guards chase straight at the player, no way around (RAS-60)
+
+Guards no longer search for a path to the player. Whenever a guard stands
+on a tile it takes one step that brings it closer to the player, never one
+that leads away, and plans nothing further. The source is the user's
+observation in a remake of the game: guards "apparently" always run toward
+the player and do not go around when they stand directly above or below.
+It is not a documented rule of the Korvet game, and `klad/MECHANICS.md`
+says so. The user decided the cases the remake does not show (RAS-60, Q1 a
+to f, 2026-11-17): at a wall on the player's row the guard waits; a gap in
+the floor does not stop it, it walks on and falls, which is how it is lured
+into a shot hole; with a ladder step toward the player's row it climbs
+first; without one it runs toward the player's column; directly above or
+below the player with no ladder step it stands still; it never plans around
+water, so it may walk into a pool, or off a ledge onto a plank and through
+it, and drown.
+
+It ships with the rewritten levels 1 to 5 and the new levels 6 to 8 on
+one release branch, `release/klad-levels`, which the user plays on its
+Pages preview before it merges (RAS-60 Q2 a, decided 2026-11-18): the
+current levels were built for the old guards (below).
+
+### Decisions worth not relitigating
+
+- **This supersedes "Guards path with BFS and believe planks always
+  hold" (2026-10-30 (later)).** The breadth-first search is removed from
+  `klad.js` (`pathStep`, `gNeighbors`, `gSupported`
+  and the arrays `prev`, `queue`, `nb`), and with it two behaviours: guards
+  that believe planks hold, and guards that never step into water. The
+  user approved the removal on 2026-11-18.
+- **The rule is one pure function, `KLAD_CHASE.step` in `klad/chase.js`**
+  (a global plus `module.exports`, like `ticks.js`), loaded between
+  `ticks.js` and `klad.js`, so `klad/test/chase.test.js` checks each case on
+  a small map without a page. `decideGuard` asks it for the next tile;
+  falling, holes, walling in, drowning, the respawn and the guard speed per
+  level are unchanged. The race tests now load `chase.js` before `klad.js`,
+  as the page does, and one of them puts a guard on the player's row and
+  sees it catch the player, so a wrong call from `decideGuard` fails there.
+  That test loads `chase.js` itself, so it does not see a script tag
+  missing from `index.html`.
+- **A guard's ladder step is the player's:** up from a ladder tile; down
+  onto a ladder tile or from one, so a guard standing on a ladder set into
+  the floor climbs down it. "A ladder that leads to the player's row" is
+  read as "a ladder step toward that row is possible now", with no look at
+  where the ladder ends. The step is checked for walls only (bricks, stone,
+  a locked door), never for a floor, a plank or water. The target is the
+  player's rounded tile, as before.
+- **The ghost race mechanics are unaffected:** guards exist only in each
+  player's own copy of the level, and ghosts touch nothing. A race on a
+  shape that cannot be cleared is another matter: every player gets the
+  host's shape, so a level 2 race with a portrait host (probably
+  unclearable, below) has no finisher and ends at the 4 minute cap.
+
+### What the new chase does to the five levels
+
+Checked by reading the layouts and with a throwaway script that ran the
+real `klad.js`, with the old and with the new chase, under a search over
+the player's moves, waits and shots. It was not played by hand, and a
+search that finds no clear is not proof that none exists.
+
+- Level 1 (замуруй хранителя): both shapes can be cleared. Landscape
+  without a shot, as before. Portrait: the search found no clear without a
+  shot, with the old chase or the new, and found one with the guard walled
+  in. A guard that walks toward the player's column over a shot hole falls
+  in, so the lesson holds.
+- Level 2 (обгони хранителей): landscape can be cleared, but the guards
+  now wait above the player instead of running at them, so it is less of a
+  race. Portrait: no clear found, with or without shots, by a search that
+  covered every state it reached. Each floor has one ladder up, and a guard
+  on the floor above follows the player's column and comes down the ladder
+  the player needs. This shape probably cannot be finished.
+- Level 3 (замуруй всех): portrait: no clear found without a shot, as
+  before, and one with a guard walled in. Landscape can now be cleared
+  without a shot, where the old chase allowed none, so walling in became
+  optional there.
+- Level 4 (обмани хранителя): both shapes can be cleared without a shot,
+  as before, and guards still drown in the plank pool. There is no trick
+  left to play on them: a guard falls through the gaps above the planks
+  whenever the player's column lies beyond a gap. The lesson is weaker.
+- Level 5 (всё сразу): landscape can be cleared without a shot, as before.
+  Portrait could be cleared without a shot before; now no clear was found
+  without one, but it can be cleared once the guard from the middle floor
+  is walled in: it goes down to the foot of the only ladder up from the
+  floor above the start and, if a shot along that floor has opened the
+  brick beside it, walks into the gap and stays there (the next brick, or
+  the player below) until the wall grows back.
+
+For the new level layouts: standing still is now often safe, since a
+guard directly above or below waits where the old guards always arrived;
+and a guard held against a brick walks into it once a shot opens it, and
+is walled in if it is still there when the brick grows back.
+
 ## 2026-11-17 (later still) - Klad: the game shell works with more than five levels (RAS-63)
 
 New levels above 5 are planned. The game already followed `KLAD_LEVELS`

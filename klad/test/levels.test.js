@@ -13,7 +13,7 @@ const LEGEND = new Set('.=#H-~$KLDEPG');
 /* A shot flies along the shooter's row, never while falling, and opens the
    first brick it meets. Counted only where it always works: standing next to
    a brick on its row, the player shoots it and steps in. */
-function reach(rows, hasKey, sx, sy) {
+function reach(rows, hasKey, sx, sy, canUseShot = true) {
   const H = rows.length, W = rows[0].length;
   const at = (x, y) => (x < 0 || x >= W || y < 0 || y >= H) ? '=' : rows[y][x];
   const solid = (x, y) => { const c = at(x, y); return c === '=' || c === '#' || (c === 'D' && !hasKey); };
@@ -24,7 +24,7 @@ function reach(rows, hasKey, sx, sy) {
     if (at(x, y) === '~') continue;
     cells.add(`${x},${y}`);
     const push = (nx, ny, nf, canShoot) => {
-      if (solid(nx, ny) && !(canShoot && at(nx, ny) === '#')) return;
+      if (solid(nx, ny) && !(canShoot && canUseShot && at(nx, ny) === '#')) return;
       const k = `${nx},${ny},${nf}`;
       if (!seen.has(k)) { seen.add(k); q.push([nx, ny, nf]); }
     };
@@ -124,6 +124,22 @@ LEVELS.forEach((level, i) => {
         assert.ok(below !== '.' && below !== '~', `(${x},${y}) is floating or over water`);
       }
     });
+  }
+});
+
+test('level 2 needs the shot: without one the key is out of reach, in both shapes', () => {
+  // given
+  const level = LEVELS[1];
+
+  for (const shape of Object.keys(DIMS)) {
+    // when
+    const rows = level[shape];
+    const [px, py] = find(rows, 'P')[0];
+    const [kx, ky] = find(rows, 'K')[0];
+    const cells = reach(rows, false, px, py, false);
+
+    // then
+    assert.ok(!cells.has(`${kx},${ky}`), `${shape}: the key is reachable without a shot`);
   }
 });
 

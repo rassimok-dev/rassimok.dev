@@ -52,7 +52,7 @@ grows back behind the runner and shuts the guards out.
 - **Every chest can be taken.** A sealed chest that no shot can reach
   would read, in a level about opening sealed chests, as a puzzle the
   player failed.
-- **The chests after the key sit at most one tile off the way out:**
+- **The chests after the key sit a short step off the way out:**
   after the key the guards climb the exit ladder behind the runner, and a
   chest further back toward the door would send the runner toward them.
   The one on the top floor (past the exit in landscape, beside the ladder
@@ -69,7 +69,7 @@ grows back behind the runner and shuts the guards out.
 - `reach` in `klad/test/levels.test.js` counts a brick as open only where
   a shot always works: the runner stands (not falls) next to it on its
   row, shoots it and steps in, and the hole stays open while they are in
-  it (`klad.js` `fire` and `updateShot`). A brick shot from further away,
+  it (`klad.js` `fire`, `updateShot` and `updateHoles`). A brick shot from further away,
   or a hole to drop into from above, does not count, so "reachable" stays
   true for a real player. Sealed chests are now checked like any other,
   at most one unreachable as before, and the key-then-exit route may pass

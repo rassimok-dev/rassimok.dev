@@ -2,9 +2,9 @@
 /* klad/race.js without a browser, on the lobby's real socket module: a fake
    WebSocket opens, receives and drops only when a test says so, a fake clock
    runs timers only when a test advances it, and a fake engine records what
-   the race asks of it. The last parts run klad.js itself (after chase.js, as
-   on the page) and race.js's page half in a vm context with a stub page, for
-   what only they can prove. */
+   the race asks of it. The last parts run klad.js itself (through play.js,
+   in the page's script order) and race.js's page half in a vm context with
+   a stub page, for what only they can prove. */
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -13,6 +13,7 @@ const vm = require('node:vm');
 const KLAD_RACE = require('../race.js');
 const KLAD_LOBBY = require('../lobby.js');
 const KLAD_TICKS = require('../ticks.js');
+const play = require('./play.js');
 
 const { TEXT } = KLAD_RACE;
 const ID = 'Room_id-42';
@@ -771,74 +772,7 @@ const GUARD_LEVELS = [{
   portrait: ['P...G' + '.'.repeat(11), ...Array(23).fill(ROW(16))],
 }];
 
-function loadGame(options = {}) {
-  const windowListeners = {};
-  const events = [];
-  const texts = [];
-  const hashes = [];
-  const elements = {};
-  let frame = null;
-  let time = 0;
-  let isDialogOpen = false;
-  const canvasContext = {
-    fillRect() {},
-    drawImage() {},
-    fillText(text) { texts.push({ text, colour: this.fillStyle }); },
-  };
-  const element = () => ({
-    textContent: '', hidden: false, style: {}, dataset: {},
-    setAttribute() {}, addEventListener() {}, focus() {},
-    getContext: () => canvasContext,
-    getBoundingClientRect: () => ({ width: 800, height: 600 }),
-  });
-  const document = {
-    documentElement: {},
-    getElementById: (id) => elements[id] || (elements[id] = element()),
-    createElement: () => ({ getContext: () => ({ fillRect() {} }) }),
-    querySelector: () => (isDialogOpen ? {} : null),
-    querySelectorAll: () => options.pad || [],
-    addEventListener() {},
-    dispatchEvent: (event) => events.push(event.type),
-  };
-  const sandbox = {
-    KLAD_LEVELS: options.levels || TEST_LEVELS,
-    document,
-    location: { hash: options.hash || '' },
-    history: { replaceState: (state, title, hash) => hashes.push(hash) },
-    matchMedia: (query) => ({
-      matches: (query === '(orientation: portrait)' && options.isPortrait === true) ||
-        (query === '(hover: none) and (pointer: coarse)' && options.isTouch === true),
-    }),
-    getComputedStyle: () => ({ getPropertyValue: () => '' }),
-    addEventListener: (type, listener) => { windowListeners[type] = listener; },
-    performance: { now: () => 0 },
-    requestAnimationFrame: (callback) => { frame = callback; },
-    CustomEvent: class { constructor(type, init) { this.type = type; this.detail = init.detail; } },
-  };
-  sandbox.window = sandbox;
-  vm.createContext(sandbox);
-  vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'chase.js'), 'utf8'), sandbox);
-  vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'klad.js'), 'utf8'), sandbox);
-  const game = vm.runInContext('KLAD_GAME', sandbox);
-  function run(seconds) {
-    for (let elapsed = 0; elapsed < seconds * 1000; elapsed += 16) {
-      time += 16;
-      frame(time);
-    }
-  }
-  function hold(code, seconds) {
-    const event = { code, repeat: false, target: { tagName: 'CANVAS', dataset: {} }, preventDefault() {} };
-    windowListeners.keydown(event);
-    run(seconds);
-    windowListeners.keyup(event);
-  }
-  const key = (code) => hold(code, 0);
-  const typeIn = (code) => windowListeners.keydown({ code, repeat: false, target: { tagName: 'INPUT', dataset: {} }, preventDefault() {} });
-  const title = () => elements['msg-title'].textContent;
-  const setDialogOpen = (isOpen) => { isDialogOpen = isOpen; };
-  const body = () => elements['msg-body'].textContent;
-  return { game, events, texts, hashes, elements, run, key, hold, typeIn, title, body, setDialogOpen };
-}
+const loadGame = (options = {}) => play.loadGame({ levels: TEST_LEVELS, ...options });
 
 const SIX_LEVELS = Array.from({ length: 6 }, (unused, index) => ({ ...TEST_LEVELS[0], name: 'level ' + (index + 1) }));
 

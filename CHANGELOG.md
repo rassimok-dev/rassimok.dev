@@ -3,6 +3,111 @@
 Dated entries, newest first. Written for a reader picking this up cold —
 or a future session needing to know what already exists and why.
 
+## 2026-11-18 (later) - Klad level 2: shoot the key out of brick while the guards come up from below (RAS-65)
+
+Level 2 has a new layout of our own, revision 2, named "вскрой кладку"
+(break open the brickwork; the word for brickwork holds the word for
+treasure). It replaces "обгони хранителей" (revision 1) in both shapes;
+the user approved that deletion on 2026-11-18. The lesson is the one read
+from Korvet maze 2, the second maze in the Korvet order (RAS-65 Q1 a):
+shoot open treasure sealed in brick while the guards work below. It was
+read from still frames, not from play, so the layout is a candidate that
+the user plays on the release preview and corrects (Q2). Clean room: the
+layout is drawn from that lesson only, never transcribed from a
+screenshot, a video frame, an original level or a remake level. It ships
+on `release/klad-levels` with the new chase (RAS-60) and the other
+rewritten levels; the API learns revision 2 in RAS-62, which deploys
+first.
+
+How it plays, in both shapes: shelves one tile high with stone floors and
+chests sealed in brick rooms on them. The first room stands in the way on
+the top floor, so the first thing to learn is the shot, with no guard
+near. More rooms lie on the way down, and the key lies in a room of its
+own on the lowest shelf, with stone above and below it. The two guards
+work below that shelf, one in a hall and one in a deeper hall, each
+walking under the runner's column. Their only way up is one ladder that
+comes out on the key shelf between the runner's ladder down and the key
+room, so crossing its column brings both guards up behind the runner.
+Shooting the key room open, taking the key and shooting out of the far
+side at once gets the runner away; the far side leads to the only ladder
+up to the exit. A runner who waits in the key room longer than about
+1.9 s (landscape) or 1.5 s (portrait) is caught by a guard walking in
+through the hole. A careful runner can instead shoot the key room from the column
+before the guards' ladder, wait about three seconds and then go: the wall
+grows back behind the runner and shuts the guards out.
+
+### Decisions worth not relitigating
+
+- **The guards' halls end at their ladder, and nothing before the key
+  shelf lies at or past its column** (landscape column 13, portrait 9):
+  the top floor ends at the door and the upper shelves end before it. A
+  guard walks toward the runner's column, so it stays below until the
+  runner goes for the key, and then it always comes up. If a walk on the
+  top floor could pass that column, the guards would come up early, wait
+  at the key room and meet the runner on the way in.
+- **The key room is the only way to the exit.** The ladder up to the exit
+  is reached only from the key room's far side or from behind the door,
+  so the door keeps the runner from walking from the start to the exit,
+  and every way to the key passes the guards' ladder.
+- **Every chest can be taken.** A sealed chest that no shot can reach
+  would read, in a level about opening sealed chests, as a puzzle the
+  player failed.
+- **The chests after the key sit a short step off the way out:**
+  after the key the guards climb the exit ladder behind the runner, and a
+  chest further back toward the door would send the runner toward them.
+  The one on the top floor (past the exit in landscape, beside the ladder
+  top in portrait) and the pocket beside the exit ladder are taken under
+  pursuit (each checked once).
+- guardSpeed is 3.2, against level 1's 3.0. One door, opened by the one
+  key (S4 a). The name follows the imperative of the other level names.
+- The note in the RAS-60 entry that a level 2 race with a portrait host
+  probably has no finisher was about the old layout and no longer
+  applies.
+
+### The level test learns the shot (RAS-65 Q3 b)
+
+- `reach` in `klad/test/levels.test.js` counts a brick as open only where
+  a shot always works: the runner stands (not falls) next to it on its
+  row, shoots it and steps in, and the hole stays open while they are in
+  it (`klad.js` `fire`, `updateShot` and `updateHoles`). A brick shot from further away,
+  or a hole to drop into from above, does not count, so "reachable" stays
+  true for a real player. Sealed chests are now checked like any other,
+  at most one unreachable as before, and the key-then-exit route may pass
+  bricks the same way. Built here for RAS-68 and RAS-69 too.
+- `cheapest`, behind the fastest-clear check, now takes every brick as
+  open or closed, whichever is quicker, so it stays a lower bound with
+  shots at any distance and drops through shot floors. Every level stays
+  above the API floor of 600 ticks; the lowest is level 2 landscape at
+  1118.
+- New cases on small maps: a chest sealed in brick next to where the
+  runner stands is reachable; behind stone, under a brick floor, or next
+  to a brick passed only in a fall it is not; and the fastest clear
+  counts a drop through a brick floor.
+
+### How it was checked
+
+- `klad/test/levels.test.js`: both shapes pass, with no unreachable chest.
+- `klad/test/level-2.test.js` (new): per shape, a fixed key script clears
+  the level with the guards active (`klad:clear` with level 2 and
+  revision 2, no life lost); the same keys without the shot at the key
+  room leave the runner at the sealed wall, where the guards come up and
+  take a life; and waiting 2.6 s in the open key room costs a life too.
+  All three give the same result with start delays from 0 to 0.3 s in
+  16 ms steps (checked once with a throwaway script).
+- Proven on the maps, since only shots make holes: without a shot the
+  runner cannot leave the start corridor in either shape, and the key
+  room has stone above and below, so no clear exists without shooting it
+  open. Checked with the old no-shot route check on the new maps, and with
+  a sweep of the new one: from every tile before the key the key can
+  still be reached, and from every tile after it an exit.
+- Measured with a throwaway script on the real `klad.js`: how long the
+  runner may wait in the key room on the scripted way (above), and the
+  early shot and the pocket under pursuit (both clear). Argued, not
+  searched: that the guards always come up when the runner goes for the
+  key (the first decision above). No guard falls into a hole in this
+  level, so the late-fall quirk in the RAS-64 entry does not arise. Not
+  played by hand; the user's play on the preview stands in.
+
 ## 2026-11-18 - Klad level 1: a dense maze and a guard to wall up (RAS-64)
 
 Level 1 has a new layout of our own, revision 2, named "найди дорогу"

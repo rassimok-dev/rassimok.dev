@@ -1,7 +1,7 @@
 'use strict';
 /* Sanity checks for hand-drawn maps: shape, legend, one player, one key,
-   an exit on the top row, and a key-then-exit route that needs no shooting
-   (shooting only ever opens more routes, so this is the conservative check). */
+   an exit on the top row, and a key-then-exit route. Each check counts the
+   shot on its safe side (see reach and cheapest). */
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const LEVELS = require('../levels.js');
@@ -10,7 +10,10 @@ const KLAD_TICKS = require('../ticks.js');
 const DIMS = { landscape: [24, 16], portrait: [16, 24] };
 const LEGEND = new Set('.=#H-~$KLDEPG');
 
-function reach(rows, hasKey, sx, sy) {
+/* A shot flies along the shooter's row, never while falling, and opens the
+   first brick it meets. Counted only where it always works: standing next to
+   a brick on its row, the player shoots it and steps in. */
+function reach(rows, hasKey, sx, sy, canUseShot = true) {
   const H = rows.length, W = rows[0].length;
   const at = (x, y) => (x < 0 || x >= W || y < 0 || y >= H) ? '=' : rows[y][x];
   const solid = (x, y) => { const c = at(x, y); return c === '=' || c === '#' || (c === 'D' && !hasKey); };
@@ -20,14 +23,14 @@ function reach(rows, hasKey, sx, sy) {
     const [x, y, fell] = q.shift();
     if (at(x, y) === '~') continue;
     cells.add(`${x},${y}`);
-    const push = (nx, ny, nf) => {
-      if (solid(nx, ny)) return;
+    const push = (nx, ny, nf, canShoot) => {
+      if (solid(nx, ny) && !(canShoot && canUseShot && at(nx, ny) === '#')) return;
       const k = `${nx},${ny},${nf}`;
       if (!seen.has(k)) { seen.add(k); q.push([nx, ny, nf]); }
     };
     const sup = ladder(x, y) || y + 1 >= H || solid(x, y + 1) || ladder(x, y + 1) || (at(x, y + 1) === '-' && !fell);
     if (!sup) { push(x, y + 1, 1); continue; }
-    push(x - 1, y, 0); push(x + 1, y, 0);
+    push(x - 1, y, 0, true); push(x + 1, y, 0, true);
     if (ladder(x, y)) push(x, y - 1, 0);
     if (ladder(x, y) || ladder(x, y + 1)) push(x, y + 1, 0);
   }
@@ -35,13 +38,15 @@ function reach(rows, hasKey, sx, sy) {
 }
 
 /* Cheapest key-then-exit route in ticks, from the speeds in klad.js: walking
-   5 cells/s, climbing 4.5, falling 9, no shooting. A lower bound for any real clear. */
+   5 cells/s, climbing 4.5, falling 9. Every brick may be open or closed,
+   whichever is quicker: a lower bound for any real clear, shots included. */
 const TICKS_PER_CELL = { walk: 120 / 5, climb: 120 / 4.5, fall: 120 / 9 };
 
 function cheapest(rows, hasKey, sx, sy) {
   const H = rows.length, W = rows[0].length;
   const at = (x, y) => (x < 0 || x >= W || y < 0 || y >= H) ? '=' : rows[y][x];
-  const solid = (x, y) => { const c = at(x, y); return c === '=' || c === '#' || (c === 'D' && !hasKey); };
+  const solid = (x, y) => { const c = at(x, y); return c === '=' || (c === 'D' && !hasKey); };
+  const brick = (x, y) => at(x, y) === '#';
   const ladder = (x, y) => at(x, y) === 'H' || at(x, y) === 'E';
   const best = new Map([[`${sx},${sy},0`, 0]]), open = [[0, sx, sy, 0]], cost = new Map();
   while (open.length) {
@@ -54,7 +59,8 @@ function cheapest(rows, hasKey, sx, sy) {
       const k = `${nx},${ny},${nf}`, total = ticks + step;
       if (!best.has(k) || total < best.get(k)) { best.set(k, total); open.push([total, nx, ny, nf]); }
     };
-    const supported = ladder(x, y) || y + 1 >= H || solid(x, y + 1) || ladder(x, y + 1) || (at(x, y + 1) === '-' && !fell);
+    const supported = ladder(x, y) || y + 1 >= H || solid(x, y + 1) || brick(x, y + 1) || ladder(x, y + 1) || (at(x, y + 1) === '-' && !fell);
+    if (brick(x, y + 1)) go(x, y + 1, 1, TICKS_PER_CELL.fall);
     if (!supported) { go(x, y + 1, 1, TICKS_PER_CELL.fall); continue; }
     go(x - 1, y, 0, TICKS_PER_CELL.walk); go(x + 1, y, 0, TICKS_PER_CELL.walk);
     if (ladder(x, y)) go(x, y - 1, 0, TICKS_PER_CELL.climb);
@@ -102,7 +108,7 @@ LEVELS.forEach((level, i) => {
       const [px, py] = find(rows, 'P')[0];
       const [kx, ky] = find(rows, 'K')[0];
       const before = reach(rows, false, px, py);
-      assert.ok(before.has(`${kx},${ky}`), 'key reachable without shooting');
+      assert.ok(before.has(`${kx},${ky}`), 'key reachable');
       const after = reach(rows, true, kx, ky);
       assert.ok(exits.some(([x, y]) => after.has(`${x},${y}`)), 'exit reachable with the key');
 
@@ -119,4 +125,100 @@ LEVELS.forEach((level, i) => {
       }
     });
   }
+});
+
+test('level 2 needs the shot: without one the key is out of reach, in both shapes', () => {
+  // given
+  const level = LEVELS[1];
+
+  for (const shape of Object.keys(DIMS)) {
+    // when
+    const rows = level[shape];
+    const [px, py] = find(rows, 'P')[0];
+    const [kx, ky] = find(rows, 'K')[0];
+    const cells = reach(rows, false, px, py, false);
+
+    // then
+    assert.ok(!cells.has(`${kx},${ky}`), `${shape}: the key is reachable without a shot`);
+  }
+});
+
+/* The shot in the checks, on small maps. Coordinates are column,row. */
+test('route check: a chest sealed in brick next to where the player stands is reachable with a shot', () => {
+  // given
+  const rows = [
+    'P.#$#.',
+    '======',
+  ];
+
+  // when
+  const cells = reach(rows, false, 0, 0);
+
+  // then
+  assert.ok(cells.has('3,0'));
+});
+
+test('route check: a chest sealed in brick behind stone is unreachable, the shot stops at stone', () => {
+  // given
+  const rows = [
+    'P.=#$#',
+    '======',
+  ];
+
+  // when
+  const cells = reach(rows, false, 0, 0);
+
+  // then
+  assert.ok(!cells.has('4,0'));
+});
+
+test('route check: a chest under a brick floor is unreachable, the shot flies along the row only', () => {
+  // given
+  const rows = [
+    'P.....',
+    '=#====',
+    '=$====',
+    '======',
+  ];
+
+  // when
+  const cells = reach(rows, false, 0, 0);
+
+  // then
+  assert.ok(!cells.has('1,2'));
+});
+
+test('route check: a brick passed in a fall stays shut, a falling player cannot shoot', () => {
+  // given
+  const rows = [
+    'P.....',
+    '=.====',
+    '=.#$#=',
+    '=.====',
+    '=.....',
+    '======',
+  ];
+
+  // when
+  const cells = reach(rows, false, 0, 0);
+
+  // then
+  assert.ok(cells.has('1,4'));
+  assert.ok(!cells.has('3,2'));
+});
+
+test('fastest clear: a drop through a brick floor counts, every brick may be open', () => {
+  // given
+  const rows = [
+    'P....',
+    '#===H',
+    '....H',
+    '=====',
+  ];
+
+  // when
+  const ticks = cheapest(rows, false, 0, 0).get('0,2');
+
+  // then
+  assert.equal(ticks, 2 * TICKS_PER_CELL.fall);
 });

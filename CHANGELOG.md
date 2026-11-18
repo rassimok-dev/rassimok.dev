@@ -3,6 +3,97 @@
 Dated entries, newest first. Written for a reader picking this up cold —
 or a future session needing to know what already exists and why.
 
+## 2026-11-18 (later still) - Klad level 3: careful climbing over a lake, no guard (RAS-66)
+
+Level 3 has a new layout of our own, revision 2, named "не оступись"
+(don't slip). It replaces "замуруй всех" (revision 1) in both shapes; the
+user approved that deletion on 2026-11-18. The lesson is careful
+climbing: chests hang over water, every slip is fatal, and there is no
+guard. It was read from still frames of level 2 of an Android remake,
+not from play, so the layout is a candidate that the user plays on the
+release preview and corrects. The name follows the imperative of the
+other level names. The user chose the Korvet order where it is verified
+(S5 a: level 2 sealed treasure from Korvet maze 2) and put this lesson,
+from the remake's level 2 whose Korvet place is not verified, at level 3,
+even though the Old-Games wiki cited in `klad/MECHANICS.md` calls Korvet
+level 3 "wall up the guards"; Korvet maze 3 itself has not been seen,
+and the wiki sentence stays in `MECHANICS.md` as a source. Clean room:
+the layout is drawn from the lesson only, never transcribed from a
+screenshot, a video frame, an original level or a remake level. It ships
+on `release/klad-levels` with the new chase (RAS-60) and the other
+rewritten levels; the API learns revision 2 in RAS-62, which deploys
+first.
+
+How it plays, in both shapes: a lake two rows deep lies above the stone
+bottom row, and ladders and plank bridges hang over it. The runner
+starts on a stone ledge at the top left, near the top of a long ladder;
+the door and the exit are on a stone ledge at the top right. The
+key lies on a plank beside the lowest rung of a ladder, just above the
+water: one rung further down, or one step past the key, and the
+runner drops into the lake. Back up, each bridge meets a ladder at one
+rung, and a step off the rung above or below it drops the runner through
+the air or a plank into the water. The other chests sit on planks beside
+rungs, on a ladder top (portrait), under the door ledge (the life chest)
+and behind the exit.
+
+### Decisions worth not relitigating
+
+- **No guard** (S7 a), so the "at least one guard" check in
+  `klad/test/levels.test.js` is gone (deletion approved 2026-11-18).
+  `klad.js` needs no change: with no guard its guard loops do nothing.
+  `klad/test/level-3.test.js` plays the level and finishes a race on it.
+- **No brick either.** Without a guard the gun is only good for opening
+  bricks, and this level has none, so a shot flies until stone, the
+  locked door or the edge and changes nothing. The lesson is the
+  climbing alone, and the search below covers every way to play.
+- **Every fall drowns.** No fall ends on a floor, a ladder or a ledge;
+  the one exception is a one-tile drop off the exit ladder, after the
+  door. A fall onto a plank goes on through it into the water.
+- **No chest sits directly above water** (RAS-66 Q3b a): the chests over
+  the lake are on planks, the others on a ladder top or on stone. Planks
+  rather than bricks: a brick would catch a runner falling from a rung
+  above, a slip without a cost.
+- **The life chest hangs under the door ledge**, with stone above it, so
+  no fall passes through it. A life chest on a fatal fall gives the life
+  back that the fall takes, so that slip would cost nothing.
+- **The first edge is two or three tiles from the start**, so a player
+  who holds the key from the first moment walks off it in under a second
+  and drowns. That is the lesson from the first step; the intro shows
+  the name.
+- **Two rows of water** look like a lake; no rule depends on the depth.
+- guardSpeed stays 3.3: no guard reads it, and removing the field was
+  not part of the approved deletion.
+
+### How it was checked
+
+- `klad/test/levels.test.js`: both shapes pass the validator, with the
+  guard check removed and every other check as before.
+- `klad/test/level-3.test.js` (new): per shape, a fixed key script clears
+  the level (`klad:clear` with level 3 and revision 2, no life lost);
+  the same way with one rung too far down, or one step past the key,
+  costs a life; and the clearing keys finish a race on level 3
+  (`startRace`), which runs with no guard. Checked once with a throwaway
+  script: the same results with start delays from 0 to 0.3 s in 16 ms
+  steps, and both slip tests fail on a level with a plank past the key
+  and a rung below the ladder's foot.
+- A throwaway breadth-first search over one-tile moves on the real
+  `klad.js` (through `test/play.js`), compared with a scratch copy of the
+  engine's movement rules: every outcome matched (464 moves from 116
+  states, a tile with or without the key, in landscape; 524 from 131 in
+  portrait). The engine decides only when the runner stands on a tile,
+  and with no guard and no brick nothing depends on timing, so any input
+  is a sequence of these moves. Found on the real engine: every move that
+  starts a fall drowns the runner, except the one-tile drop off the exit
+  ladder after the door; and from every state the runner can
+  reach, the exit can still be reached. Found on the copy, which matched
+  move for move: every clear takes at least 8 careful moves in each
+  shape (on the cheapest route 6 stops where one more tile the same way
+  drowns, and 2 steps off a ladder where the same step one rung further
+  drowns).
+- Argued, not proven: that these moves feel like the original's careful
+  climbing. Not played by hand; the user's play on the preview stands
+  in.
+
 ## 2026-11-18 (later) - Klad level 2: shoot the key out of brick while the guards come up from below (RAS-65)
 
 Level 2 has a new layout of our own, revision 2, named "вскрой кладку"

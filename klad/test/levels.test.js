@@ -100,7 +100,6 @@ LEVELS.forEach((level, i) => {
       assert.ok([...rows[H - 1]].every((c) => c === '='), 'bottom row is stone');
       assert.equal(find(rows, 'P').length, 1, 'exactly one player');
       assert.equal(find(rows, 'K').length, 1, 'exactly one key chest');
-      assert.ok(find(rows, 'G').length >= 1, 'at least one guard');
       const exits = find(rows, 'E').filter(([, y]) => y === 0);
       assert.ok(exits.length >= 1, 'an exit ladder reaches the top row');
       assert.ok(find(rows, 'D').length >= 1, 'a locked door');

@@ -32,19 +32,22 @@ caches to the exit ladder, which climbs the left edge to the top.
 
 It is a different lesson from level 2's: there the guards wait below
 and come up only when the runner crosses their ladder; here a guard is
-always coming down after the runner, so every cache costs time against
-it, and the key lets out more guards from above.
+coming down after the runner, so a cache across the shaft from it costs
+time (one on its side, reached before it gets to the shaft, keeps it on
+the top floor), and the key lets out more guards from above.
 
 ### Decisions worth not relitigating
 
 - **The ledge guard's head start is the budget for the caches.** It
   walks along the ledge and the top floor toward the runner's column and
   climbs down the shaft whenever it stands at its head while the runner
-  is below in the shaft's column. At the test harness's pace, and with
-  start delays from 0 to 0.3 s in 0.05 s steps, every single cache and
-  every pair of caches beside the shaft clears at each delay, and no set
-  of three does, in both shapes (some sets of three clear at some
-  delays). A runner who goes straight down at once can be gone before
+  is below in the shaft's column. At the test harness's pace, with
+  start delays from 0 to 0.3 s in 0.05 s steps, and on the sweep's route
+  (caches top to bottom, then the test's key and exit script), every
+  single cache and every pair of caches beside the shaft clears at each
+  delay. In landscape no set of three does; in portrait a few sets of
+  three do (6 of 120 in the review's sweep), all starting with a cache on
+  the guard's side. A runner who goes straight down at once can be gone before
   the guard reaches the shaft (landscape); the guard then stays on the
   top floor above the runner.
 - **The head start is short on purpose; it trades the cache budget
@@ -85,14 +88,20 @@ it, and the key lets out more guards from above.
   further on for that reason (with the brick beside the ladder, a runner
   who stopped to shoot had 0.5 s).
 - **Every chest can be taken**, none is out of reach. The open chest
-  beside the shaft's foot, and in landscape the cache beside the start,
-  are for greed.
-- **No guard falls in this level**: guards move only by floors and
-  ladders, so the late-fall quirk in the RAS-64 entry does not arise.
+  beside the shaft's foot, and in landscape the open chest beside the
+  start, are for greed. That one was sealed in a first draft: a runner
+  who shot it and waited inside walled the ledge guard into its brick
+  and stalled (the review reproduced it), so it lies open now, as the
+  one at the shaft's foot does.
+- **No guard falls in the scripted runs**: guards move by floors and
+  ladders, and the late-fall quirk in the RAS-64 entry is not used.
   There are no planks and no water.
-- guardSpeed 3.0, the low end, against 3.8 for the old level 5: the head
-  start is a walk. At 3.4 on the same layout no pair of caches clears at
-  every start delay in landscape, and only 29 of 45 pairs in portrait.
+- guardSpeed 3.0, the low end, against 3.8 for the old level 5, so level
+  5 runs below levels 2 to 4 on purpose and the 2026-10-30 per-level
+  speed ramp no longer holds: the head start is a walk. At 3.4 the
+  reliable pairs of caches drop (the developer's sweep found none in
+  landscape and 29 of 45 in portrait; the review's route 4 of 15 and 40
+  of 45).
   The name follows the imperative of the other level names.
 
 ### How it was checked

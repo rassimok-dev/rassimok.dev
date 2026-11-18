@@ -72,6 +72,9 @@ ameblo «ライズアウト (MSX)» player write-up; idpixel. MobyGames, GoodOld
   and above the small pools at their feet, from level 6 of the remake, read from still frames;
   7, lead the guard away into a pit before you empty a rich treasure room with one way in,
   where it would follow you down and trap you, from level 10 of the remake, read from still
+  frames; 8, reach two treasure vaults across deadly water with the guards between them,
+  standing where they follow you into the lake and dropping past their ledges while they are
+  gone, from level 23 of the remake, a Korvet level by the user's word, read from still
   frames).
 - Level code = URL hash (no storage). Two shapes per level (landscape/portrait).
 - Fire left out of v1 until behaviour is confirmed.

@@ -1259,9 +1259,9 @@ test('a position outside the grid plus one cell makes no ghost', () => {
   const { race, say } = racing();
 
   // when
-  say({ type: 'pos', slot: 1, nick: 'Anna', x: 25, y: 3, tick: 1 });
+  say({ type: 'pos', slot: 1, nick: 'Anna', x: 31, y: 3, tick: 1 });
   say({ type: 'pos', slot: 1, nick: 'Anna', x: 3, y: -1, tick: 1 });
-  say({ type: 'pos', slot: 2, nick: 'Anna', x: 24, y: 0, tick: 1 });
+  say({ type: 'pos', slot: 2, nick: 'Anna', x: 30, y: 0, tick: 1 });
 
   // then
   assert.deepEqual(race.ghosts().map((ghost) => ghost.slot), [2]);

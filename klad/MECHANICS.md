@@ -59,22 +59,26 @@ ameblo «ライズアウト (MSX)» player write-up; idpixel. MobyGames, GoodOld
 - Several levels, our own layouts. The lesson order follows Korvet where it is verified
   (levels 1 and 2); level 3's place is the user's choice of 2026-11-18, against the wiki's
   "Levels 1 and 3" above (Korvet maze 3 not seen); level 4 follows the remake. Lessons: find
-  the way through a dense maze over deadly water, to a key whose room is held by one guard you
-  must wall up first (from Korvet maze 1); shoot open treasure sealed in brick, the key too,
-  while the guards come up from below (from Korvet maze 2); climb with care over a lake with no
-  guard, every slip fatal (from level 2 of the remake); plan the route across planks over
-  water, walking onto them and falling through one only where stone lies below, while the
-  guard the key lets out falls through them and drowns (from level 4 of the remake, read from
-  still frames); shoot open sealed caches beside a shaft while a guard comes down it after you,
-  then run out under pens whose guards the key lets out, one door each (from level 5 of the
-  remake, read from still frames). Later levels are new, each from the remake and read from
-  still frames: 6, climb between tall brick columns and break through them only on the rows
-  below the guards that climb level with you behind them and above the small pools at their
-  feet (its level 6); 7, lead the guard away into a pit before you empty a rich treasure room
-  with one way in, where it would follow you down and trap you (its level 10); 8, reach two
-  treasure vaults across deadly water with the guards between them, standing where they follow
-  you into the lake and dropping past their ledges while they are gone (its level 23, a Korvet
-  level by the user's word).
+  the way through a dense maze with a pool in its floor, to a key whose room is held by one
+  guard you must wall up first (from Korvet maze 1); shoot open treasure sealed in brick, the
+  key too, while the guards come up from below (from Korvet maze 2); climb with care over a
+  lake with no guard, every slip fatal except the drop back onto the start ledge (from level 2
+  of the remake); plan the route across planks over water, where falls land safely only on the
+  few brick landing pads and a plank drops you into the water, while the guard walks off its
+  ledge into the lake and comes back (from level 4 of the remake, read from still frames); shoot
+  open sealed caches on both sides of a shaft while two guards on the ledge above come down it
+  whenever you are on it or across it (a guard that follows across the gap drops into the pocket
+  at its foot), then reach a door, the key opening all three (from level 5 of the remake, read
+  from still frames). Later levels are new, each from the remake and read from still frames: 6,
+  climb between tall columns and break through the brick ones only on the walkway row, below
+  the guards that come down level with you behind them and above the small pools that lie on
+  ledges beside the columns (its level 6); 7, lead the guard into the notch at the far end of
+  its hall before you empty a rich treasure room with one way in, where it would follow you up
+  its ladder and trap you (its level 10); 8, reach two treasure vaults across deadly water with
+  the guards between them: the runner starts at the top over a vault and climbs down the
+  central ladder, and each crossing of the plank bridge starts at a lookout level with the
+  guards, waits until they have walked into the lake and goes before they are back (its level
+  23, a Korvet level by the user's word).
 - Level code = URL hash (no storage). Two shapes per level (landscape/portrait).
 - Fire left out of v1 until behaviour is confirmed.
 - Guard chase: only "straight at the player, no way around" was observed. The other cases

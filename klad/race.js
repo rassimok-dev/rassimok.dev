@@ -15,7 +15,8 @@ const KLAD_RACE = (() => {
   const MAX_SAMPLES = 10;
   const NOTICE_FOR = 8 * 1000;
   const SLOTS = 10;
-  const LAST_CELL = 24;
+  /* The longer grid side is 30 cells (0 to 29); one cell of slack past it. */
+  const LAST_CELL = 30;
   const MAX_SECONDS = 4 * 60 + 10;
   const SHAPES = ['landscape', 'portrait'];
   const ACTIVE = ['starting', 'countdown', 'racing', 'finished'];

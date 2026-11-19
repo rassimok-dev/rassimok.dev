@@ -1,13 +1,12 @@
 'use strict';
 /* Level 4 played in both shapes with the guard active, on the real page
-   scripts (test/play.js). Planks hold a runner who walks onto them and drop
-   one who lands on them from a fall. The only way down is the hole at the
-   left: its fall goes through a plank onto stone. The key lies on a bridge
-   of planks, reached on foot; the fall straight down to it goes through the
-   planks into the water. The key also opens the door of the guard's ledge:
-   the guard steps out toward the runner, falls through the planks and
-   drowns, and the far ladder must be climbed before it is back. Counts are
-   tiles. */
+   scripts (test/play.js). A plank holds a runner who walks onto it and drops
+   one who lands on it from a fall. The key lies on a short plank beside a
+   brick: the safe way down to it is the fall from the end of the high plank
+   onto that brick, while the fall onto the key from the middle plank goes
+   through its plank into the water. From the key the way out is a second
+   fall onto a brick, away from the exit; the step off the key shelf toward
+   the exit staircase goes through the planks below. Counts are tiles. */
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { playLevel } = require('./play.js');
@@ -15,56 +14,113 @@ const { playLevel } = require('./play.js');
 const RIGHT = 'ArrowRight';
 const LEFT = 'ArrowLeft';
 const UP = 'ArrowUp';
-const TRAPDOOR_FALL_SECONDS = 1.3;
-const SHORTCUT_FALL_SECONDS = { landscape: 1.5, portrait: 2.4 };
+/* Long enough for a fall of up to eight rows onto a brick. */
+const BRICK_FALL_SECONDS = 0.9;
+/* Past a fall into the water, short of the end of the 1.4 s death screen. */
+const WATER_FALL_SECONDS = { landscape: 1.5, portrait: 2.8 };
 /* The death screen stays 1.4 s before the life is taken. */
 const DEATH_SECONDS = 1.6;
-/* Long enough for the guard to come back, walk to the far ladder and climb
-   down it, and for the level to start again after the death. */
-const GUARD_RETURN_SECONDS = 12;
 
-function downTheTrapdoor(play) {
-  play.walk(LEFT, 2);
-  play.run(TRAPDOOR_FALL_SECONDS);
-}
-
-const TO_THE_FAR_LADDER = {
+const TO_THE_MIDDLE_PLANK = {
   landscape(play) {
-    play.walk(RIGHT, 16);
-    play.climb(UP, 1);
+    play.walk(RIGHT, 2);
+    play.climb(UP, 3);
     play.walk(RIGHT, 3);
+    play.climb(UP, 2);
+    play.walk(RIGHT, 1);
+    play.climb(UP, 2);
+    play.walk(RIGHT, 1);
+    play.climb(UP, 3);
   },
   portrait(play) {
-    play.walk(RIGHT, 9);
-    play.climb(UP, 1);
-    play.walk(RIGHT, 3);
+    play.walk(RIGHT, 2);
+    play.climb(UP, 3);
+    play.walk(RIGHT, 4);
+    play.climb(UP, 3);
+    play.walk(LEFT, 1);
+    play.climb(UP, 3);
+    play.walk(LEFT, 1);
+    play.climb(UP, 3);
+    play.walk(LEFT, 4);
+    play.climb(UP, 3);
+    play.walk(RIGHT, 4);
+    play.climb(UP, 3);
+    play.walk(RIGHT, 1);
+    play.climb(UP, 3);
   },
 };
 
-const UP_AND_OUT = {
+const TO_THE_KEY = {
   landscape(play) {
-    play.climb(UP, 9);
+    TO_THE_MIDDLE_PLANK.landscape(play);
+    play.walk(RIGHT, 1);
+    play.climb(UP, 3);
+    play.walk(RIGHT, 6);
+    play.run(BRICK_FALL_SECONDS);
+    play.walk(LEFT, 2);
+  },
+  portrait(play) {
+    TO_THE_MIDDLE_PLANK.portrait(play);
+    play.walk(LEFT, 1);
+    play.climb(UP, 3);
+    play.walk(RIGHT, 5);
+    play.run(BRICK_FALL_SECONDS);
+    play.walk(LEFT, 2);
+  },
+};
+
+const TO_THE_EXIT = {
+  landscape(play) {
+    play.walk(LEFT, 1);
+    play.run(BRICK_FALL_SECONDS);
+    play.walk(RIGHT, 13);
+    play.climb(UP, 2);
+    play.walk(RIGHT, 3);
+    play.climb(UP, 2);
+    play.walk(LEFT, 1);
+    play.climb(UP, 2);
+    play.walk(LEFT, 1);
+    play.climb(UP, 2);
+    play.walk(LEFT, 1);
+    play.climb(UP, 2);
     play.walk(RIGHT, 2);
     play.climb(UP, 2);
   },
   portrait(play) {
-    play.climb(UP, 10);
+    play.walk(LEFT, 1);
+    play.run(BRICK_FALL_SECONDS);
+    play.walk(RIGHT, 10);
+    play.climb(UP, 2);
+    play.walk(LEFT, 1);
+    play.climb(UP, 2);
+    play.walk(RIGHT, 1);
+    play.climb(UP, 2);
+    play.walk(LEFT, 1);
+    play.climb(UP, 2);
+    play.walk(RIGHT, 1);
+    play.climb(UP, 2);
+    play.walk(LEFT, 1);
+    play.climb(UP, 2);
+    play.walk(LEFT, 1);
+    play.climb(UP, 2);
     play.walk(RIGHT, 2);
     play.climb(UP, 2);
   },
 };
 
-const TOWARD_THE_KEY = { landscape: 6, portrait: 1 };
+/* From the end of the middle plank to the column of the key. */
+const ONTO_THE_KEY = { landscape: 5, portrait: 2 };
+/* From the key past the far end of the key shelf, toward the exit. */
+const TOWARD_THE_EXIT = { landscape: 11, portrait: 7 };
 
 for (const shape of ['landscape', 'portrait']) {
-  test(`level 4 ${shape}: falling through the plank over stone, walking the bridge to the key and climbing out while the released guard drowns clears the level at revision 2 with no life lost`, () => {
+  test(`level 4 ${shape}: dropping from the high plank onto the brick, taking the key, dropping onto the lower brick and climbing the staircase clears the level at revision 2 with no life lost`, () => {
     // given
     const play = playLevel(4, shape);
 
     // when
-    downTheTrapdoor(play);
-    TO_THE_FAR_LADDER[shape](play);
-    UP_AND_OUT[shape](play);
+    TO_THE_KEY[shape](play);
+    TO_THE_EXIT[shape](play);
 
     // then
     assert.deepEqual(play.events, ['klad:clear']);
@@ -73,36 +129,38 @@ for (const shape of ['landscape', 'portrait']) {
     assert.equal(play.lives(), 3);
   });
 
-  test(`level 4 ${shape}: walking off the ledge toward the key falls through the planks into the water and costs a life`, () => {
+  test(`level 4 ${shape}: stepping off the middle plank onto the key takes it and falls on through its plank into the water, costing a life`, () => {
     // given
     const play = playLevel(4, shape);
+    TO_THE_MIDDLE_PLANK[shape](play);
 
     // when
-    play.walk(RIGHT, TOWARD_THE_KEY[shape]);
-    play.run(SHORTCUT_FALL_SECONDS[shape]);
+    play.walk(RIGHT, ONTO_THE_KEY[shape]);
+    play.run(WATER_FALL_SECONDS[shape]);
+    const titleAfterFall = play.title();
+    const isKeyShownAfterFall = !play.elements['h-key'].hidden;
+    play.run(DEATH_SECONDS);
+
+    // then
+    assert.equal(titleAfterFall, 'ПОГИБ');
+    assert.equal(isKeyShownAfterFall, true);
+    assert.equal(play.lives(), 2);
+    assert.deepEqual(play.events, []);
+  });
+
+  test(`level 4 ${shape}: with the key, stepping off the key shelf toward the exit falls through the planks below into the water and costs a life`, () => {
+    // given
+    const play = playLevel(4, shape);
+    TO_THE_KEY[shape](play);
+
+    // when
+    play.walk(RIGHT, TOWARD_THE_EXIT[shape]);
+    play.run(WATER_FALL_SECONDS[shape]);
     const titleAfterFall = play.title();
     play.run(DEATH_SECONDS);
 
     // then
     assert.equal(titleAfterFall, 'ПОГИБ');
-    assert.equal(play.lives(), 2);
-    assert.deepEqual(play.events, []);
-  });
-
-  test(`level 4 ${shape}: waiting at the foot of the far ladder lets the guard come back down it and costs a life`, () => {
-    // given
-    const play = playLevel(4, shape);
-
-    // when
-    downTheTrapdoor(play);
-    TO_THE_FAR_LADDER[shape](play);
-    const livesAtTheLadder = play.lives();
-    const titleAtTheLadder = play.title();
-    play.run(GUARD_RETURN_SECONDS);
-
-    // then
-    assert.equal(livesAtTheLadder, 3);
-    assert.notEqual(titleAtTheLadder, 'ПОГИБ');
     assert.equal(play.lives(), 2);
     assert.deepEqual(play.events, []);
   });

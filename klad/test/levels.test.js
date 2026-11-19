@@ -7,7 +7,7 @@ const assert = require('node:assert/strict');
 const LEVELS = require('../levels.js');
 const KLAD_TICKS = require('../ticks.js');
 
-const DIMS = { landscape: [24, 16], portrait: [16, 24] };
+const DIMS = { landscape: [30, 18], portrait: [18, 30] };
 const LEGEND = new Set('.=#H-~$KLDEPG');
 
 /* A shot flies along the shooter's row, never while falling, and opens the

@@ -3,6 +3,137 @@
 Dated entries, newest first. Written for a reader picking this up cold —
 or a future session needing to know what already exists and why.
 
+## 2026-11-19 - Klad level 5: open sealed caches while a guard comes down after you (RAS-68)
+
+Level 5 has a new layout of our own, revision 2, named "не мешкай"
+(don't dawdle). It replaces "всё сразу" (revision 1) in both shapes; the
+user approved that deletion on 2026-11-18. The lesson is the one read
+from level 5 of the Android remake: shoot open many sealed caches while
+the guards come down from above, with several locked doors. The Korvet
+order is verified only for mazes 1 and 2, so this place follows the
+remake. It was read from still frames, not from play, so the layout is a
+candidate that the user plays on the release preview and corrects. Clean
+room: the layout is drawn from that lesson only, never transcribed from
+a screenshot, a video frame, an original level or a remake level. It
+ships on `release/klad-levels` with the new chase (RAS-60) and the other
+rewritten levels; the API learns revision 2 in RAS-62, which deploys
+first.
+
+How it plays, in both shapes: the runner starts on the top floor beside
+the head of a shaft. Down the shaft, on each floor, a chest sits sealed
+in brick on either side (three floors in landscape, five in portrait),
+and a guard on a ledge above walks to the shaft and comes down it after
+the runner. The key is sealed in brick at the foot of the shaft. The one
+key opens every door (S4 a): two pens over the way out, a guard behind
+each door, and the door of the exit ladder at the far end. Each pen's
+guard follows the runner along above and climbs down its ladder once
+the runner has passed under it. The way out runs through more sealed
+caches to the exit ladder, which climbs the left edge to the top.
+
+It is a different lesson from level 2's: there the guards wait below
+and come up only when the runner crosses their ladder; here a guard is
+coming down after the runner, so a cache across the shaft from it costs
+time (one on its side, reached before it gets to the shaft, keeps it on
+the top floor), and the key lets out more guards from above.
+
+### Decisions worth not relitigating
+
+- **The ledge guard's head start is the budget for the caches.** It
+  walks along the ledge and the top floor toward the runner's column and
+  climbs down the shaft whenever it stands at its head while the runner
+  is below in the shaft's column. At the test harness's pace, with
+  start delays from 0 to 0.3 s in 0.05 s steps, and on the sweep's route
+  (caches top to bottom, then the test's key and exit script), every
+  single cache and every pair of caches beside the shaft clears at each
+  delay. In landscape no set of three does; in portrait a few sets of
+  three do (6 of 120 in the review's sweep), all starting with a cache on
+  the guard's side. A runner who goes straight down at once can be gone before
+  the guard reaches the shaft (landscape); the guard then stays on the
+  top floor above the runner.
+- **The head start is short on purpose; it trades the cache budget
+  against a shut-in case.** With the guard two tiles further back, a
+  quick runner waiting in the first cache was shut in with the guard
+  walled into the cache's open brick: it stepped in just as the brick
+  grew back, and the shot that opens the way out frees it next to the
+  runner. Now the guard steps into that brick at least about 0.9 s
+  before it grows back on the quickest way to a first cache, on every
+  floor, and later caches on the way down have less head start. A
+  throwaway sweep of 1512 ways back up the shaft for a cache after the
+  key (the guard still on the top floor or following) found none that
+  walls the guard in. A farther start would allow more caches and bring
+  the shut-in case back.
+- **The chest beside the foot of the shaft lies open.** A sealed dead
+  end there was dropped: a runner coming back to it from the way out
+  meets the guard coming down the shaft with a longer head start than at
+  the first cache, near the moment its brick grows back, which is the
+  shut-in case above (argued from the timings; the few ways into it that
+  were tried ended in a plain death).
+- **A cache on the guard's side of the shaft keeps it above the runner
+  while it is still on the top floor**: it stops directly above the
+  runner's column and comes down once the runner is back in the shaft. A
+  cache across the shaft pulls it in. That is the chase rule of RAS-60,
+  not a special case.
+- **Each pen's guard lands behind the runner.** It walks above the
+  runner's column and reaches its ladder only once the runner is at or
+  past it; stopping under the ladder costs a life (about 1.1 s in
+  landscape, 0.7 s in portrait). Before the key the doors hold the pens'
+  guards, and the way out under the pens is reached only through the key
+  cache.
+- **Every door has its own job**: two pens and the exit. The exit ladder
+  is walled off from every floor, so a guard can follow the runner into
+  it only from behind, through the last door, and it climbs no faster
+  than the runner.
+- **In portrait the pens stand on a one-row floor**, so their guards come
+  down in two steps; the brick after the first pen's ladder is one tile
+  further on for that reason (with the brick beside the ladder, a runner
+  who stopped to shoot had 0.5 s).
+- **Every chest can be taken**, none is out of reach. The open chest
+  beside the shaft's foot, and in landscape the open chest beside the
+  start, are for greed. That one was sealed in a first draft: a runner
+  who shot it and waited inside walled the ledge guard into its brick
+  and stalled (the review reproduced it), so it lies open now, as the
+  one at the shaft's foot does.
+- **No guard falls in the scripted runs**: guards move by floors and
+  ladders, and the late-fall quirk in the RAS-64 entry is not used.
+  There are no planks and no water.
+- guardSpeed 3.0, the low end, against 3.8 for the old level 5, so level
+  5 runs below levels 2 to 4 on purpose and the 2026-10-30 per-level
+  speed ramp no longer holds: the head start is a walk. At 3.4 the
+  reliable pairs of caches drop (the developer's sweep found none in
+  landscape and 29 of 45 in portrait; the review's route 4 of 15 and 40
+  of 45).
+  The name follows the imperative of the other level names.
+
+### How it was checked
+
+- `klad/test/levels.test.js`: both shapes pass the validator, with no
+  unreachable chest (fastest clear 1126 ticks in landscape, 1456 in
+  portrait). New case: level 5 needs the shot, as level 2 does: with the
+  shot turned off, `reach` misses the key in both shapes.
+- `klad/test/level-5.test.js` (new): per shape, a fixed key script takes
+  a cache beside the shaft, shoots the key out of its cache and runs out
+  under the opened pens, and clears the level with the guards active
+  (`klad:clear` with level 5 and revision 2, no life lost). The same way
+  without the shot at the key leaves it sealed, and the ledge guard
+  comes down onto the runner; waiting in the cache lets the ledge guard
+  come down and in; stopping under the first pen's ladder lets its guard
+  down. Each of those costs a life. All eight give the same result with
+  start delays from 0 to 0.3 s in 16 ms steps (checked once with a
+  throwaway script).
+- Proven: no clear without a shot. Besides the map check above, a
+  breadth-first search over one-tile moves on the real `klad.js`, with
+  the guards removed (a guard cannot open brick), reaches the same 33
+  tiles in landscape and 35 in portrait and never the key. With the
+  validator's movement rules, from every tile reachable before the key
+  the key stays reachable, and from every tile after it an exit.
+- Measured, not proven: that guards come down from above in every clear.
+  In the scripted clears the ledge guard reaches the foot of the shaft
+  and the first pen's guard the way out. Argued: the only way to the
+  exit passes under the first pen's ladder after the key while the
+  runner is below the pen, so that guard always comes down. The cache
+  budgets above are for the harness's pace; a person's pace differs. Not
+  played by hand; the user's play on the preview stands in.
+
 ## 2026-11-18 (fourth) - Klad level 4: a route across planks over water (RAS-67)
 
 Level 4 has a new layout of our own, revision 2, named "смотри, куда

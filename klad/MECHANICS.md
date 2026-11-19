@@ -65,7 +65,9 @@ ameblo «ライズアウト (MSX)» player write-up; idpixel. MobyGames, GoodOld
   guard, every slip fatal (from level 2 of the remake); plan the route across planks over
   water, walking onto them and falling through one only where stone lies below, while the
   guard the key lets out falls through them and drowns (from level 4 of the remake, read from
-  still frames); 5 = everything together (later levels are new).
+  still frames); shoot open sealed caches beside a shaft while a guard comes down it after you,
+  then run out under pens whose guards the key lets out, one door each, from level 5 of the
+  remake, read from still frames (later levels are new).
 - Level code = URL hash (no storage). Two shapes per level (landscape/portrait).
 - Fire left out of v1 until behaviour is confirmed.
 - Guard chase: only "straight at the player, no way around" was observed. The other cases

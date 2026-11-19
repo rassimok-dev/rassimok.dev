@@ -1,11 +1,15 @@
 'use strict';
 /* Level 5 played in both shapes with the guards active, on the real page
-   scripts (test/play.js). A shaft runs down from the start past sealed
-   caches on both sides, and a guard on the ledge above comes down it after
-   the runner. The key is sealed in brick at the foot of the shaft. The key
-   also opens two pens over the way to the exit, and each pen's guard comes
-   down behind the runner once the runner has passed under its ladder. The
-   exit ladder climbs from behind the last door to the top. Counts are tiles. */
+   scripts (test/play.js). Sealed caches stand on both sides of a shaft of
+   two ladders with a gap between them and a pocket of water at its foot.
+   Both guards start on a ledge over the left caches: while the runner is
+   inside those caches they wait overhead, and whenever the runner is on the
+   shaft or across it they come down its left ladder. A guard that reaches
+   the runner's row with the gap in between steps into it and drowns, except
+   on the rows a bridge crosses. So the runner opens the lower left caches, the
+   key among them, with short stops on the ladder, crosses, lets the guards
+   follow down into the pocket, and opens the cache strips on the right on
+   the way to a door. Counts are tiles. */
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { playLevel } = require('./play.js');
@@ -14,141 +18,167 @@ const RIGHT = 'ArrowRight';
 const LEFT = 'ArrowLeft';
 const UP = 'ArrowUp';
 const DOWN = 'ArrowDown';
-/* Measured on the scripted way: the guard from the ledge reaches a runner
-   waiting in the cache after about 2.7 to 3 s, and one waiting at the sealed
-   key after about 1.2 to 1.5 s; a pen's guard reaches a runner stopped under
-   its ladder after about 1.1 s in landscape and 0.7 s in portrait. The death
+/* Portrait: the guards come down after the runner one behind the other. The
+   runner waits on a row they cannot cross to until both have stepped into
+   the gap: after the first box on the right, and again after the key. The
+   second wait leaves about half a second to spare on every step after it. */
+const BOTH_GUARDS_DROP_SECONDS = { first: 0.7, second: 4.5 };
+/* Measured on the scripted way: the guards reach a runner stopped on the
+   shaft after about 4 s in landscape and 2.5 s in portrait. The death
    screen then stays 1.4 s. */
-const WAIT_IN_THE_CACHE_SECONDS = 3.5;
-const WAIT_AT_THE_KEY_SECONDS = 2;
-const WAIT_UNDER_THE_PEN_SECONDS = 1.5;
+const STOP_ON_THE_SHAFT_SECONDS = { landscape: 4.6, portrait: 3 };
 const DEATH_SECONDS = 1.6;
+/* More than half of the chests on the scripted way. */
+const CHESTS = {
+  landscape: { chests: 24, chestsTotal: 32 },
+  portrait: { chests: 21, chestsTotal: 29 },
+};
 
-const TO_THE_BOTTOM = { landscape: 9, portrait: 17 };
-const EXIT_CLIMB = { landscape: 14, portrait: 22 };
-
-/* The walk into the brick only turns the runner to face it for the shot. */
-function openTheCacheRightOfTheShaft(play) {
-  play.walk(RIGHT, 1);
-  play.shoot();
-  play.walk(RIGHT, 2);
-}
-
-function toTheCache(play) {
-  play.walk(LEFT, 1);
-  play.climb(DOWN, 3);
-  openTheCacheRightOfTheShaft(play);
-}
-
-function toTheKey(play, shape, shouldShootTheKeyOpen) {
-  toTheCache(play);
-  play.walk(LEFT, 2);
-  play.climb(DOWN, TO_THE_BOTTOM[shape]);
-  if (shape === 'portrait') play.walk(LEFT, 1);
-  if (shouldShootTheKeyOpen) play.shoot();
-  play.walk(LEFT, 2);
-}
-
-/* From the key out through the far side of its cache, the run's caches and
-   the first pen's door to the tile under that pen's ladder. */
-const UNDER_THE_FIRST_PEN = {
+/* From the start onto the guards' ladder. Landscape: along the floor to the
+   shaft and through the bottom row of the left caches. Portrait: through
+   the caches on the start floor and up to the lowest bridge. */
+const ONTO_THE_SHAFT = {
   landscape(play) {
+    play.walk(RIGHT, 12);
+    play.climb(UP, 2);
+    play.walk(LEFT, 3);
     play.shoot();
-    play.walk(LEFT, 2);
-    play.shoot();
-    play.walk(LEFT, 2);
+    play.walk(LEFT, 4);
     play.shoot();
     play.walk(LEFT, 3);
+    play.walk(RIGHT, 10);
   },
   portrait(play) {
     play.shoot();
-    play.walk(LEFT, 3);
+    play.walk(RIGHT, 3);
+    play.shoot();
+    play.walk(RIGHT, 2);
+    play.shoot();
+    play.walk(RIGHT, 2);
+    play.climb(UP, 9);
   },
 };
 
+/* The walk into a brick wall only turns the runner to face it for the shot. */
 const ON_TO_THE_EXIT = {
   landscape(play) {
+    // the key row, over the bridge and down beside the pocket
+    play.climb(UP, 2);
+    play.walk(LEFT, 3);
     play.shoot();
-    play.walk(LEFT, 2);
+    play.walk(LEFT, 4);
     play.shoot();
-    play.walk(LEFT, 6);
+    play.walk(LEFT, 3);
+    play.walk(RIGHT, 10);
+    play.climb(UP, 1);
+    play.walk(RIGHT, 3);
+    play.climb(DOWN, 5);
+    // the floor strip while the guards drown, then the lower bridge strip
+    play.walk(RIGHT, 2);
+    play.shoot();
+    play.walk(RIGHT, 3);
+    play.shoot();
+    play.walk(RIGHT, 3);
+    play.walk(LEFT, 8);
+    play.climb(UP, 5);
+    play.walk(RIGHT, 3);
+    play.shoot();
+    play.walk(RIGHT, 3);
+    play.shoot();
+    play.walk(RIGHT, 3);
+    play.walk(LEFT, 9);
+    // the upper bridge strip, through its door and up the exit ladder
+    play.climb(UP, 6);
+    play.walk(RIGHT, 1);
+    for (let box = 0; box < 4; box++) {
+      play.shoot();
+      play.walk(RIGHT, 3);
+    }
+    play.climb(UP, 5);
   },
   portrait(play) {
+    // across, down to the box on the lowest row and wait there
+    play.walk(RIGHT, 2);
+    play.climb(DOWN, 5);
+    play.walk(RIGHT, 1);
+    play.shoot();
+    play.walk(RIGHT, 3);
+    play.shoot();
+    play.walk(RIGHT, 2);
+    play.walk(LEFT, 5);
+    play.run(BOTH_GUARDS_DROP_SECONDS.first);
+    // back across, the key box and the box below it, then across and down
+    play.climb(UP, 5);
+    play.walk(LEFT, 2);
+    play.climb(UP, 5);
     play.walk(LEFT, 1);
     play.shoot();
     play.walk(LEFT, 2);
     play.shoot();
+    play.walk(LEFT, 3);
+    play.walk(RIGHT, 5);
+    play.climb(DOWN, 2);
+    play.walk(LEFT, 1);
+    play.shoot();
     play.walk(LEFT, 4);
+    play.walk(RIGHT, 5);
+    play.climb(DOWN, 3);
+    play.walk(RIGHT, 2);
+    play.climb(DOWN, 5);
+    play.run(BOTH_GUARDS_DROP_SECONDS.second);
+    // up the right ladder: the lower bridge strip and the box on top of it
+    play.climb(UP, 5);
+    play.walk(RIGHT, 1);
+    play.shoot();
+    play.walk(RIGHT, 4);
+    play.walk(LEFT, 5);
+    play.climb(UP, 2);
+    play.walk(RIGHT, 1);
+    play.shoot();
+    play.walk(RIGHT, 4);
+    play.walk(LEFT, 4);
+    // the upper bridge strip, through its door and up the exit ladder
+    play.climb(UP, 7);
+    play.walk(RIGHT, 1);
+    play.shoot();
+    play.walk(RIGHT, 4);
+    play.shoot();
+    play.walk(RIGHT, 3);
+    play.climb(UP, 10);
   },
 };
 
 for (const shape of ['landscape', 'portrait']) {
-  test(`level 5 ${shape}: a cache beside the shaft, the key shot out of its cache and the run under the opened pens clear the level at revision 2 with no life lost`, () => {
+  test(`level 5 ${shape}: opening the caches with short stops on the shaft, the key among them, and the strips on the way to a door clears the level at revision 2 with most chests and no life lost`, () => {
     // given
     const play = playLevel(5, shape);
 
     // when
-    toTheKey(play, shape, true);
-    UNDER_THE_FIRST_PEN[shape](play);
+    ONTO_THE_SHAFT[shape](play);
     ON_TO_THE_EXIT[shape](play);
-    play.climb(UP, EXIT_CLIMB[shape]);
 
     // then
     assert.deepEqual(play.events, ['klad:clear']);
-    const { level, revision, shape: clearedShape } = play.details[0];
-    assert.deepEqual({ level, revision, shape: clearedShape }, { level: 5, revision: 2, shape });
+    const { level, revision, shape: clearedShape, chests, chestsTotal } = play.details[0];
+    assert.deepEqual({ level, revision, shape: clearedShape, chests, chestsTotal },
+      { level: 5, revision: 2, shape, ...CHESTS[shape] });
     assert.equal(play.lives(), 3);
   });
 
-  test(`level 5 ${shape}: the same way without the shot at the key leaves it sealed, and the guard that came down the shaft after the runner costs a life`, () => {
+  test(`level 5 ${shape}: stopping on the shaft lets the guards come down it onto the runner and costs a life`, () => {
     // given
     const play = playLevel(5, shape);
+    ONTO_THE_SHAFT[shape](play);
+    const livesOnTheShaft = play.lives();
 
     // when
-    toTheKey(play, shape, false);
-    const isKeyHiddenAtTheWall = play.elements['h-key'].hidden;
-    play.run(WAIT_AT_THE_KEY_SECONDS);
-    const titleAtTheWall = play.title();
+    play.run(STOP_ON_THE_SHAFT_SECONDS[shape]);
+    const titleOnTheShaft = play.title();
     play.run(DEATH_SECONDS);
 
     // then
-    assert.equal(isKeyHiddenAtTheWall, true);
-    assert.equal(titleAtTheWall, 'ПОГИБ');
-    assert.equal(play.lives(), 2);
-    assert.deepEqual(play.events, []);
-  });
-
-  test(`level 5 ${shape}: waiting in a cache beside the shaft lets the guard from the ledge come down and in, and costs a life`, () => {
-    // given
-    const play = playLevel(5, shape);
-
-    // when
-    toTheCache(play);
-    play.run(WAIT_IN_THE_CACHE_SECONDS);
-    const titleInTheCache = play.title();
-    play.run(DEATH_SECONDS);
-
-    // then
-    assert.equal(titleInTheCache, 'ПОГИБ');
-    assert.equal(play.lives(), 2);
-    assert.deepEqual(play.events, []);
-  });
-
-  test(`level 5 ${shape}: stopping under the ladder of a pen the key opened lets its guard down onto the runner and costs a life`, () => {
-    // given
-    const play = playLevel(5, shape);
-
-    // when
-    toTheKey(play, shape, true);
-    UNDER_THE_FIRST_PEN[shape](play);
-    const livesUnderThePen = play.lives();
-    play.run(WAIT_UNDER_THE_PEN_SECONDS);
-    const titleUnderThePen = play.title();
-    play.run(DEATH_SECONDS);
-
-    // then
-    assert.equal(livesUnderThePen, 3);
-    assert.equal(titleUnderThePen, 'ПОГИБ');
+    assert.equal(livesOnTheShaft, 3);
+    assert.equal(titleOnTheShaft, 'ПОГИБ');
     assert.equal(play.lives(), 2);
     assert.deepEqual(play.events, []);
   });

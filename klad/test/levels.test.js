@@ -142,19 +142,37 @@ test('level 2 needs the shot: without one the key is out of reach, in both shape
   }
 });
 
-test('level 5 needs the shot: without one the key in its cache at the foot of the shaft is out of reach, in both shapes', () => {
+test('level 5 needs the shot: without one the key sealed in the caches under the guards\' ledge is out of reach, in both shapes', () => {
   // given
   const level = LEVELS[4];
+  // The portrait start is walled in, so the key is also checked from the foot of the guards' ladder.
+  const ladderFoot = { landscape: [13, 16], portrait: [7, 28] };
 
   for (const shape of Object.keys(DIMS)) {
     // when
     const rows = level[shape];
     const [px, py] = find(rows, 'P')[0];
     const [kx, ky] = find(rows, 'K')[0];
-    const cells = reach(rows, false, px, py, false);
+    const [fx, fy] = ladderFoot[shape];
+    const fromStart = reach(rows, false, px, py, false);
+    const fromLadderFoot = reach(rows, false, fx, fy, false);
 
     // then
-    assert.ok(!cells.has(`${kx},${ky}`), `${shape}: the key is reachable without a shot`);
+    assert.ok(!fromStart.has(`${kx},${ky}`), `${shape}: the key is reachable without a shot`);
+    assert.ok(!fromLadderFoot.has(`${kx},${ky}`), `${shape}: the key is reachable without a shot from the foot of the guards' ladder`);
+  }
+});
+
+test('level 5 has several doors in both shapes', () => {
+  // given
+  const level = LEVELS[4];
+
+  for (const shape of Object.keys(DIMS)) {
+    // when
+    const doors = find(level[shape], 'D');
+
+    // then
+    assert.ok(doors.length >= 2, `${shape}: ${doors.length} door(s)`);
   }
 });
 

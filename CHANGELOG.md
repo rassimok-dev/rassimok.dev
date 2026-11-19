@@ -3,6 +3,514 @@
 Dated entries, newest first. Written for a reader picking this up cold —
 or a future session needing to know what already exists and why.
 
+## 2026-11-19 (fifth) - Klad levels 1 to 8 redrawn in the references' style on a 30x18 grid (RAS-64 to RAS-71)
+
+All eight levels are drawn again, in both shapes. This entry supersedes
+the layout descriptions in the eight level entries below (named per level
+under "What no longer holds"). Names, revisions and the lessons stay.
+
+### Why
+
+The user played the release preview and rejected the look of the levels:
+"does not even look like what I asked". Screenshot sheets of all eight
+levels next to the reference screenshots showed that every level missed
+its reference. Ours were masses of stone with full-width floors, few
+planks and few chests. The references are mostly open space with brick,
+ladder and plank structures, little stone inside the frame and many
+chests. The checks in place (validator, scripted clears, reviews) covered the
+lessons, not the look.
+
+### Decisions worth not relitigating
+
+- **Redraw all eight at once** (the user's decision). Each level was built
+  alone, shot into a screenshot sheet next to its reference, fixed until
+  the look matched, and only then reviewed.
+- **Both shapes stay.** Landscape is 30x18 and portrait is 18x30. The
+  user named only "about 30x18"; the portrait size is the transposed
+  landscape size, our assumption, to be corrected at the preview.
+- **Revisions stay**: levels 1 to 5 at revision 2, levels 6 to 8 at
+  revision 1. None of the replaced layouts reached production, so the API
+  change is unchanged. The API checks no geometry; a level must stay at
+  or under 100 chests.
+- **The look wins over the lesson when they pull apart.** When proving
+  the lesson seemed to need more stone than the rules allow, the level
+  stayed open and brick-built, the lesson was proven with what the look
+  allows, and the gap became an open point below. No stone masses came
+  back.
+- **Clean room.** Each layout is our own, with the reference's character:
+  the mix of materials, how open it is, how many chests and where they
+  sit, where the hazard lies, where the start, guards and exit stand, how
+  dense the ladders and planks are. Nothing was traced from a screenshot
+  or copied tile by tile. Each reference's signature silhouette is not
+  reproduced (level 2's stepped tree, level 3's regular lattice with a
+  chest at every crossing, level 5's two mirrored towers, level 7's box
+  of chests on short ladders, level 8's two mirrored vaults round a
+  pool).
+
+### The rules every level follows
+
+- Brick is the main building material. Stone only in the bottom row and
+  in small pieces the lesson needs, at most 15 percent of the tiles
+  above the bottom row. Level 6 is the exception: its tall columns may be
+  stone (5.5 and 5.9 percent, so it stays under the cap anyway).
+- Open air is at least half of the tiles above the bottom row (counting
+  plain `.` only). The smallest is level 1 portrait with 50.2 percent.
+- No full-width floors: floors are runs broken by gaps, ladders, planks
+  and walls.
+- The lesson is proven by the level's own test with the guards active: a
+  scripted clear, and scripts that show the lesson matters (the same
+  keys with one wrong step or wait cost a life).
+
+### What no longer holds
+
+The older entries below still describe the replaced layouts. Where an
+entry and this one disagree, this one is right. Per level:
+
+- **Level 1** ("2026-11-18 - Klad level 1: a dense maze and a guard to wall
+  up"): water no longer fills the row above the bottom; there is a pool
+  in the bottom middle with dry ends. The key's room is no longer a stone
+  shell with a side after the key: its shell is brick except one stone
+  tile at each end of its row, and the runner leaves it by shooting its
+  left wall and dropping down a shaft. "The player never gets past the
+  guard's waiting column" and "guardSpeed stays 3.0 because the guard only
+  walks to its tile" are false: the player roams the whole width and the
+  guard follows the player's column along its room (guardSpeed is still
+  3.0). The old timings (5.5 s and 5.1 s) are replaced by the numbers
+  below. "Stone under the trap brick" holds again in landscape, and in
+  portrait that tile is brick.
+- **Level 2** ("2026-11-18 (later) - Klad level 2: shoot the key out of
+  brick while the guards come up from below"): there are no shelves, key
+  room with stone above and below, two guard halls or waits of 1.9 s and
+  1.5 s. "Nothing before the key shelf lies at or past its column" is
+  reversed on purpose: the route crosses the shaft's column to draw the
+  guards up. "The key room is the only way to the exit" is false: the
+  balcony reaches the tile before the door, and the key is reachable
+  without passing the guards' ladder. There are no chests after the key:
+  every chest is inside the castle. Its "lowest fastest clear, level 2
+  landscape at 1118" is now 1054, still the lowest of all.
+- **Level 3** ("2026-11-18 (later still) - Klad level 3: careful climbing
+  over a lake, no guard"): the lake is one row deep, not two. The start
+  is a three-tile stone ledge at the bottom left, not the top left. The
+  door stands on a plank, with no stone ledge. The key is beside the
+  second-lowest rung, not the lowest. The only falls that do not drown
+  are now the steps left off the start ladder onto the start ledge (11
+  tiles in landscape, 19 in portrait); the drop off the exit ladder
+  drowns now. No chest stands on stone. The life chest rule stays (see
+  below), with new places for the chest.
+- **Level 4** ("2026-11-18 (fourth) - Klad level 4: a route across planks
+  over water"): four decisions are reversed. The guard no longer waits
+  behind a door the key opens: it is free from the start and drowns in a
+  loop (also false: "Level 4 rejected a guard that drowned from the first
+  second" and "Level 4 shipped with 1.65 s and 2.4 s", both in the level 8
+  entry). Ladders no longer all stand on stone: some stand on planks.
+  The safe fall no longer passes through a plank onto stone but lands on
+  brick. "The level has no brick, a shot changes nothing" is false: two
+  brick landing pads exist per shape. What the old entry says about the raised
+  pier and the chest on the far ladder's shelf describes the old layout.
+  There is one door (one key opens every door).
+- **Level 5** ("2026-11-19 - Klad level 5: open sealed caches while a guard
+  comes down after you"): the whole description is replaced. There are two
+  guards, not one. The runner starts at the bottom left, not the top floor.
+  There are no pens with a guard behind each door: there are three doors
+  in a stone wall at the ends of the right strips, and the exit ladder is
+  on the right edge. The key is not at the shaft's foot: it is two shots
+  deep in the lower left caches. Every chest is sealed (no open chests for
+  greed). Guards do drown, in the pocket at the shaft's foot, and planks
+  link the caches. The fastest clears (1126 and 1456) are now 1531 and
+  1347, and the old test set is replaced by two tests per shape.
+- **Level 6** ("2026-11-19 (later) - Klad level 6: break through tall
+  columns between the guards and the pools"): the exit is no longer at the
+  top of the left shaft but at the far right, past the key, and there is
+  no way back. The guards stand on brick (closed by a stone block), not on
+  stone. Each column has one safe row, the walkway row, not two. The
+  pools are two tiles under the walkways (plus a one-tile trap by a chest or
+  by the key), not one tile at each column's foot, and the
+  level has planks (22 tiles in landscape, 16 in portrait). The columns
+  are 9 to 13 tall, not 12 and 20. The fastest clears (1366 and 1379)
+  are now 1593 and 1155. "A correct runner is never chased" holds on the
+  scripted route and on the route that takes every chest, but not after
+  a wrong shot at range. The shortcut that walled up the first guard with
+  two timed shots is gone.
+- **Level 7** ("2026-11-19 (later still) - Klad level 7: lead the guard
+  away from a rich treasure room"): the room is no longer a dead end deep
+  below the walkway with 10 and 8 chests; it is above the hall, entered up
+  one ladder, with 18 (landscape) and 16 (portrait) chests inside. The way
+  into the hall is no longer a drop through the walkway's floor but the
+  long ladder at the left edge, in both shapes. The guard
+  now comes up the room's ladder after the runner; it no longer follows
+  down. There is no pit drown-and-respawn: the lured guard stays in the
+  notch. The door is beside the exit at the top left, and the life chest
+  is behind it (it paid on a clear only). "This level has no brick" is
+  false. guardSpeed is 3.7, not 3.5. The fastest clears (1627 and 2451)
+  are now 1736 and 1798.
+- **Level 8** ("2026-11-19 (fourth) - Klad level 8: two vaults across deadly
+  water, guards between them"): the layout description is replaced: no
+  ledges one above the other at stone walls, no start at the top right in
+  landscape, no hole at the walkway's left end, no key in a lower room of
+  the left vault, no left vault door, no drop onto a ladder, no life chest.
+  The decision "at the start nothing moves, every drowning follows a step
+  of the runner" is reversed (see level 8 below). "No guard has a ladder up"
+  and "both crossings go one way" are false: each guard stands on top of
+  its own ladder, and there are four crossings, there and back. The fastest
+  clears (1774 and 1608) are now 1731 and 1187.
+
+### Level 1, "найди дорогу"
+
+How it plays: a dense maze of short brick runs and one-tile corridors,
+short ladders, small planks over gaps and chests in dead ends. A pool lies
+in the bottom middle. The guard is shut in the key's room high in the
+middle. It follows the player's column along its room and waits at the end
+that lies under the only way in, a drop. A shot from the top of the ladder
+below the drop opens the trap brick, the guard falls in and is walled up.
+The way round to the drop takes 6.2 s in landscape and 7.0 s in
+portrait at the fastest, with shots, longer than the 4.2 s the hole stays
+open, so nobody lands on a free guard. The runner leaves the room by shooting its
+left wall and dropping down a one-way shaft behind it.
+
+Decisions that carry weight:
+
+- Stone at both ends of the room's row, so no shot from outside can open
+  the room along that row.
+- In landscape the tile under the trap brick is stone. Without it a runner
+  could shoot the brick beside the ladder, reach the ladder top from the
+  key side and shoot while the guard stands a tile short of its place:
+  it falls in, climbs out just before the brick grows back and stands free
+  again. With the stone the ladder top is reached only from the right,
+  and the guard is back on its tile before any shot, with 1.1 s to spare in
+  landscape and 0.3 s in portrait. In portrait that tile stays brick:
+  nobody can stand beside it.
+- Both shapes have one life chest, off both scripted routes. Portrait
+  first had none, which gave a landscape run one more life than a portrait
+  run (the run report carries no shape).
+- guardSpeed 3.0, the slowest, since this is the first level.
+
+Numbers (tiles above the bottom row, landscape | portrait): air 257 | 262,
+brick 161 | 164, stone 5 | 4, ladder tiles 38 | 45, plank 19 | 25, water
+15 | 9, chests 12 | 10. Fastest clear (lower bound) 2219 | 2659 ticks.
+
+### Level 2, "вскрой кладку"
+
+How it plays: a castle of our own in open ground, two towers with a gap
+and a short ladder between them, a lower wall and a wider plinth. The
+guards start in a hall at its base, left of an off-centre shaft. The key
+lies in a vault low on the right that opens only to the shaft; one brick
+separates it from a balcony, which the runner reaches by a drop from the
+right tower. Chests are sealed in the castle's wings, towers and vault. The guards climb the shaft to the runner's row. Once
+drawn up to the top they need longer to climb down to the vault than the
+drop takes, so a runner who shoots the vault open at once leaves with the
+key; one who pauses meets them. In landscape the way up to the right tower
+takes as long as the guards' climb. In portrait the shaft is taller, so
+the runner waits for them at the tower ladder.
+
+Decisions that carry weight:
+
+- Single stones, each added because a review found a free way round the
+  lesson (a shot opening a floor, or the guards parked where they cannot
+  come):
+  - the wall of the guards' room on the start row: a shot from the start
+    would open it, and the guards would be let out or stranded for free;
+  - a stone at the shaft's foot on the vault's side: a step down the
+    balcony ladder and back up used to park both guards below the vault,
+    leaving it free for any pause. Now the guards are drawn only down the
+    shaft and climb straight back, and the stone also stops shots from
+    the ladder's foot that would wall them up there;
+  - a stone under the vault wall, beside the balcony ladder's middle rung:
+    two shots from that rung would open the floor under the guards that
+    wait at the wall, wall them up for good and leave the vault free;
+  - four more from the last review's exhaustive sweep. In landscape, one
+    beside the shaft top and one on the shaft's row through the castle:
+    shots along those rows from the inner ladder or the ledge let the
+    guards step into the opened row and be walled up. One at the left
+    tower's pocket: through it the runner could go back to the left side
+    while the guards were on the shaft and shoot them a way out into a
+    pocket, where they stayed. In portrait, one beside the pocket by the
+    tower ladder, which closed the same way back.
+- Second way in, shot through the pockets on the castle's left onto the
+  shaft (landscape is shorter). The guards climb at the runner there too:
+  going on to the key at once wins, a pause is caught. A runner who steps
+  back off the shaft at once leaves them stranded on a ledge and the vault
+  is free. That is kept on purpose, as the reward for winning the race.
+- The balcony ladder ends on brick, and the plinth and a catch brick
+  stop an overshoot to the left, so a held key does not drop the runner
+  through a plank into the water.
+- No pocket touches the shaft except the vault; in simulation such
+  windows trapped the guards whenever the falling runner passed their row
+  and switched the lesson off.
+- Portrait has a plank that can drown a runner who shoots a lone brick
+  from the left ladder near the start and steps into the hole. Landscape has no live
+  water. This difference is accepted.
+- guardSpeed 3.2, unchanged.
+
+Numbers (landscape | portrait): air 279 | 264, brick 114 | 115, stone 20 |
+13, ladder tiles 59 | 103, plank 15 | 9, water 8 | 4, chests 11 | 10, one of
+them the life chest. Fastest clear 1054 | 1198 ticks.
+
+### Level 3, "не оступись"
+
+How it plays: no guard. An irregular frame of upright ladders and plank
+walkways stands in a lake, with chests on most ladder tops and at walkway
+ends. The runner starts on a three-tile stone ledge at the bottom left.
+The key lies on a plank beside the second-lowest rung of a ladder that
+reaches the water, and the door and the exit are at the top right. Planks
+hold only someone who walks on them; a falling runner goes through every
+plank and only a ladder stops the fall. So a wrong rung, a step past a
+walkway end or a rung below a ladder's foot drops the runner through the
+planks into the water. The only safe falls are the steps left off the
+start ladder, which land on the ledge.
+
+Decisions that carry weight:
+
+- Walkways are planks, not rows of ladder tiles. A ladder row is walkable,
+  but it stops every fall above it, which defeats "every slip is fatal",
+  and it draws as upright rails.
+- The life chest lies mid-walkway in landscape and on a ladder top in
+  portrait. The first portrait draft put it on a fatal fall line, where it
+  gave back the life that the fall took. A test now pins that line.
+- Brick is not the main material here: the checklist wants none, so the
+  level has none, and only three stone tiles (the ledge).
+
+Numbers (landscape | portrait): air 284 | 313, stone 3 | 3, ladder tiles 91
+| 110, plank 78 | 53, water 27 | 15, chests 25 | 26. Fastest clear 1494 |
+1339 ticks.
+
+### Level 4, "смотри, куда падаешь"
+
+How it plays: planks are the main tile, in runs at many heights over a
+lake, with short ladders (some as diagonal staircases) and rows of chests
+on the planks. No ladder leads to the key. It lies on a short plank next to
+a brick; the safe way down is to walk off the end of the high plank and
+fall onto that brick. Stepping off the middle plank onto the key takes it
+and then drops the runner through the key's plank into the water. After
+the key the way out is a second fall onto a brick away from the exit, and
+the step toward the exit staircase falls through the planks below into the
+water. One guard stands on a short ledge at the top left. It walks off the
+ledge into the lake whenever the runner is to its right, comes back 3 s
+later and does it again.
+
+Decisions that carry weight (the reversed ones are named above):
+
+- The guard is free from the start and drowns in a loop. It is a timed
+  hazard on the left walkways and always in sight. It can still kill by
+  falling onto the runner in its column, in a window of about 0.35 s per
+  cycle.
+- Ladders over planks are kept because the look needs planks as the main
+  tile. A climber who goes one rung too far through the plank under a
+  ladder's foot drops into the water (7 of 15 ladders in landscape, 6 of
+  18 in portrait; the overshoot drowns at every one in landscape and at 3
+  in portrait).
+- The two landing bricks per shape can be shot open from a ladder on their
+  row; the drop onto an open one then drowns, so firing on the left
+  staircase costs a life.
+- The life chest lies before the key, so it refunds every death at the
+  plank traps.
+- One door; the exit stair is a diagonal staircase in landscape and a
+  zigzag up the right edge in portrait.
+
+Numbers (landscape | portrait): air 314 | 341, brick 2 | 2, stone 4 | 4,
+ladder tiles 37 | 50, plank 100 | 85, water 26 | 14, chests 24 | 23. Fastest
+clear 1496 | 2032 ticks.
+
+### Level 5, "не мешкай"
+
+How it plays: a shaft of two ladders runs through the middle, with a gap
+between them and a small water pocket at the gap's foot; bridges cross the
+gap on two rows. On the left, stacks of sealed caches sit on shared brick
+slabs, with the two guards on a ledge above them. On the right, strips of
+caches each end at one of three doors in a stone wall, with the exit ladder
+behind them on the right edge. The runner starts at the bottom left. While
+the runner is inside the left caches, the guards wait overhead. Whenever
+the runner is on the shaft or across it, they come down its left ladder.
+A guard that reaches the runner's row with the gap between steps into it
+and drowns in the pocket, except on the bridge rows, where it walks over.
+So the runner opens the lower left caches with short stops on the shaft,
+the key among them (reachable only from the guards' ladder), crosses, lets
+the guards follow down into the pocket, and opens the right strips on the
+way to a door. One key opens all three doors.
+
+Decisions that carry weight:
+
+- Every chest is sealed. The scripted clears take 24 of 32 chests in
+  landscape and 21 of 29 in portrait with no life lost; the eight chests of
+  the upper left stack are the risk bonus. The old layout let a run open
+  only about two caches.
+- The pocket is the guards' trap and the runner's safe spot, so the pocket
+  stays between the ladders as in the reference.
+
+Numbers (landscape | portrait): air 275 | 274, brick 111 | 106, stone 14 |
+24, ladder tiles 46 | 71, plank 24 | 11, water 2 | 1, chests 32 | 29, doors
+3 | 3. Fastest clear 1531 | 1347 ticks.
+
+### Level 6, "выбери высоту"
+
+How it plays: the runner starts at the bottom left. Two one-tile brick
+columns stand between the runner and the key. Behind each, a guard comes
+down a ladder that hugs the column, as far as a brick shelf at the
+ladder's foot that is closed by a stone block. Under the shelf a plank
+walkway leads on, and under the walkway a small pool lies on a ledge. So
+each column has one safe row to break through: the walkway's. Higher up,
+the guard walks through the hole, or the runner ends in the guard's
+pocket; lower down, the runner falls into the pool. Stacks of brick blocks
+with planks under them stand at the edges, with chests on them, and a
+staircase of short ladders climbs one side. The key lies past both
+columns and the exit past a door beyond it, at the far right.
+
+Decisions that carry weight:
+
+- The portrait staircase stops at a shorter height and its top chest sits
+  on brick. The first draft let the runner climb high enough to pull both
+  guards out of their shafts.
+- Stone sits in the tall columns and in the blocks that close a guard's
+  ledge or pocket. It is 5.5 and 5.9 percent, under the cap anyway.
+- Eight chests per shape, all takeable on the way out without meeting a
+  guard (the all-chest test proves it).
+- Walling in the first guard is possible in portrait with two timed
+  shots but gives no shortcut: the walkway route is as fast as any trick
+  with a guard.
+
+Numbers (landscape | portrait): air 324 | 319, brick 51 | 48, stone 28 |
+31, ladder tiles 68 | 91, plank 22 | 16, water 5 | 5, chests 8 | 8. Fastest
+clear 1593 | 1155 ticks.
+
+### Level 7, "уведи хранителя"
+
+How it plays: a walled treasure room in the upper middle, full of chests
+(18 in landscape, 16 in portrait) and with one way in, a ladder up from the
+hall under it. Inside there are only dead ends, so a guard that comes in
+cannot be passed. The guard drops from its corner into the far end of the
+hall and follows the runner's column. Whenever the runner is in the room,
+it comes up the room's ladder after them or waits under it for them to come
+out. A notch at the far end of the hall holds the guard for good: the
+runner walks the walkway below the hall to its far end, where nothing else
+lies, and the guard follows into the notch. Only then does the runner go up
+to the hall and empty the room. The only way up to the hall is the long
+ladder at the left edge, and the hall's floor reaches it, so a guard that
+follows a runner at the start stops above them on solid ground. The door
+and the exit are at the top left, with the life chest behind the door.
+
+Decisions that carry weight:
+
+- The notch's west walls and, in portrait, its floor are stone. Without
+  them a runner who gets into the notch first, or who shoots along the row
+  under the hall, could wall the lured guard in below the hall and clear
+  with no lure, or be shut alone in the empty notch for good (on a touch
+  pad only a page reload helps).
+- A single stone beside the long ladder in the hall's row stops a shot
+  from the ladder that would wall the guard up.
+- The guard walks at 3.7, not 3.5. No test needs it; it is a feel choice,
+  still under the engine default of 3.8.
+- The guard also catches a runner who waits on the start tile or one tile
+  short of the walkway's far end. Both are tested.
+
+Numbers (landscape | portrait): air 274 | 311, brick 54 | 32, stone 46 |
+47 (9.0 percent in both), ladder tiles 43 | 65, plank 34 | 21, water 26 |
+15, chests 30 | 28, one of them the life chest. Fastest clear 1736 | 1798
+ticks.
+
+### Level 8, "утопи хранителей"
+
+How it plays: two vaults lie in the upper part, one on each side, with
+chests in stacked rows, over a lake under a plank bridge. The runner
+starts at the top, on a vault's brick roof (the left vault in landscape,
+the right in portrait), and walks the top walk to the central ladder under
+the exit. The only way to either vault runs down that ladder and over the
+bridge. Each guard stands on top of its own ladder down to the bridge.
+While the runner is level with the guards or above them, they step toward
+the runner's column, drop through the planks and drown, and stand on their
+ladders again 3 s later. While the runner is lower, a live guard climbs
+down and walks at the runner on the bridge, or follows the runner up into a
+vault. So each crossing starts at a lookout level with the guards, waits
+until both have walked into the lake and goes before they are back. There
+are four crossings (to the left vault, back, to the right vault with the
+key, back to the door). The key lies in the right vault.
+
+Decisions that carry weight:
+
+- The guards drown from the first second, with no input, in a loop (landscape
+  at ticks 162 and 685, portrait at 168 and 697). This reverses the older
+  level 8 decision that nothing moves at the start. Here the loop is the
+  lesson's own clock, in sight, and the level's name is "drown the
+  guardians". The user's preview play is the check.
+- A single stone on each side of the central ladder in the vault roofs'
+  row. Without them repeated shots from the central ladder open the roof
+  brick by brick over the chests (landscape) or the key (portrait). A
+  later look pass that turns single stones to brick would undo this.
+- In landscape four stone tiles frame the exit column, so an overshoot
+  after the door does not fall into the lake. Portrait already has stone
+  beside its exit.
+- Portrait's left vault has a stone inner wall.
+- guardSpeed 3.5, unchanged.
+- No life chest: the clear keeps every life.
+- A stop on the top walk over a guard's post, or over a plank beside it,
+  while the guard respawns puts the two guards out of step. The level
+  stays clearable and a death puts them back in step. A fix would be a
+  layout change for the user (the top walk passing over a guard's post),
+  not a plank tweak.
+
+Numbers (landscape | portrait): air 272 | 280, brick 82 | 63, stone 17 |
+23, ladder tiles 48 | 85, plank 17 | 14, water 42 | 27, chests 28 | 26.
+Fastest clear 1731 | 1187 ticks.
+
+### Also changed: ghost positions on the bigger grid
+
+`klad/race.js` dropped any race position past cell 24, the old grid side
+plus one cell of slack. On the 30-cell sides a ghost past column or row 24
+would not be drawn. The bound is now cell 30, the 30-cell side plus the
+same slack, and the race test keeps 30 and drops 31. The API passes
+positions through without a bound, so it needs no change.
+
+### How it was checked
+
+- Each level, both shapes: a screenshot sheet (the reference above,
+  landscape and portrait below), compared with the level's look checklist
+  and shot again until every item held. Tile counts per shape by a short
+  script (above, per level).
+- Node tests: each level's test file plays the level through on the real
+  page scripts with the guards active. The validator in `levels.test.js`
+  checks size, legend, key-then-exit reachability and a fastest clear
+  above the API floor of 600 ticks; the lowest is level 2 landscape at
+  1054. Levels 2, 5 and 6 also have a "needs the shot" case, and level 5 a
+  "several doors" case. Tests were also run against broken copies of the
+  layouts (a tile changed back) to see that they fail where they should.
+- Independent review of each level until the verdict was merge, with the
+  reviewers running their own probes on the engine (shot lines, start
+  delays, waits at every step). Levels 2 and 7 needed the most rounds
+  (their fixes are the stones named above). Level 2 took four rounds;
+  its last fix is exactly the layout the fourth round's sweep checked.
+- Not played by hand. The user plays the release preview and corrects.
+
+### Open points for the user's preview play
+
+- **Level 2:** the life chest is free on every attempt (3 lives become 4,
+  and a restart gives back 3), and the tunnel release is kept as a reward
+  for winning the race. A fast runner can also win a race at the shaft top
+  (rapid shots along the row above it) and strand the guards; it is kept
+  the same way. Each of the four review rounds found a new way to trap the
+  guards outside the vault, so another may exist outside the sweeps.
+- **Level 3:** the plank is the engine's thin sprite, while the reference
+  shows heavy beams. A heavier plank sprite is an art decision outside the
+  level files; ladder tiles would break "every slip is fatal".
+- **Level 4:** the guard drowns in a loop; ladders that stand on planks
+  drop a climber who goes one rung too far; the life chest before the key
+  refunds deaths; there are fewer ladders than in the reference (15 and 18
+  against about 30) and an empty band in the top middle of landscape.
+- **Level 5:** the right ladder is safe while the guards drown in the
+  pocket, so the level may play as a lure rather than a hurry. More
+  pressure would need a bridge on more rows or a guard that starts on the
+  right.
+- **Level 7:** the landscape hall is a long floor from the long ladder,
+  and the portrait lower third is sparse.
+- **Level 8:** the key-only route (crossings 3 and 4) clears by luck about
+  a quarter of the time in landscape (26 percent) and about two fifths in
+  portrait (43 percent) with no waiting at all, over two guard periods;
+  the full treasure route almost never (0 and 9 percent). A stop on the top
+  walk over a guard puts the guards out of step.
+- **Phone portrait:** the stage is drawn small at 390x844 with touch. The
+  current release (16x24) does the same, so the bigger grid is not the
+  cause.
+- **All levels:** the layouts are read from still frames and tested by
+  scripts. Look, feel and difficulty are the user's to judge on the
+  preview.
+
 ## 2026-11-19 (fourth) - Klad level 8: two vaults across deadly water, guards between them (RAS-71)
 
 Level 8 is new, revision 1, named "утопи хранителей" (drown the

@@ -3,6 +3,145 @@
 Dated entries, newest first. Written for a reader picking this up cold —
 or a future session needing to know what already exists and why.
 
+## 2026-11-19 (fourth) - Klad level 8: two vaults across deadly water, guards between them (RAS-71)
+
+Level 8 is new, revision 1, named "утопи хранителей" (drown the
+guardians). It takes the next free number (S6 a). The lesson is the one
+read from level 23 of the Android remake: two treasure vaults across
+deadly water, with the guards between them. The user confirmed on
+2026-11-18 that it belongs to the Korvet game (RAS-71 Q1); its place in
+the Korvet order is not known. It was read from still frames, not from
+play, so the layout is a candidate that the user plays on the release
+preview and corrects (Q3). Clean room: the layout is drawn from that
+lesson only, never transcribed from a screenshot, a video frame, an
+original level or a remake level. It ships on `release/klad-levels` with
+the chase (RAS-60) and the rewritten levels; the API accepts level 8 at
+revision 1 with RAS-62, which deploys first, and its boards start then.
+
+How it plays, in both shapes: a lake fills the middle above the stone
+bottom row. Two guards stand on two ledges over it, one above the other,
+each at the stone wall at its right end. The runner starts on a walkway
+at the top right and walks left over their heads. The guards follow the
+runner's column below and walk off the open left end of their ledges
+into the lake. A hole at the walkway's left end drops the runner into
+the left vault, with no way back up. The key lies in its lower room,
+down a short ladder, at the edge of the lake: one step past it drowns.
+The vault's door, opened by the key, leads to its edge, from where the
+runner drops onto the top of a ladder that goes down through both
+ledges to a bridge over the lake. The bridge leads to the right vault,
+its door and the exit. While the runner is left of the ledges, the
+guards keep walking into the lake and come back 3 s after each
+drowning. So the runner waits at the edge until both have walked in,
+then drops and climbs down. A drop while they walk back meets them at
+the ladder.
+
+### Decisions worth not relitigating
+
+- **Two ledges, one guard each, one above the other.** On one ledge the
+  two guards would meet under the runner's column and move as one. Each
+  waits at its wall while the runner is right of the ledges, so at the
+  start nothing moves, and every drowning follows a step of the runner.
+  Level 4 rejected a guard that drowned from the first second.
+- **No guard has a ladder up.** The ladder at the drop starts in each
+  ledge's floor, so a guard can only climb down it, toward a runner
+  below. A guard follows the runner's column at any height: it walks into
+  the lake while the runner is left of the ledges, stands still on its
+  ledge above a runner on the bridge, and waits at its wall when the
+  runner is further right. After a drop late in the window, a guard
+  follows down the ladder and along the bridge, so the runner must keep
+  moving to the exit. A stop at the ladder's foot is always caught.
+- **Both crossings go one way.** Nothing leads back up from the left
+  vault to the walkway, or from the ledges to the vault, so the drop is
+  the only way on.
+- **Known gap, open for the user's preview play: only the second
+  crossing is deadly.** The ticket asks that both vaults be reached only
+  across the water with the guards in between, a wrong step there
+  costing a life. That holds for the right vault only. The walk to the
+  left vault runs on unbroken stone ten or more rows above the lake, the
+  guards cannot climb to it, and it cannot be failed; the only fatal step
+  on that side is the one past the key, inside the vault. The engine has
+  no jump, so a gap in the walkway cannot change this. If the user wants
+  the first crossing deadly too, that is a new layout, built on the
+  release branch before the release PR.
+- **The left vault has a door that the key opens** (one key opens every
+  door, S4 a). A draft had the key off the way to the drop. A runner who
+  skipped it could drop and be shut in at the right vault's door with no
+  way back.
+- **The key lies in a lower room, off the way to the edge.** A runner who
+  goes straight for it reaches the edge just as the guards that followed
+  them into the lake come back. A drop then meets them, so even a quick
+  runner has to stop and watch. In a draft with the key on the way, a
+  runner who kept moving dropped while the guards were still in the
+  water, and the lesson could be skipped.
+- **The ledges end close to the ladder** (walls at landscape column 13,
+  portrait column 10). A guard back from the water reaches the ladder
+  soon, so a drop at the wrong moment meets it. In the first cycle after
+  the second guard falls, the runner may start the drop within about
+  3.4 s (landscape) or 2.4 s (portrait); a start in the next 2 s
+  (landscape) or 2.7 s (portrait) meets a guard. The two guards fall
+  different heights into the lake (landscape 7 and 5 rows, portrait 8
+  and 5), so their rhythm drifts apart while the runner stays in the
+  left vault. The window is widest in the first cycles and narrows to
+  about 1 s after about a minute of waiting (landscape) or 0.8 s after
+  about half a minute (portrait), without closing. Evening out the two
+  cycles (equal falls, or ledges of different lengths) is an option for
+  the user's preview play, not built. Level 4 shipped with 1.65 s and
+  2.4 s.
+- **No part of the left vault lies below a guard's row.** The lower room
+  is on the upper guard's row (landscape) or above it (portrait). A
+  guard climbs down the ladder only toward a runner below it, so it
+  never takes the ladder while the runner is in the vault.
+- **No brick and no plank.** The gun changes nothing here, and planks are
+  level 4's lesson. No chest, key, guard or start stands above water.
+- **The life chest lies in the right vault, after the drop.** Every
+  attempt restores the chests, so a life chest before the key or the drop
+  would pay back each death there (level 3's reasoning).
+- guardSpeed 3.5. The name follows the imperative of the other level
+  names; хранители is the game's word for the guards.
+- Both sizes, 24x16 and 16x24 (S1 a), hold the same layout, the known
+  gap above included.
+
+### How it was checked
+
+- `klad/test/levels.test.js`: both shapes pass the validator; the
+  fastest clear (a lower bound) is 1774 ticks in landscape and 1608 in
+  portrait.
+- `klad/test/level-8.test.js` (new) finds the level's number by name.
+  Per shape it has four tests:
+  - a fixed key script clears the level with both guards active
+    (`klad:clear` with level 8 and revision 1, four lives: three and the
+    life chest);
+  - dropping at once, while the guards walk back, costs a life;
+  - one step past the key into the lake costs a life;
+  - after a safe drop, one step left off the ladder's foot into the lake
+    costs a life.
+
+  All eight tests give the same result with start delays from 0 to 0.3 s
+  in 16 ms steps. On a throwaway copy with the open ends of both ledges
+  walled, both clear tests fail; with the gap beside the ladder's foot
+  filled in, both step-off tests fail.
+- The validator's movement rules, which are exact for the runner here
+  since the level has no brick:
+  - with the ladder at the drop turned to stone, there is no way to the
+    right vault or the exit;
+  - with a wall on the walkway, there is no way to the left vault and
+    the key;
+  - from every tile before the key the key stays reachable, and from
+    every tile after it an exit, except the falls into the lake.
+- A throwaway breadth-first search on the real `klad.js` over the
+  runner's one-tile moves and 0.25 s waits. It rounds guard positions to
+  half tiles and their time in the water to 0.25 s, so its results are
+  "found" or "not found", not proofs. It found:
+  - the straight route to the key and on to the drop dies at the drop (as
+    in the test); the clear with the fewest moves and waits spends about
+    1.4 s (landscape) or 2 s (portrait) longer in the left vault, waiting
+    or stepping back and forth;
+  - with the ends of both ledges walled, so that no guard reaches the
+    water, it searched to the end and found no clear;
+  - with every state that has a drowned guard dropped, the runner does
+    not even reach the key.
+- Not played by hand; the user's play on the preview stands in.
+
 ## 2026-11-19 (later still) - Klad level 7: lead the guard away from a rich treasure room (RAS-70)
 
 Level 7 is a new level, revision 1, named "уведи хранителя" (lead the
